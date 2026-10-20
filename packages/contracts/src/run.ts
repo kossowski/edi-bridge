@@ -59,7 +59,8 @@ export function whoFixes(run: {
     }
 
     case 'delivery': {
-      return 'retry'
+      // A retry fails until an Admin accepts the server's new host key on the Channel.
+      return run.problem?.reason === 'hostKeyMismatch' ? 'you' : 'retry'
     }
 
     case 'parse':

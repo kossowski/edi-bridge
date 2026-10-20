@@ -810,8 +810,8 @@
           "description": "{direction, select, inbound {The document was translated, but your ERP did not accept it when EDI Bridge delivered it.} other {The document is ready, but the upload to {tradingPartner} failed.}} This is usually temporary."
         },
         "hostKeyMismatch": {
-          "title": "The server of {tradingPartner} showed a different key",
-          "description": "The document is ready, but the server's key is not the one confirmed for this connection, so EDI Bridge did not send the document. Ask {tradingPartner} whether they replaced their server or its key, confirm the new key on the connection, then try again."
+          "title": "{direction, select, inbound {The server of your ERP showed a different key} other {The server of {tradingPartner} showed a different key}}",
+          "description": "{direction, select, inbound {The document was translated} other {The document is ready}}, but the server's key is not the one confirmed for this connection, so EDI Bridge did not send the document. Trying again fails until the new key is accepted on the connection."
         },
         "seededChannel": {
           "title": "Demo connections never send",
@@ -838,6 +838,7 @@
         "completeSetup": "Complete the setup.",
         "fixCauseWithoutTarget": "Fix the cause described here. EDI Bridge cannot process this document again, so {direction, select, inbound {ask {tradingPartner} to send it again} other {send it again from your ERP}}.",
         "checkConnection": "If it keeps failing, check the connection details.",
+        "acceptHostKey": "Ask {direction, select, inbound {your IT team} other {{tradingPartner}}} whether they replaced the server or its key. If they did, accept the new key on the connection.",
         "processAgain": "Process it again. EDI Bridge uses the original file, so {direction, select, inbound {{tradingPartner} does} other {your ERP does}} not have to send anything again.",
         "tryAgain": "{action, select, reprocess {Try again. EDI Bridge processes the original file once more with the same mapping version.} other {Try again. The finished document is sent once more, nothing is translated again.}}",
         "tellTradingPartner": "Tell {tradingPartner} and ask for a corrected file. The message includes the technical detail their IT team needs. Their contact details are on the partner page.",

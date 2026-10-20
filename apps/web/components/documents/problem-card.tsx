@@ -193,6 +193,22 @@ export function useFixSteps(run: FailedRun): WhatToDoStep[] {
 
   switch (problem.whoFixes) {
     case 'you': {
+      // A retry fails until the server's new key is accepted on the connection.
+      if (problem.reason === 'hostKeyMismatch' && target) {
+        return [
+          fixStep(
+            t('acceptHostKey', {
+              direction: run.direction,
+              tradingPartner: tradingPartner.name,
+            }),
+            run,
+            target,
+            true,
+          ),
+          { key: 'tryAgain', content: <TryAgainStep run={run} secondary /> },
+        ]
+      }
+
       const mapping = reprocessMapping(run)
 
       if (target === null && mapping === null) {

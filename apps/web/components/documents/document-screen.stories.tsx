@@ -239,6 +239,27 @@ function servingSeededChannel() {
   )
 }
 
+function servingHostKeyMismatch() {
+  const detail = incompleteSetupDetail({
+    error: {
+      code: 'hostKeyMismatch',
+      message: 'The SFTP server showed a different host key from the one confirmed',
+      position: null,
+      details: null,
+    },
+    fixTarget: seededChannelTarget,
+  })
+
+  return http.get(`${apiUrl}${toPath(runEndpoint.path, { id: incompleteSetup.id })}`, () =>
+    HttpResponse.json(
+      runDetailSchema.parse({
+        ...detail,
+        problem: { reason: 'hostKeyMismatch', whoFixes: 'you', fixTarget: seededChannelTarget },
+      }),
+    ),
+  )
+}
+
 function servingRuns(tradingPartners: ReadonlyArray<TradingPartner> = seedTradingPartners) {
   return runDetailHandlers(apiUrl, {
     runs,
@@ -483,6 +504,47 @@ export const DeliveryFailure = meta.story({
       canvas.getByRole('link', { name: `Check the connection “${channel.name}”` }),
       `/channels/${channel.id}`,
     )
+  },
+})
+
+export const HostKeyMismatchDelivery = meta.story({
+  args: { id: incompleteSetup.id },
+  beforeEach({ msw }) {
+    msw.use(servingHostKeyMismatch())
+  },
+  async play({ canvas }) {
+    await expect(
+      await canvas.findByRole('heading', {
+        name: `The server of ${partner.name} showed a different key`,
+      }),
+    ).toBeVisible()
+    await expect(canvas.getByText('You fix this')).toBeVisible()
+    await expect(canvas.queryByText('Just try again')).toBeNull()
+    await expect(canvas.queryByText('Trying again usually works.', { exact: false })).toBeNull()
+
+    const fix = canvas.getByRole('link', { name: `Check the connection “${channel.name}”` })
+    const tryAgain = canvas.getByRole('button', { name: 'Try again' })
+
+    await expectFixLink(fix, `/channels/${channel.id}`)
+    await expect(fix.compareDocumentPosition(tryAgain)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+  },
+})
+
+export const GermanHostKeyMismatchDelivery = meta.story({
+  args: { id: incompleteSetup.id },
+  decorators: [german],
+  beforeEach({ msw }) {
+    msw.use(servingHostKeyMismatch())
+  },
+  async play({ canvas }) {
+    await expect(
+      await canvas.findByRole('heading', {
+        name: `Der Server von ${partner.name} hat einen anderen Serverschlüssel gezeigt`,
+      }),
+    ).toBeVisible()
+    await expect(
+      canvas.getByText('Übernehmen Sie den neuen Serverschlüssel', { exact: false }),
+    ).toBeVisible()
   },
 })
 

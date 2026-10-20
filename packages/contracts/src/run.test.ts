@@ -103,6 +103,16 @@ describe('whoFixes', () => {
     ).toBe('retry')
   })
 
+  it('leaves a refused host key to the Workspace, since a retry fails until the new key is accepted', () => {
+    expect(
+      whoFixes({
+        failureStage: 'delivery',
+        direction: 'outbound',
+        problem: { reason: 'hostKeyMismatch' },
+      }),
+    ).toBe('you')
+  })
+
   it('offers trying again for a defect at every Failure Stage', () => {
     for (const failureStage of failureStages) {
       for (const direction of ['inbound', 'outbound'] as const) {
@@ -181,7 +191,7 @@ describe('runDetailSchema', () => {
       },
       problem: {
         reason: 'hostKeyMismatch',
-        whoFixes: 'retry',
+        whoFixes: 'you',
         fixTarget: {
           kind: 'channel',
           channelId: '00000003-0000-4000-8000-000000000003',
