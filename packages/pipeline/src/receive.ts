@@ -140,6 +140,8 @@ function interchangeKeyOf(content: string): InterchangeKey | undefined {
   }
 }
 
+export const contentHashOf = (content: string) => createHash('sha256').update(content).digest('hex')
+
 const replaced = aliasedTable(runs, 'replaced')
 
 const advisoryLock = (tx: Transaction, key: readonly string[]) =>
@@ -167,7 +169,12 @@ async function originalRunsOf(
   }
 
   if (interchange !== undefined) {
-    await advisoryLock(tx, [workspaceId, interchange.sender, interchange.controlReference])
+    await advisoryLock(tx, [
+      'interchange',
+      workspaceId,
+      interchange.sender,
+      interchange.controlReference,
+    ])
     matches.push(
       and(
         eq(storedDocuments.interchangeSender, interchange.sender),
@@ -216,7 +223,7 @@ async function originalRunsOf(
 
 const nameCollator = new Intl.Collator('de')
 
-const checkInboundChannel = (workspaceId: string, channelId: string) =>
+const inboundChannelOf = (workspaceId: string, channelId: string) =>
   Effect.gen(function* () {
     const db = yield* Database
 
@@ -268,10 +275,10 @@ export const receive = (arriving: ArrivingDocument) =>
   Effect.gen(function* () {
     const receiptStartedAt = yield* DateTime.nowAsDate
 
-    const channel = yield* checkInboundChannel(arriving.workspaceId, arriving.channelId)
+    const channel = yield* inboundChannelOf(arriving.workspaceId, arriving.channelId)
 
     const documents = yield* Documents
-    const key = interchangeKeyOf(arriving.content)
+    const interchangeKey = interchangeKeyOf(arriving.content)
 
     // Only a file polled from an SFTP server comes again unchanged after a failed removal.
     const fileKey =
@@ -279,7 +286,7 @@ export const receive = (arriving: ArrivingDocument) =>
         ? {
             channelId: arriving.channelId,
             fileName: arriving.fileName,
-            contentHash: createHash('sha256').update(arriving.content).digest('hex'),
+            contentHash: contentHashOf(arriving.content),
           }
         : undefined
 
@@ -289,8 +296,8 @@ export const receive = (arriving: ArrivingDocument) =>
         channelId: arriving.channelId,
         fileName: arriving.fileName,
         content: arriving.content,
-        interchangeSender: key?.sender ?? null,
-        interchangeControlReference: key?.controlReference ?? null,
+        interchangeSender: interchangeKey?.sender ?? null,
+        interchangeControlReference: interchangeKey?.controlReference ?? null,
         contentHash: fileKey?.contentHash ?? null,
       }),
     )
@@ -314,7 +321,7 @@ export const receive = (arriving: ArrivingDocument) =>
     const created = yield* Effect.promise(() =>
       db.transaction(async (tx) => {
         const originals = await originalRunsOf(tx, arriving.workspaceId, document.id, {
-          interchange: key,
+          interchange: interchangeKey,
           file: fileKey,
         })
 
