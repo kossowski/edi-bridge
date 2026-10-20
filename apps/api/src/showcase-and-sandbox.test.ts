@@ -12,7 +12,7 @@ import {
 } from '@edi-bridge/contracts'
 import { members, runs, users, workspaces } from '@edi-bridge/db'
 
-import { ensureDemoWorkspaces, showcaseAdmin, showcaseViewer } from './demo-workspaces.js'
+import { ensureShowcaseAndSandbox, showcaseAdmin, showcaseViewer } from './showcase-and-sandbox.js'
 import {
   type Client,
   ownWorkspace,
@@ -30,7 +30,7 @@ let api: TestApi
 const adminPassword = 'sandbox-admin-password'
 
 const ensure = (password = vi.fn(() => adminPassword)) =>
-  ensureDemoWorkspaces(api.connection.db, {
+  ensureShowcaseAndSandbox(api.connection.db, {
     secrets: secretBox(testChannels.secretKey),
     adminPassword: password,
   })
@@ -72,7 +72,7 @@ afterAll(async () => {
   await api.stop()
 })
 
-describe('POST /auth/sign-in/showcase before the demo Workspaces exist', () => {
+describe('POST /auth/sign-in/showcase before the Showcase and Sandbox exist', () => {
   it('answers 404 and creates no session', async () => {
     const response = await showcaseSignIn()
 
@@ -82,7 +82,7 @@ describe('POST /auth/sign-in/showcase before the demo Workspaces exist', () => {
 })
 
 describe('api start', () => {
-  it('creates no demo Workspace', async () => {
+  it('creates no Showcase or Sandbox Workspace', async () => {
     const kinds = await api.connection.db.select({ kind: workspaces.kind }).from(workspaces)
 
     expect(kinds.map(({ kind }) => kind)).not.toContain('showcase')
@@ -90,7 +90,7 @@ describe('api start', () => {
   })
 })
 
-describe('ensureDemoWorkspaces', () => {
+describe('ensureShowcaseAndSandbox', () => {
   it('creates the seeded Showcase and Sandbox with their fixed users once', async () => {
     const password = vi.fn(() => adminPassword)
 
@@ -136,7 +136,7 @@ describe('ensureDemoWorkspaces', () => {
     expect(response.statusCode).toBe(401)
   })
 
-  it('changes nothing on a rerun: no reseed, no new password', async () => {
+  it('changes nothing when run again: no new seed, no new password', async () => {
     const before = { showcase: await runCount('showcase'), sandbox: await runCount('sandbox') }
     const password = vi.fn(() => 'another-sandbox-password')
 
@@ -177,7 +177,7 @@ describe('POST /auth/sign-in/showcase', () => {
       method: 'POST',
       url: createTradingPartnerEndpoint.path,
       body: {
-        name: 'Demo Besucher GmbH',
+        name: 'Besucher GmbH',
         gln: null,
         characterSet: 'UNOC',
         acknowledgementTimeLimitHours: 24,

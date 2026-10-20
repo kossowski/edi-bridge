@@ -7,7 +7,7 @@ import type { BetterAuthPlugin } from 'better-auth'
 import { type SignedIn } from '@edi-bridge/contracts'
 import { members, users, workspaces } from '@edi-bridge/db'
 
-import { showcaseViewer } from './demo-workspaces.js'
+import { showcaseViewer } from './showcase-and-sandbox.js'
 
 import type { Database } from './db.js'
 
@@ -30,7 +30,7 @@ async function findShowcaseViewer(database: Database) {
     throw new APIError('NOT_FOUND', { message: 'No Showcase Workspace exists' })
   }
 
-  // The live demo hands out a read-only Viewer of the Showcase; any more rights and it stays shut.
+  // Only a read-only Viewer of the Showcase may sign in here; any more rights and it stays shut.
   if (
     rows.length !== 1 ||
     viewer.operator ||

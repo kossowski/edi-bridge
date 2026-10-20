@@ -182,7 +182,7 @@ describe('POST /channels/:id/test for a seeded Channel', () => {
     return channel
   }
 
-  it('answers that a demo connection never sends, without connecting', async () => {
+  it('answers that a seeded Channel never sends, without connecting', async () => {
     const channel = await seededChannel(httpDelivery())
 
     const { status, body } = await tested(channel.id)

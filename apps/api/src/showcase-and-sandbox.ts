@@ -24,7 +24,7 @@ export const showcaseAdmin = {
   email: 'showcase-admin@edi-bridge.example',
 } as const
 
-export interface DemoWorkspacesInput {
+export interface ShowcaseAndSandboxInput {
   secrets: SecretBox
   adminPassword: () => string
   now?: Date
@@ -32,7 +32,7 @@ export interface DemoWorkspacesInput {
 
 type Outcome = 'created' | 'found'
 
-export interface DemoWorkspacesOutcome {
+export interface ShowcaseAndSandboxOutcome {
   showcase: Outcome
   sandbox: Outcome
   viewer: Outcome
@@ -100,13 +100,13 @@ async function hashedAdminPassword(adminPassword: () => string) {
   return hashPassword(password)
 }
 
-export function ensureDemoWorkspaces(
+export function ensureShowcaseAndSandbox(
   database: Database,
-  { secrets, adminPassword, now = new Date() }: DemoWorkspacesInput,
-): Promise<DemoWorkspacesOutcome> {
+  { secrets, adminPassword, now = new Date() }: ShowcaseAndSandboxInput,
+): Promise<ShowcaseAndSandboxOutcome> {
   return database.transaction(async (tx) => {
     // The lock keeps two runs of the command from creating a second Showcase or Sandbox.
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtext('workspaces.demo'))`)
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext('workspaces.showcase-and-sandbox'))`)
 
     const showcase = await ensureWorkspace(tx, showcaseWorkspace, { secrets, now })
     const sandbox = await ensureWorkspace(tx, sandboxWorkspace, { secrets, now })

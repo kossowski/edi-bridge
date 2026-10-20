@@ -42,7 +42,7 @@ Running the command again is safe. An existing user keeps their password and rol
 
 ## Create the Showcase and Sandbox
 
-The live demo on the login screen needs the Showcase Workspace. The API never creates it on start. Until the Operator runs the command below, **Open the demo** fails and `POST /api/auth/sign-in/showcase` answers 404.
+**Open the demo** on the login screen signs visitors in to the Showcase Workspace. The API never creates it on start. Until the Operator runs the command below, **Open the demo** fails and `POST /api/auth/sign-in/showcase` answers 404.
 
 1. Open a terminal in the running API container, as in [Create the Operator](#create-the-operator).
 2. Run the command:
@@ -73,9 +73,9 @@ SHOWCASE_ADMIN_PASSWORD='<password>' node dist/create-demo-workspaces.js
 
 Running the command again is safe. It changes nothing that exists: it does not seed an existing Workspace again and keeps the password of the Sandbox Admin.
 
-The demo connections of both Workspaces point at reserved hosts and never send. **Test connection** on one of them answers that a demo connection never sends.
+The seeded Channels of both Workspaces point at reserved hosts and never send. **Test connection** on one of them answers that it never sends.
 
-The live demo refuses to sign anyone in once the Viewer gains any right beyond a Viewer of the Showcase, such as another Workspace, a higher role or the Operator role. Do not invite or promote the Viewer.
+The Showcase sign-in refuses to sign anyone in once the Viewer gains any right beyond a Viewer of the Showcase, such as another Workspace, a higher role or the Operator role. Do not invite or promote the Viewer.
 
 ## Deploy a change
 

@@ -5,15 +5,15 @@ import { secretBox, secretKeyEnv } from '@edi-bridge/channels'
 import { connect, localDatabaseUrl, migrate } from '@edi-bridge/db'
 
 import {
-  type DemoWorkspacesOutcome,
-  ensureDemoWorkspaces,
+  type ShowcaseAndSandboxOutcome,
+  ensureShowcaseAndSandbox,
   sandboxWorkspace,
   showcaseAdmin,
   showcaseViewer,
   showcaseWorkspace,
-} from './demo-workspaces.js'
+} from './showcase-and-sandbox.js'
 
-const summary = (outcome: DemoWorkspacesOutcome) =>
+const summary = (outcome: ShowcaseAndSandboxOutcome) =>
   [
     `Showcase Workspace "${showcaseWorkspace.name}": ${outcome.showcase}`,
     `Sandbox Workspace "${sandboxWorkspace.name}": ${outcome.sandbox}`,
@@ -21,7 +21,7 @@ const summary = (outcome: DemoWorkspacesOutcome) =>
     `Admin ${showcaseAdmin.email} of the Sandbox: ${outcome.admin}`,
   ].join('\n')
 
-async function createDemoWorkspaces() {
+async function createShowcaseAndSandbox() {
   const env = z
     .object({
       DATABASE_URL: z.url().default(localDatabaseUrl),
@@ -47,7 +47,7 @@ async function createDemoWorkspaces() {
   let generated: string | undefined
 
   try {
-    const outcome = await ensureDemoWorkspaces(connection.db, {
+    const outcome = await ensureShowcaseAndSandbox(connection.db, {
       secrets: secretBox(secretKey),
       adminPassword: () => password ?? (generated = randomBytes(18).toString('base64url')),
     })
@@ -65,7 +65,7 @@ async function createDemoWorkspaces() {
 }
 
 try {
-  await createDemoWorkspaces()
+  await createShowcaseAndSandbox()
 } catch (error) {
   console.error(
     error instanceof Error ? error.message : 'The Showcase and Sandbox could not be created.',
