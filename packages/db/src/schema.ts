@@ -402,6 +402,7 @@ export const channels = pgTable(
     remotePath: text(),
     authentication: sftpAuthentication(),
     encryptedCredential: text(),
+    hostKeyFingerprint: text(),
     pollingIntervalMinutes: integer(),
     rateLimitPerMinute: integer(),
     encryptedWebhookToken: text(),
@@ -447,6 +448,10 @@ export const channels = pgTable(
     check(
       'channels_http_settings',
       allSetOnlyWhen(sql`${table.type} = 'http'`, [sql`${table.url}`]),
+    ),
+    check(
+      'channels_host_key_fingerprint',
+      sql`${table.type} = 'sftp' or ${table.hostKeyFingerprint} is null`,
     ),
     check(
       'channels_authorization',
