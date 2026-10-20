@@ -77,6 +77,32 @@ The seeded Channels of both Workspaces point at reserved hosts and never send. *
 
 The Showcase sign-in refuses to sign anyone in once the Viewer gains any right beyond a Viewer of the Showcase, such as another Workspace, a higher role or the Operator role. Do not invite or promote the Viewer.
 
+## Reset the Sandbox
+
+A reset replaces all data of the Sandbox Workspace with its seed: Trading Partners, Lookup Tables, Document Structures, Mappings, Channels, Flows, Documents, Runs and the AI usage of the day. It keeps the Workspace, its name, its Operator settings, its Members, open invites and sessions. It never changes another Workspace. A reset cannot be undone.
+
+To reset the Sandbox in the Operator area:
+
+1. Sign in as the Operator and open the Operator area.
+2. Open the Sandbox Workspace and select **Danger zone**.
+3. Select **Reset Sandbox**, then confirm with **Reset Sandbox**.
+4. Confirm that **Last reset** shows the current time.
+
+To reset the Sandbox from a terminal:
+
+1. Open a terminal in the running API container, as in [Create the Operator](#create-the-operator).
+2. Run the command:
+
+   ```sh
+   node dist/reset-sandbox.js
+   ```
+
+3. Confirm that the output reports the Sandbox Workspace as reset to its seed.
+
+The command uses `DATABASE_URL` and `CHANNEL_SECRET_KEY` from the application's **Environment** settings. If no Sandbox exists, it fails with a message. Run [Create the Showcase and Sandbox](#create-the-showcase-and-sandbox) first.
+
+A Run that the worker still has queued for the Sandbox at the time of the reset is dropped without an error. Screens of the Sandbox that are open in another browser show the new data after a reload.
+
 ## Deploy a change
 
 Deploy changes through the GitHub integration:
