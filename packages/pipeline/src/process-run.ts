@@ -954,8 +954,25 @@ const defectFailure = (stage: FailureStage): Failure => ({
   problem: { reason: 'defect', fixTarget: null },
 })
 
+// Only a Run left unprocessed for the retention period of its Workspace loses its Document first.
+const documentExpiredFailure = (stage: FailureStage): Failure => ({
+  stage,
+  error: {
+    code: 'documentExpired',
+    message: 'The Document expired before the Run was processed',
+    position: null,
+    details: null,
+  },
+  problem: { reason: 'defect', fixTarget: null },
+})
+
 // A defect can stop a Run before its first step starts or after its step failed.
-const failStopped = async (tx: Transaction, runId: string, finishedAt: Date) => {
+const failStopped = async (
+  tx: Transaction,
+  runId: string,
+  finishedAt: Date,
+  failureAt = defectFailure,
+) => {
   await lockRun(tx, runId)
 
   const steps = await tx
@@ -971,7 +988,7 @@ const failStopped = async (tx: Transaction, runId: string, finishedAt: Date) => 
     return false
   }
 
-  const failed = await failRun(tx, runId, defectFailure(stage.data), stopped.position)
+  const failed = await failRun(tx, runId, failureAt(stage.data), stopped.position)
 
   if (failed === undefined || stopped.status === 'failed') {
     return failed !== undefined
@@ -1000,7 +1017,7 @@ export const failOnDefect = (runId: string) =>
   })
 
 // A stalled worker's defect must not fail the Run that another worker owns now.
-const failHeldOnDefect = ({ runId, hold }: Holding) =>
+const failHeldOnDefect = ({ runId, hold }: Holding, failureAt = defectFailure) =>
   Effect.gen(function* () {
     const db = yield* Database
     const held = yield* Ref.get(hold)
@@ -1012,7 +1029,7 @@ const failHeldOnDefect = ({ runId, hold }: Holding) =>
           return false
         }
 
-        await failStopped(tx, runId, finishedAt)
+        await failStopped(tx, runId, finishedAt, failureAt)
 
         return true
       }),
@@ -1474,11 +1491,21 @@ const processClaimed = (
       return
     }
 
+    const { documentId } = run
+
+    if (documentId === null) {
+      if (!(yield* failHeldOnDefect(holding, documentExpiredFailure))) {
+        return yield* new RunNotOwned({ runId: run.id })
+      }
+
+      return yield* Effect.logError(`The Document of Run ${run.id} expired before it was processed`)
+    }
+
     const documents = yield* Documents
-    const document = yield* Effect.promise(() => documents.read(queued.workspaceId, run.documentId))
+    const document = yield* Effect.promise(() => documents.read(queued.workspaceId, documentId))
 
     if (document === undefined) {
-      return yield* Effect.die(new Error(`Document ${run.documentId} of Run ${run.id} is missing`))
+      return yield* Effect.die(new Error(`Document ${documentId} of Run ${run.id} is missing`))
     }
 
     const lookupTables = yield* loadLookupTables(queued.workspaceId, pinned.graph)

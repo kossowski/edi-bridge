@@ -523,9 +523,9 @@ export const runs = pgTable(
     workspaceId: uuid()
       .notNull()
       .references(() => workspaces.id, { onDelete: 'cascade' }),
-    documentId: uuid()
-      .notNull()
-      .references(() => documents.id),
+    // Null once the Document expired, when documentDeletedAt says since when.
+    documentId: uuid().references(() => documents.id, { onDelete: 'set null' }),
+    documentDeletedAt: timestamp({ withTimezone: true, mode: 'date' }),
     flowId: uuid()
       .notNull()
       .references(() => flows.id),
@@ -594,6 +594,10 @@ export const runs = pgTable(
     ),
     check('runs_message_index', sql`${table.messageIndex} >= 1`),
     check(
+      'runs_document_deleted',
+      sql`(${table.documentId} is null) = (${table.documentDeletedAt} is not null)`,
+    ),
+    check(
       'runs_duplicate',
       sql`(${table.status} = 'duplicate') = (${table.duplicateOfRunId} is not null)`,
     ),
@@ -619,10 +623,10 @@ export const acknowledgements = pgTable(
     workspaceId: uuid()
       .notNull()
       .references(() => workspaces.id, { onDelete: 'cascade' }),
+    // Null once the answered Document expired.
     documentId: uuid()
-      .notNull()
       .unique()
-      .references(() => documents.id),
+      .references(() => documents.id, { onDelete: 'set null' }),
     tradingPartnerId: uuid()
       .notNull()
       .references(() => tradingPartners.id),

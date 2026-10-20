@@ -537,7 +537,10 @@ export async function readRun(db: Db, id: string) {
     return undefined
   }
 
-  const [document] = await db.select().from(documents).where(eq(documents.id, run.documentId))
+  const [document] =
+    run.documentId === null
+      ? []
+      : await db.select().from(documents).where(eq(documents.id, run.documentId))
 
   const steps = await db
     .select()

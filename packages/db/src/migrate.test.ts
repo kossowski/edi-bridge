@@ -510,7 +510,10 @@ describe('a Run', () => {
 
       await expect(stepsOf(run.id)).resolves.toEqual([])
       await expect(
-        connection.db.select().from(documents).where(eq(documents.id, run.documentId)),
+        connection.db
+          .select()
+          .from(documents)
+          .where(eq(documents.id, String(run.documentId))),
       ).resolves.toEqual([])
     })
   })

@@ -299,6 +299,7 @@ export const receive = (arriving: ArrivingDocument) =>
         interchangeSender: interchangeKey?.sender ?? null,
         interchangeControlReference: interchangeKey?.controlReference ?? null,
         contentHash: fileKey?.contentHash ?? null,
+        receivedAt: receiptStartedAt,
       }),
     )
 

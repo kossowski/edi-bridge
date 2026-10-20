@@ -4,6 +4,8 @@ export { channelDelivery } from './channel-delivery'
 
 export { decodeDocument } from './decode-document'
 
+export { deleteExpiredDocuments } from './delete-expired-documents'
+
 export {
   MappingVersionNotOfRun,
   ReceiptRejected,

@@ -41,6 +41,7 @@ import {
   bullmqRunQueue,
   channelDelivery,
   type DeliveryService,
+  deleteExpiredDocuments,
   markOverdueInterchanges,
   processRun,
   ReceiptRejected,
@@ -2288,6 +2289,28 @@ describe('the processing of an inbound Run', () => {
       expect(again.runs).toMatchObject([
         { status: 'duplicate', messageIndex: null, duplicateOfRunId: original.runs[0]?.id },
       ])
+    })
+
+    it('is no Duplicate once the Document of the original expired', async () => {
+      const into = await ordersWorkspace('Long Ago Foods')
+      const content = interchangeOf([ordersMessage])
+      const [original] = await receiveInterchange(into, content)
+      const receivedAt = original?.document?.receivedAt
+
+      assert.instanceOf(receivedAt, Date)
+      await Effect.runPromise(
+        Effect.gen(function* () {
+          yield* TestClock.setTime(receivedAt.getTime() + Duration.toMillis(Duration.days(90)))
+          yield* deleteExpiredDocuments
+        }).pipe(
+          pipelineServices(connection.db, inMemoryRunQueue()),
+          Effect.provide(TestClock.layer()),
+        ),
+      )
+
+      const again = await receiveAgain(into, content)
+
+      expect(again.runs).toMatchObject([{ status: 'delivered', duplicateOfRunId: null }])
     })
 
     it('yields one original when copies arrive at once', async () => {
