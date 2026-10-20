@@ -48,6 +48,7 @@ import {
   lookupTableImportPreviewEndpoint,
   lookupTableMissingCodesEndpoint,
   lookupTableSuggestionsEndpoint,
+  liveEventsEndpoint,
   lookupTablesEndpoint,
   maxEncodedFileBytes,
   mappingComparisonEndpoint,
@@ -99,6 +100,7 @@ import {
   workspaceSettingsEndpoint,
 } from '@edi-bridge/contracts'
 import {
+  LiveEvents,
   type ReceiptRejected,
   type ReceiptRejection,
   RunQueue,
@@ -133,6 +135,12 @@ import { createFlow, listFlows, loadFlow, moveFlowMappingVersion, updateFlow } f
 import { loadHome } from './home.js'
 import { listInterchanges, loadInterchange } from './interchange.js'
 import { acceptInvite, createInvite, listInvites, revokeInvite } from './invite.js'
+import {
+  defaultHeartbeatMs,
+  type LiveEventHub,
+  liveEventStreams,
+  silentLiveEvents,
+} from './live-events.js'
 import {
   createLookupTable,
   deleteLookupTable,
@@ -223,6 +231,8 @@ export interface AppDependencies {
   auth: AuthSettings
   channels: ChannelSettings
   database: Database
+  liveEventHeartbeatMs?: number | undefined
+  liveEvents?: LiveEventHub
   logger?: FastifyServerOptions['logger']
   probes: { postgres: Probe; redis: Probe }
   probeTimeoutMs?: number
@@ -356,6 +366,8 @@ function registerRoutes(
     auth: authSettings,
     channels: channelSettings,
     database,
+    liveEventHeartbeatMs = defaultHeartbeatMs,
+    liveEvents = silentLiveEvents,
     probes,
     probeTimeoutMs = 2000,
     runQueue,
@@ -404,6 +416,7 @@ function registerRoutes(
         Effect.provideService(ChannelEnvironment, channelEnvironment),
         Effect.provideService(ChannelReach, reach),
         Effect.provideService(RunQueue, runQueue),
+        Effect.provideService(LiveEvents, liveEvents.service),
       ),
     )
 
@@ -462,6 +475,23 @@ function registerRoutes(
   }
 
   app.get(sessionEndpoint.path, (request, reply) => respond(request, reply, loadSession))
+
+  const liveEventStreamsOfApp = liveEventStreams(liveEvents, liveEventHeartbeatMs)
+
+  app.addHook('preClose', (done) => {
+    liveEventStreamsOfApp.endAll()
+    done()
+  })
+
+  app.get(liveEventsEndpoint.path, async (request, reply) => {
+    const member = await resolveMember(auth, database, request)
+
+    if (member === undefined) {
+      return unauthorized(reply)
+    }
+
+    return liveEventStreamsOfApp.stream(reply, member.workspaceId)
+  })
 
   app.get(currentWorkspaceEndpoint.path, (request, reply) =>
     respond(request, reply, loadCurrentWorkspace),

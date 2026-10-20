@@ -17,7 +17,13 @@ import {
   workspaces,
 } from '@edi-bridge/db'
 import { startTestDatabase } from '@edi-bridge/db/testing'
-import { type QueuedRun, RunNotQueued, type RunQueueService } from '@edi-bridge/pipeline'
+import {
+  type LiveEventListener,
+  type PublishedLiveEvent,
+  type QueuedRun,
+  RunNotQueued,
+  type RunQueueService,
+} from '@edi-bridge/pipeline'
 import { type InvoiceWorkspace, seedInvoiceWorkspace } from '@edi-bridge/pipeline/testing'
 
 import { utcDay } from './ai-budget.js'
@@ -29,6 +35,7 @@ import { memoryWebhookRateLimiter } from './webhook-rate-limit.js'
 import type { AuthSettings } from './auth.js'
 import type { ChannelSettings } from './channel.js'
 import type { Database } from './db.js'
+import type { LiveEventHub } from './live-events.js'
 
 export const ownWorkspace = { ...developmentWorkspace, gln: null }
 
@@ -68,6 +75,38 @@ export function testRunQueue() {
   }
 
   return { queued, redis, service }
+}
+
+// Hands each published event to the listeners of its Workspace, as Redis does between processes.
+export function memoryLiveEvents() {
+  const published: PublishedLiveEvent[] = []
+  const listeners = new Set<{ workspaceId: string; listener: LiveEventListener }>()
+
+  const hub: LiveEventHub = {
+    service: {
+      publish: (event) =>
+        Effect.sync(() => {
+          published.push(event)
+
+          for (const { workspaceId, listener } of listeners) {
+            if (workspaceId === event.workspaceId) {
+              listener(event.event)
+            }
+          }
+        }),
+    },
+    subscribe: (workspaceId, listener) => {
+      const subscription = { workspaceId, listener }
+
+      listeners.add(subscription)
+
+      return () => {
+        listeners.delete(subscription)
+      }
+    },
+  }
+
+  return { ...hub, published, listening: () => listeners.size }
 }
 
 export interface Credentials {
@@ -296,8 +335,13 @@ export const ownOperator: NewMember = {
 
 export async function startTestApi({
   aiModel = null,
+  liveEventHeartbeatMs,
   logger = false,
-}: { aiModel?: LanguageModel | null; logger?: FastifyServerOptions['logger'] } = {}) {
+}: {
+  aiModel?: LanguageModel | null
+  liveEventHeartbeatMs?: number
+  logger?: FastifyServerOptions['logger']
+} = {}) {
   const testDatabase = await startTestDatabase()
   const connection = connect(testDatabase.url)
 
@@ -307,12 +351,15 @@ export async function startTestApi({
   await addMember(connection.db, otherAdmin)
 
   const runQueue = testRunQueue()
+  const liveEvents = memoryLiveEvents()
 
   const app = buildApp({
     aiModel,
     auth: testAuth,
     channels: testChannels,
     database: connection.db,
+    liveEventHeartbeatMs,
+    liveEvents,
     logger,
     probes: { postgres: up, redis: up },
     runQueue: runQueue.service,
@@ -324,6 +371,7 @@ export async function startTestApi({
     app,
     connection,
     runQueue,
+    liveEvents,
     databaseUrl: testDatabase.url,
     admin: await signIn(app, ownAdmin),
     viewer: await signIn(app, ownViewer),
