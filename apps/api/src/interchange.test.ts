@@ -118,7 +118,6 @@ async function addTradingPartner(target: InvoiceWorkspace, name: string, gln: st
         .returning(),
     )
 
-  // One outbound Run that the Channel took as its own Interchange.
   const sendInvoice = async ({
     controlReference,
     handedOverAt,
@@ -141,7 +140,6 @@ async function addTradingPartner(target: InvoiceWorkspace, name: string, gln: st
     })
   }
 
-  // One received Interchange whose Messages each started a Run.
   const receiveOrders = async ({
     controlReference,
     receivedAt,
@@ -348,6 +346,27 @@ describe('GET /interchanges', () => {
     expect(await idsFor({ q: 'moselhandel', messageType: ['ORDERS'] })).toEqual([
       received.document.id,
     ])
+  })
+
+  it('filters by the message type of the Runs', async () => {
+    const partner = await addTradingPartner(workspace, 'Ilmtaler Markt eG', '4012345000085')
+
+    const invoice = await partner.sendInvoice({ controlReference: 640, handedOverAt: hoursAgo(9) })
+
+    const received = await partner.receiveOrders({
+      controlReference: 'ILM640',
+      receivedAt: hoursAgo(10),
+      businessReferences: ['PO-640'],
+    })
+
+    const idsFor = async (messageType: InterchangeListQuery['messageType']) =>
+      (
+        await listed({ tradingPartnerId: [partner.tradingPartner.id], messageType })
+      ).interchanges.map(({ id }) => id)
+
+    expect(await idsFor(['INVOIC'])).toEqual([invoice.id])
+    expect(await idsFor(['ORDERS'])).toEqual([received.document.id])
+    expect(await idsFor(['INVOIC', 'ORDERS'])).toEqual([invoice.id, received.document.id])
   })
 
   it('serves one page at a time and leaves out the Interchanges of other Workspaces', async () => {
