@@ -1944,8 +1944,8 @@
       "requestFailed": "Der Test konnte nicht laufen. Versuchen Sie es erneut.",
       "failed": {
         "hostKeyMismatch": {
-          "title": "Der Server hat einen anderen Schlüssel gezeigt.",
-          "hint": "Der Serverschlüssel ist nicht der bestätigte, deshalb hat sich EDI Bridge nicht angemeldet. Fragen Sie die IT der Gegenseite, ob sie ihren Server oder dessen Schlüssel ersetzt hat, bevor Sie den neuen Schlüssel übernehmen."
+          "title": "Der Server hat einen anderen Serverschlüssel gezeigt.",
+          "hint": "Der Serverschlüssel ist nicht der bestätigte, deshalb hat sich EDI Bridge nicht angemeldet. Fragen Sie die IT der Gegenseite, ob sie ihren Server oder den Serverschlüssel ersetzt hat, bevor Sie den neuen Serverschlüssel übernehmen."
         },
         "loginRejected": {
           "title": "Die Anmeldung wurde abgelehnt.",
