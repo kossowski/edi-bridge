@@ -14,7 +14,7 @@ import {
 import { runs } from '@edi-bridge/db'
 
 import { Db, type Database } from './db.js'
-import { dayMs, minuteMs } from './duration.js'
+import { minuteMs, startOfUtcDay } from './duration.js'
 import { byName, inWorkspace } from './rows.js'
 import { listTasks } from './task.js'
 import { listTradingPartners } from './trading-partner.js'
@@ -123,7 +123,7 @@ export const loadHome = (query: HomeQuery) =>
     const workspace = yield* CurrentWorkspace
     const now = yield* Clock.currentTimeMillis
     const window = windowOf(query, now)
-    const startOfToday = new Date(Math.floor(now / dayMs) * dayMs)
+    const startOfToday = startOfUtcDay(now)
 
     const [{ tasks, counts }, tradingPartners, [bucketRows, [inProgress], runsToday]] =
       yield* Effect.all([

@@ -7,7 +7,7 @@ import {
   type ThroughputBucket,
 } from '@edi-bridge/contracts'
 
-import { dayMs, hourMs } from './duration.js'
+import { dayMs, hourMs, startOfUtcDay } from './duration.js'
 import {
   addTradingPartnerWithFlows,
   type Client,
@@ -106,7 +106,7 @@ describe('GET /home', () => {
   it('lists each Trading Partner with its Documents today and open problems, most problems first', async () => {
     const { workspace, admin } = await seedWorkspaceWithAdmin(api, 'Elbe Großhandel GmbH')
     const db = api.connection.db
-    const startOfToday = new Date(Math.floor(now / dayMs) * dayMs)
+    const startOfToday = startOfUtcDay(now)
 
     const quiet = await addTradingPartnerWithFlows(db, workspace, 'Alpenfrisch Märkte AG')
     const busy = await addTradingPartnerWithFlows(db, workspace, 'Baltic Frische GmbH')
