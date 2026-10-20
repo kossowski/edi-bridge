@@ -3896,6 +3896,7 @@ describe('the CONTRL answering a received Interchange', () => {
 
   const receivingContent = async (into: InvoiceWorkspace, content: ArrivingDocument['content']) => {
     const { messages, logger } = collectLogs()
+    const queue = inMemoryRunQueue()
 
     const exit = await Effect.runPromiseExit(
       receive({
@@ -3904,10 +3905,10 @@ describe('the CONTRL answering a received Interchange', () => {
         fileName: 'orders.edi',
         content,
         manualSubmission: false,
-      }).pipe(pipelineServices(connection.db, inMemoryRunQueue()), Effect.provide(logger)),
+      }).pipe(pipelineServices(connection.db, queue), Effect.provide(logger)),
     )
 
-    return { exit, logs: messages }
+    return { exit, logs: messages, queue }
   }
 
   const receiving = (into: InvoiceWorkspace, content: string) =>
@@ -3973,6 +3974,17 @@ describe('the CONTRL answering a received Interchange', () => {
       to: (channelId: string) =>
         delivered.flatMap(({ channelId: to, ...document }) => (to === channelId ? [document] : [])),
     }
+  }
+
+  // The bytes of the text read as ISO 8859-1 are not valid in UTF-8.
+  const undecodableInterchange = (text: string, characterSet = 'UNOW') => {
+    const decoded = decodeDocument(
+      Buffer.from(text.replace('UNOC:3', `${characterSet}:3`), 'latin1'),
+    )
+
+    assert('undecodable' in decoded, 'The Interchange decoded in UTF-8')
+
+    return decoded
   }
 
   const acknowledgementOf = async (documentId: string) => {
@@ -4354,14 +4366,12 @@ describe('the CONTRL answering a received Interchange', () => {
       })
     })
 
-    it('names the header of an Interchange not valid in its character set', async () => {
+    it('names the header of an Interchange whose recipient is not valid in its character set', async () => {
       const into = await answeringWorkspace('Mis-encoded Orders')
 
-      const decoded = decodeDocument(
-        Buffer.from(interchangeOf([ordersMessage]).replace('UNOC:3', 'UNOW:3'), 'latin1'),
+      const decoded = undecodableInterchange(
+        interchangeOf([ordersMessage]).replace('4389876511114:14', '438987651111\u00e4:14'),
       )
-
-      assert('undecodable' in decoded, 'The Interchange decoded in UTF-8')
 
       const { acknowledgement, logs } = await recordedFor(into, decoded)
 
@@ -4390,6 +4400,64 @@ describe('the CONTRL answering a received Interchange', () => {
         },
       })
     })
+  })
+
+  const misEncodedOrders = ordersMessage.map((line) => line.replace('+128576+', '+1285\u00e476+'))
+
+  it.each([
+    ['its character set', 'UNOW'],
+    ['UTF-8 under a syntax identifier not listed', 'UNOX'],
+  ])('rejects an Interchange not valid in %s in a CONTRL sent', async (_case, characterSet) => {
+    const into = await answeringWorkspace(`Mis-encoded ${characterSet} Order Lines`)
+    const delivery = recordingDelivery()
+
+    const { exit } = await receivingContent(
+      into,
+      undecodableInterchange(interchangeOf([misEncodedOrders]), characterSet),
+    )
+
+    await sendWith(delivery.service)
+
+    expect(delivery.to(into.outboundChannelId).map(({ content }) => content)).toEqual([
+      "UNB+UNOC:3+4389876511114:14+4071615111111:14+YYMMDD:HHMM+1'" +
+        "UNH+1+CONTRL:D:3:UN:EAN002'" +
+        "UCI+00000001+4071615111111:14+4389876511114:14+4+21'" +
+        "UNT+3+1'" +
+        "UNZ+1+1'",
+    ])
+    await expect(acknowledgementOf(documentIdOf(exit))).resolves.toMatchObject({
+      notSentReason: null,
+    })
+  })
+
+  it('answers no Interchange not valid in its character set whose UNB cannot be read', async () => {
+    const into = await answeringWorkspace('Mis-encoded Headless Orders')
+    const delivery = recordingDelivery()
+
+    const { exit, queue } = await receivingContent(
+      into,
+      undecodableInterchange(
+        interchangeOf([misEncodedOrders])
+          .replace("+00000001'", "'")
+          .replace("UNZ+1+00000001'", "UNZ+1'"),
+      ),
+    )
+
+    await processQueued(queue, delivery.service)
+    await sendWith(delivery.service)
+
+    const [run] = await connection.db
+      .select({ id: runs.id })
+      .from(runs)
+      .where(eq(runs.documentId, documentIdOf(exit)))
+
+    await expect(readRun(connection.db, run?.id ?? '')).resolves.toMatchObject({
+      status: 'failed',
+      failureStage: 'parse',
+    })
+    await expect(acknowledgementOf(documentIdOf(exit))).resolves.toBeUndefined()
+    expect(delivery.to(into.outboundChannelId)).toEqual([])
+    expect(erp.received).toHaveLength(0)
   })
 
   it('rejects an Interchange whose envelope is broken in a CONTRL sent', async () => {

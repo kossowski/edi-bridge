@@ -1,3 +1,4 @@
+import { type CharacterSetError } from './character-set'
 import { defaultDelimiters } from './delimiters'
 import { messageIdentifierElement } from './message-identifier'
 import { isBrokenMessage } from './model'
@@ -71,6 +72,8 @@ const validationErrorCodes: Record<ValidationErrorCode, string> = {
 }
 
 type ReceivedError = ParseError | ValidationError
+
+const invalidCharacterCode = validationErrorCodes['invalid-character']
 
 const syntaxErrorCode = (error: ReceivedError) =>
   error instanceof ParseError ? parseErrorCodes[error.code] : validationErrorCodes[error.code]
@@ -275,7 +278,31 @@ const rejection = (
   ...(serviceSegmentError(error, segmentAt) ?? [[syntaxErrorCode(error)]]),
 ]
 
-export const buildContrl = (text: string, messageReference: string): Message => {
+// Bytes that fail an encoding the UNB does not name have no position in its character set.
+export type InvalidCharacter = CharacterSetError | 'unlocated'
+
+// A UCI names only a service segment, so a byte in another segment rejects without a position.
+const invalidCharacterRejection = (
+  invalidCharacter: InvalidCharacter,
+  segmentAt: (segment: number) => Segment | undefined,
+): Element[] => {
+  if (invalidCharacter === 'unlocated') {
+    return [[rejected], [invalidCharacterCode]]
+  }
+
+  const { position, tag } = invalidCharacter
+  const segment = segmentAt(position.segment)
+
+  return serviceSegmentTags.has(tag)
+    ? [[rejected], [invalidCharacterCode], [tag], dataElementIdentification(segment, position)]
+    : [[rejected], [invalidCharacterCode]]
+}
+
+export const buildContrl = (
+  text: string,
+  messageReference: string,
+  { invalidCharacter }: { invalidCharacter?: InvalidCharacter | undefined } = {},
+): Message => {
   const {
     hasServiceStringAdvice,
     header,
@@ -285,6 +312,7 @@ export const buildContrl = (text: string, messageReference: string): Message => 
   } = readableInterchange(text)
 
   const firstSegment = interchangeSegmentPosition(hasServiceStringAdvice)(0).segment
+  const receivedAt = (segment: number) => received[segment - firstSegment]
 
   const interchangeResponse = (...response: Element[]) =>
     withoutTrailingEmptyElements({
@@ -304,10 +332,13 @@ export const buildContrl = (text: string, messageReference: string): Message => 
   }
 
   const responses = () => {
+    // The text holds U+FFFD in place of the invalid bytes, so nothing read from it is accepted.
+    if (invalidCharacter) {
+      return [interchangeResponse(...invalidCharacterRejection(invalidCharacter, receivedAt))]
+    }
+
     if (envelope instanceof ParseError) {
-      return [
-        interchangeResponse(...rejection(envelope, (segment) => received[segment - firstSegment])),
-      ]
+      return [interchangeResponse(...rejection(envelope, receivedAt))]
     }
 
     const envelopeError = validationErrorOf({ ...envelope, messages: [] })
