@@ -54,6 +54,15 @@ The proxied Cloudflare CNAME points to `<tunnel-id>.cfargotunnel.com`. The tunne
 
 Traefik routes `/` to web on port 3000. It routes `/api` to API on port 3001 and removes the `/api` prefix before forwarding requests. HTTPS terminates at Cloudflare. The Dokploy domain entries use HTTP with certificate type `none`.
 
+### Live events
+
+The browser receives live events from `/api/events` as server-sent events, a response that stays open. The proxies need no setting for it by default:
+
+- The API sends a heartbeat comment every 25 seconds, within the 100-second idle limit of Cloudflare.
+- The API sends `Cache-Control: no-cache, no-transform` and `X-Accel-Buffering: no`, so proxies forward each event at once.
+
+Do not add a buffering or compression middleware to the Traefik router of the API. Such a middleware holds the events back until the response ends.
+
 ## Environment variables
 
 Each application's Dokploy **Environment** settings contain values with the forms below. Dokploy stores separate generated passwords for Postgres and Redis. The repository contains no production passwords.
