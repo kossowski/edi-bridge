@@ -403,7 +403,7 @@ export const WrongEncoding = meta.story({
     await expect(alert).toHaveTextContent(
       'The file is not valid UTF-8. Choose another encoding, such as Windows-1252 for a typical German CSV file, and upload it again.',
     )
-    await expect(alert).toHaveTextContent(/Details: Byte \d+ \(0xE4\) is not valid utf-8$/)
+    await expect(alert).toHaveTextContent(/Details: Byte \d+ \(0xE4\) is not valid UTF-8$/)
     await expect(content.queryByRole('link', { name: 'Set up a document route' })).toBeNull()
 
     await chooseEncoding(content, 'Windows-1252')
@@ -447,7 +447,7 @@ export const GermanWrongEncoding = meta.story({
     await expect(alert).toHaveTextContent(
       'Die Datei ist kein gültiges UTF-8. Wählen Sie eine andere Kodierung, etwa Windows-1252 für eine typische deutsche CSV-Datei, und laden Sie sie erneut hoch.',
     )
-    await expect(alert).toHaveTextContent(/Details: Byte \d+ \(0xE4\) is not valid utf-8$/)
+    await expect(alert).toHaveTextContent(/Details: Byte \d+ \(0xE4\) is not valid UTF-8$/)
     await expect(alert).not.toHaveTextContent('Choose another encoding')
   },
 })
