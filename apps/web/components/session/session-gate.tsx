@@ -2,26 +2,22 @@
 
 import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
-import { type ReactNode, useEffect, useSyncExternalStore } from 'react'
+import { type ReactNode, useEffect } from 'react'
 
+import { useClientValue } from '@/hooks/use-client-value'
 import { useSession } from '@/hooks/use-session'
 
 export function SessionGate({ children }: { children: ReactNode }) {
   const t = useTranslations('Shell.session')
   const router = useRouter()
   const { isPending, signedOut } = useSession()
+  const hydrated = useClientValue(() => true, false)
 
   useEffect(() => {
     if (signedOut) {
       router.replace('/login')
     }
   }, [router, signedOut])
-
-  const serverOrHydrating = useSyncExternalStore(
-    subscribeToNothing,
-    () => false,
-    () => true,
-  )
 
   if (isPending || signedOut) {
     return (
@@ -31,8 +27,7 @@ export function SessionGate({ children }: { children: ReactNode }) {
             {t(signedOut ? 'redirecting' : 'loading')}
           </p>
         </div>
-        {/* The server render needs the page, so that its notFound() answers 404. */}
-        {serverOrHydrating && <div hidden>{children}</div>}
+        {!hydrated && <ServerRenderedPage>{children}</ServerRenderedPage>}
       </>
     )
   }
@@ -40,6 +35,11 @@ export function SessionGate({ children }: { children: ReactNode }) {
   return children
 }
 
-function subscribeToNothing() {
-  return () => {}
+// The server render lets notFound() answer 404; the client leaves it unhydrated, so no effects run.
+function ServerRenderedPage({ children }: { children: ReactNode }) {
+  if (typeof window === 'undefined') {
+    return <div hidden>{children}</div>
+  }
+
+  return <div dangerouslySetInnerHTML={{ __html: '' }} hidden suppressHydrationWarning />
 }
