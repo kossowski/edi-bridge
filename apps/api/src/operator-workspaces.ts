@@ -8,8 +8,9 @@ import type { WorkspaceInput, WorkspaceSummary } from '@edi-bridge/contracts'
 import { ChannelEnvironment } from './channel.js'
 import { Db } from './db.js'
 import { startOfUtcDay } from './duration.js'
-import { Conflict } from './errors.js'
-import { byName, exactlyOne } from './rows.js'
+import { Conflict, NotFound } from './errors.js'
+import { byName, exactlyOne, rejectingInvalidId } from './rows.js'
+import { resetSandbox } from './sandbox-reset.js'
 import { seedWorkspace } from './seed.js'
 
 import type { ValidationError } from './parse.js'
@@ -138,4 +139,25 @@ export const createWorkspace = (input: Effect.Effect<WorkspaceInput, ValidationE
     }
 
     return yield* Effect.flatMap(loadSummaries(created.id, now), exactlyOne)
+  })
+
+export const resetSandboxWorkspace = (workspaceId: string) =>
+  Effect.gen(function* () {
+    yield* rejectingInvalidId(workspaceId)
+
+    const db = yield* Db
+    const { secrets } = yield* ChannelEnvironment
+    const now = new Date()
+
+    const outcome = yield* Effect.promise(() => resetSandbox(db, workspaceId, { secrets, now }))
+
+    if (outcome === 'notFound') {
+      return yield* new NotFound()
+    }
+
+    if (outcome === 'notSandbox') {
+      return yield* new Conflict({ message: 'Only the Sandbox Workspace can be reset' })
+    }
+
+    return yield* Effect.flatMap(loadSummaries(workspaceId, now), exactlyOne)
   })

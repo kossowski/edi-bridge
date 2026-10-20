@@ -45,6 +45,7 @@ import {
   receiveWebhookEndpoint,
   regenerateWebhookTokenEndpoint,
   removeWorkspaceMemberEndpoint,
+  resetSandboxWorkspaceEndpoint,
   requestAiDraftEndpoint,
   restoreMappingVersionEndpoint,
   revokeInviteEndpoint,
@@ -534,6 +535,13 @@ const changes: Change[] = [
         workspaceId: ownWorkspace.id,
         userId: '2b7e4c9a-1d3f-4a68-b5e0-9c8d7f6a5b43',
       }),
+    }),
+  ],
+  [
+    'reset the Sandbox',
+    () => ({
+      method: 'POST',
+      url: toPath(resetSandboxWorkspaceEndpoint.path, { workspaceId: ownWorkspace.id }),
     }),
   ],
 ]
