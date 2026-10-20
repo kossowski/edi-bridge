@@ -57,10 +57,6 @@ function findOwnCodeHint(kind: LookupTableKind, code: string, language: Language
   }
 }
 
-export function ownCodeHintOf(kind: LookupTableKind, code: string, language: Language) {
-  return findOwnCodeHint(kind, code, language) ?? { meaning: null, suggestions: [] }
-}
-
 export function aiHintOf(kind: LookupTableKind, code: string, language: Language) {
   return findOwnCodeHint(kind, code, language) ?? knownMeaningOf(kind, code, language)
 }

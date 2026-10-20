@@ -447,12 +447,8 @@ describe('GET /lookup-tables/:id/missing-codes', () => {
     expect(krt).toEqual({
       urgency: 'blocking',
       code: 'KRT',
-      meaning: 'Carton',
-      suggestions: [
-        { code: 'CT', meaning: 'Carton' },
-        { code: 'PK', meaning: 'Package' },
-        { code: 'BX', meaning: 'Box' },
-      ],
+      meaning: null,
+      suggestions: [],
       failedRuns: [
         {
           id: newerFailure.id,
@@ -466,21 +462,19 @@ describe('GET /lookup-tables/:id/missing-codes', () => {
     })
   })
 
-  it('explains the code and its suggestions in German', async () => {
+  it('explains only a known code without AI, in German', async () => {
     server.use(...lookupTableHandlers(apiUrl, { runs: [newerFailure] }))
     const units = seedLookupTableNamed('Units of measure')
 
-    const [krt] = await getMissingCodes(units.id, 'de')
+    const codes = await getMissingCodes(units.id, 'de')
 
-    expect(krt).toMatchObject({
-      code: 'KRT',
-      meaning: 'Karton',
-      suggestions: [
-        { code: 'CT', meaning: 'Karton' },
-        { code: 'PK', meaning: 'Packung' },
-        { code: 'BX', meaning: 'Kiste' },
+    expect(codes.map(({ code, meaning, suggestions }) => ({ code, meaning, suggestions }))).toEqual(
+      [
+        { code: 'KRT', meaning: null, suggestions: [] },
+        { code: 'BTL', meaning: null, suggestions: [] },
+        { code: 'SET', meaning: 'Satz', suggestions: [{ code: 'SET', meaning: 'Satz' }] },
       ],
-    })
+    )
   })
 
   it('points the blocking code at a Run whose problem names the same table and code', async () => {
@@ -533,7 +527,7 @@ describe('GET /lookup-tables/:id/missing-codes', () => {
       ['BTL', 'upcoming'],
       ['SET', 'upcoming'],
     ])
-    expect(codes[1]).toMatchObject({ meaning: 'Bottle', itemCount: 14 })
+    expect(codes[1]).toMatchObject({ code: 'BTL', itemCount: 14 })
   })
 
   it('drops a code once the table translates it and counts the rest on the list', async () => {
