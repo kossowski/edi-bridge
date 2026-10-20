@@ -523,7 +523,7 @@ export const runs = pgTable(
     workspaceId: uuid()
       .notNull()
       .references(() => workspaces.id, { onDelete: 'cascade' }),
-    // Null once the Document expired, when documentDeletedAt says since when.
+    // Retention deletes the Document but keeps the Run.
     documentId: uuid().references(() => documents.id, { onDelete: 'set null' }),
     documentDeletedAt: timestamp({ withTimezone: true, mode: 'date' }),
     flowId: uuid()
@@ -623,7 +623,7 @@ export const acknowledgements = pgTable(
     workspaceId: uuid()
       .notNull()
       .references(() => workspaces.id, { onDelete: 'cascade' }),
-    // Null once the answered Document expired.
+    // Retention deletes the answered Document but keeps its Acknowledgement.
     documentId: uuid()
       .unique()
       .references(() => documents.id, { onDelete: 'set null' }),

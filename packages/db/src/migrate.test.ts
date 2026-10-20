@@ -497,6 +497,11 @@ describe('a Run', () => {
 
     it('are deleted with the Workspace, together with the Run and its Document', async () => {
       const run = await insertRun()
+      const { documentId } = run
+
+      if (documentId === null) {
+        throw new Error('The Run was inserted without its Document')
+      }
 
       await connection.db.insert(runSteps).values({
         runId: run.id,
@@ -510,10 +515,7 @@ describe('a Run', () => {
 
       await expect(stepsOf(run.id)).resolves.toEqual([])
       await expect(
-        connection.db
-          .select()
-          .from(documents)
-          .where(eq(documents.id, String(run.documentId))),
+        connection.db.select().from(documents).where(eq(documents.id, documentId)),
       ).resolves.toEqual([])
     })
   })
