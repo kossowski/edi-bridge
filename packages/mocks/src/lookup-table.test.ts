@@ -713,6 +713,44 @@ describe('POST /lookup-tables/:id/missing-codes/hints', () => {
     ])
   })
 
+  it('explains the codes without AI when the AI is unavailable', async () => {
+    server.use(
+      ...lookupTableHandlers(apiUrl, {
+        runs: [newerFailure],
+        missingCodeHintsNotice: 'aiUnavailable',
+      }),
+    )
+
+    const { hints, notice } = await getHints(seedLookupTableNamed('Units of measure').id)
+
+    expect(notice).toEqual({
+      reason: 'aiUnavailable',
+      message: 'AI unavailable; codes explained without AI',
+    })
+    expect(hints.map(({ meaning }) => meaning)).toEqual([null, null, 'Set'])
+  })
+
+  it('answers with no hints for a table without missing codes', async () => {
+    server.use(...lookupTableHandlers(apiUrl, { runs: [] }))
+
+    expect(await getHints(seedLookupTableNamed('VAT categories').id)).toEqual({
+      hints: [],
+      notice: null,
+    })
+  })
+
+  it('explains a large volume of missing codes', async () => {
+    const [large] = createLookupTables({ count: 1, blockingCodeCount: 200, upcomingCodeCount: 500 })
+    server.use(...lookupTableHandlers(apiUrl, { lookupTables: [large!], runs: [] }))
+
+    const { hints } = await getHints(large!.id)
+
+    expect(hints.map(({ code }) => code)).toEqual(
+      (await getMissingCodes(large!.id)).map(({ code }) => code),
+    )
+    expect(hints).toHaveLength(700)
+  })
+
   it('answers 404 for an unknown Lookup Table and 400 for an unknown language', async () => {
     server.use(...lookupTableHandlers(apiUrl, { lookupTables: [] }))
 
