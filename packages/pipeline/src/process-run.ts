@@ -492,17 +492,17 @@ type ClaimedRun = typeof runs.$inferSelect
 
 type OnboardingStep = 'testInterchangeSentAt' | 'contrlReceivedAt'
 
-// Traffic completes an onboarding step only in Test Mode, and only the first time.
+// Traffic records an onboarding step only in Test Mode, and only until the step is complete.
 const recordOnboardingStep = (
   tx: Transaction,
   workspaceId: string,
   tradingPartnerIds: ReadonlyArray<string | null>,
   step: OnboardingStep,
-  at: Date,
+  values: Partial<typeof tradingPartners.$inferInsert>,
 ) =>
   tx
     .update(tradingPartners)
-    .set({ [step]: at })
+    .set(values)
     .where(
       and(
         eq(tradingPartners.workspaceId, workspaceId),
@@ -550,7 +550,7 @@ const handOver = (
             run.workspaceId,
             [run.tradingPartnerId],
             'testInterchangeSentAt',
-            handedOverAt,
+            { testInterchangeSentAt: handedOverAt },
           )
         }
       }),
@@ -1367,20 +1367,27 @@ const acknowledge = async (
         ),
       ),
     )
-    .returning({ tradingPartnerId: runs.tradingPartnerId })
+    .returning({ id: runs.id, tradingPartnerId: runs.tradingPartnerId })
 
   // The Trading Partner's system could read the test only when its CONTRL accepts the Interchange.
-  if (state !== 'accepted' || acknowledged.length === 0) {
+  if (state === 'accepted') {
+    await recordOnboardingStep(
+      tx,
+      workspaceId,
+      acknowledged.map(({ tradingPartnerId }) => tradingPartnerId),
+      'contrlReceivedAt',
+      { contrlReceivedAt: receivedAt, testRejectedAt: null, testRejectedRunId: null },
+    )
+
     return
   }
 
-  await recordOnboardingStep(
-    tx,
-    workspaceId,
-    acknowledged.map(({ tradingPartnerId }) => tradingPartnerId),
-    'contrlReceivedAt',
-    receivedAt,
-  )
+  for (const { id, tradingPartnerId } of acknowledged) {
+    await recordOnboardingStep(tx, workspaceId, [tradingPartnerId], 'contrlReceivedAt', {
+      testRejectedAt: receivedAt,
+      testRejectedRunId: id,
+    })
+  }
 }
 
 const processInbound = ({

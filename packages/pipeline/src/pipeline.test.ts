@@ -3254,6 +3254,8 @@ describe('the Acknowledgement of a sent Interchange', () => {
         .select({
           testInterchangeSentAt: tradingPartners.testInterchangeSentAt,
           contrlReceivedAt: tradingPartners.contrlReceivedAt,
+          testRejectedAt: tradingPartners.testRejectedAt,
+          testRejectedRunId: tradingPartners.testRejectedRunId,
         })
         .from(tradingPartners)
         .where(eq(tradingPartners.id, into.tradingPartnerId))
@@ -3269,6 +3271,8 @@ describe('the Acknowledgement of a sent Interchange', () => {
       await expect(onboardingOf(into)).resolves.toEqual({
         testInterchangeSentAt: sent?.handedOverAt,
         contrlReceivedAt: null,
+        testRejectedAt: null,
+        testRejectedRunId: null,
       })
     })
 
@@ -3362,6 +3366,8 @@ describe('the Acknowledgement of a sent Interchange', () => {
       await expect(onboardingOf(into)).resolves.toEqual({
         testInterchangeSentAt: null,
         contrlReceivedAt: null,
+        testRejectedAt: null,
+        testRejectedRunId: null,
       })
     })
 
@@ -3373,6 +3379,78 @@ describe('the Acknowledgement of a sent Interchange', () => {
       await receiveContrl(into, contrlOf(String(sent?.controlReference), '7'))
 
       await expect(onboardingOf(into)).resolves.toMatchObject({ contrlReceivedAt: null })
+    })
+
+    it('records the rejection of a test Interchange with the Run that sent it', async () => {
+      const into = await testingWorkspace('Refused Test Foods')
+      const sent = await sendInvoice(into)
+
+      const contrl = await receiveContrl(into, contrlOf(String(sent?.controlReference), '4'))
+
+      expect(contrl?.receivedAt).toBeInstanceOf(Date)
+      await expect(onboardingOf(into)).resolves.toMatchObject({
+        contrlReceivedAt: null,
+        testRejectedAt: contrl?.receivedAt,
+        testRejectedRunId: sent?.id,
+      })
+    })
+
+    it('records the latest rejection of a test Interchange', async () => {
+      const into = await testingWorkspace('Twice Refused Test Foods')
+      const first = await sendInvoice(into)
+      const second = await sendInvoice(into)
+
+      await receiveContrl(into, contrlOf(String(first?.controlReference), '4'))
+
+      const contrl = await receiveContrl(into, contrlOf(String(second?.controlReference), '4'))
+
+      await expect(onboardingOf(into)).resolves.toMatchObject({
+        testRejectedAt: contrl?.receivedAt,
+        testRejectedRunId: second?.id,
+      })
+    })
+
+    it('clears the rejection once a CONTRL accepts another test Interchange', async () => {
+      const into = await testingWorkspace('Finally Confirmed Test Foods')
+      const rejected = await sendInvoice(into)
+      const accepted = await sendInvoice(into)
+
+      await receiveContrl(into, contrlOf(String(rejected?.controlReference), '4'))
+
+      const contrl = await receiveContrl(into, contrlOf(String(accepted?.controlReference), '7'))
+
+      await expect(onboardingOf(into)).resolves.toMatchObject({
+        contrlReceivedAt: contrl?.receivedAt,
+        testRejectedAt: null,
+        testRejectedRunId: null,
+      })
+    })
+
+    it('records no rejection once the CONTRL step is complete', async () => {
+      const into = await testingWorkspace('Confirmed Then Refused Test Foods')
+      const accepted = await sendInvoice(into)
+      const rejected = await sendInvoice(into)
+
+      await receiveContrl(into, contrlOf(String(accepted?.controlReference), '7'))
+      await receiveContrl(into, contrlOf(String(rejected?.controlReference), '4'))
+
+      await expect(onboardingOf(into)).resolves.toMatchObject({
+        testRejectedAt: null,
+        testRejectedRunId: null,
+      })
+    })
+
+    it('records no rejection of an Interchange once the Trading Partner is in production', async () => {
+      const into = await testingWorkspace('Refused Live Test Foods')
+      const sent = await sendInvoice(into)
+
+      await setTestMode(into, false)
+      await receiveContrl(into, contrlOf(String(sent?.controlReference), '4'))
+
+      await expect(onboardingOf(into)).resolves.toMatchObject({
+        testRejectedAt: null,
+        testRejectedRunId: null,
+      })
     })
   })
 
