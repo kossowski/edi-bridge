@@ -538,9 +538,11 @@ describe('the polling of inbound SFTP Channels', () => {
       .where(eq(documents.channelId, box.channelId))
       .orderBy(documents.receivedAt)
 
+    const anyId: unknown = expect.any(String)
+
     expect(stored).toEqual([
-      { status: 'received', duplicateOfRunId: null, id: expect.any(String) },
-      { status: 'duplicate', duplicateOfRunId: stored[0]?.id, id: expect.any(String) },
+      { status: 'received', duplicateOfRunId: null, id: anyId },
+      { status: 'duplicate', duplicateOfRunId: stored[0]?.id, id: anyId },
     ])
   })
 })
