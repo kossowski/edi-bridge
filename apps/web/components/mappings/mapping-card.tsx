@@ -6,6 +6,7 @@ import { useFormatter, useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { useId } from 'react'
 
+import { documentsHref } from '@/components/documents/document-filters'
 import { aiDraftStartHref } from '@/components/mappings/ai-draft-run'
 import { DirectionPath } from '@/components/mappings/direction-path'
 import { mappingState, type MappingState } from '@/components/mappings/mapping-state'
@@ -99,7 +100,7 @@ function nextAction(mappingId: string, state: MappingState) {
 
   switch (state) {
     case 'failing':
-      return { href, icon: Alert02Icon }
+      return { href: documentsHref({ status: 'attention', mappingId }), icon: Alert02Icon }
     case 'draft':
       return { href, icon: PencilEdit02Icon }
     case 'new':

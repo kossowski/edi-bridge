@@ -70,7 +70,17 @@ export const Default = meta.story({
 
     await expect(dataFormat).toBeVisible()
     await expect(dataFormat).toHaveTextContent('Your data format: ERP dispatch advice')
-    await expect(shared.getByRole('link', { name: 'See what failed' })).toBeVisible()
+    const seeWhatFailed = shared.getByRole('link', { name: 'See what failed' })
+
+    const mappingHref = shared
+      .getByRole('link', { name: 'Dispatch advices to 2 partners' })
+      .getAttribute('href')
+
+    await expect(seeWhatFailed).toBeVisible()
+    await expect(seeWhatFailed).toHaveAttribute(
+      'href',
+      mappingHref?.replace(/^\/mappings\/([\w-]+)$/, '/documents?status=attention&mapping=$1'),
+    )
 
     const neverPublished = card(goingOut.getByRole('link', { name: 'Invoices' }))
 
