@@ -119,7 +119,10 @@ const uniqueName = (name: string, taken: ReadonlySet<string>) => {
 const noDocumentStructure = () =>
   new Unprocessable({ message: 'The Workspace has no Document Structure to map yet.' })
 
-const insertNumbered = (messageType: MessageType) =>
+const unknownDocumentStructure = () =>
+  new Unprocessable({ message: 'The Document Structure does not exist.' })
+
+const insertNumbered = ({ messageType, documentStructureId }: CreateMappingBody) =>
   Effect.gen(function* () {
     const db = yield* Db
     const workspace = yield* CurrentWorkspace
@@ -147,13 +150,18 @@ const insertNumbered = (messageType: MessageType) =>
       ),
     )
 
-    const structuresByName = structures.toSorted(byName)
+    // Until Document Structures carry a Message Type, every one of the Workspace fits.
+    const fitting = structures.toSorted(byName)
 
     const structure =
-      structuresByName.find(({ id }) => structureIdsOfMessageType.has(id)) ?? structuresByName[0]
+      documentStructureId === undefined
+        ? (fitting.find(({ id }) => structureIdsOfMessageType.has(id)) ?? fitting[0])
+        : fitting.find(({ id }) => id === documentStructureId)
 
     if (!structure) {
-      return yield* noDocumentStructure()
+      return yield* documentStructureId === undefined
+        ? noDocumentStructure()
+        : unknownDocumentStructure()
     }
 
     const name = uniqueName(
@@ -181,12 +189,12 @@ const insertNumbered = (messageType: MessageType) =>
   })
 
 // A Mapping created at the same time may take the numbered name first; the next attempt sees it.
-export const createMapping = ({ messageType }: CreateMappingBody) =>
+export const createMapping = (body: CreateMappingBody) =>
   Effect.gen(function* () {
     const db = yield* Db
     const workspace = yield* CurrentWorkspace
 
-    const { id } = yield* insertNumbered(messageType).pipe(
+    const { id } = yield* insertNumbered(body).pipe(
       Effect.retry({ times: 5, while: Predicate.isTagged('Conflict') }),
     )
 
