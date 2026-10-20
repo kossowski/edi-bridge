@@ -16,6 +16,7 @@ import {
 import { ParseError, parseMessages, readInterchange } from '@edi-bridge/edifact'
 
 import { answerDocument } from './acknowledgement'
+import { carriesTestIndicator } from './envelope'
 import { ReceiptRejected } from './errors'
 import { Database, Documents, RunQueue } from './services'
 import { stagesOf } from './stages'
@@ -124,16 +125,21 @@ function route(content: string, channelFlows: readonly ChannelFlow[]) {
   return Effect.succeed({ routed, notRouted })
 }
 
-function interchangeKeyOf(content: string): InterchangeKey | undefined {
+type ReceivedEnvelope = { key: InterchangeKey | undefined; testIndicator: boolean }
+
+function envelopeOf(content: string): ReceivedEnvelope {
   try {
     const { header } = readInterchange(content)
     const sender = header?.elements[1]?.[0]
     const controlReference = header?.elements[4]?.[0]
 
-    return sender && controlReference ? { sender, controlReference } : undefined
+    return {
+      key: sender && controlReference ? { sender, controlReference } : undefined,
+      testIndicator: carriesTestIndicator(header),
+    }
   } catch (error) {
     if (error instanceof ParseError) {
-      return undefined
+      return { key: undefined, testIndicator: false }
     }
 
     throw error
@@ -278,7 +284,7 @@ export const receive = (arriving: ArrivingDocument) =>
     const channel = yield* inboundChannelOf(arriving.workspaceId, arriving.channelId)
 
     const documents = yield* Documents
-    const interchangeKey = interchangeKeyOf(arriving.content)
+    const { key: interchangeKey, testIndicator } = envelopeOf(arriving.content)
 
     // Only a file polled from an SFTP server comes again unchanged after a failed removal.
     const fileKey =
@@ -298,6 +304,7 @@ export const receive = (arriving: ArrivingDocument) =>
         content: arriving.content,
         interchangeSender: interchangeKey?.sender ?? null,
         interchangeControlReference: interchangeKey?.controlReference ?? null,
+        testIndicator,
         contentHash: fileKey?.contentHash ?? null,
         receivedAt: receiptStartedAt,
       }),
