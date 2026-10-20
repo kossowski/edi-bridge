@@ -13,6 +13,7 @@ import {
   createDocumentStructureEndpoint,
   createFlowEndpoint,
   createInviteEndpoint,
+  createWorkspaceEndpoint,
   createLookupTableEndpoint,
   createMappingEndpoint,
   createTradingPartnerEndpoint,
@@ -497,6 +498,14 @@ const changes: Change[] = [
       method: 'POST',
       url: toPath(reprocessRunEndpoint.path, { id: crypto.randomUUID() }),
       body: { mappingVersionId: crypto.randomUUID() },
+    }),
+  ],
+  [
+    'create a Workspace',
+    () => ({
+      method: 'POST',
+      url: createWorkspaceEndpoint.path,
+      body: { name: 'Viewer Workspace GmbH', seed: false },
     }),
   ],
   [

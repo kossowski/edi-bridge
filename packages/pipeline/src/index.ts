@@ -6,6 +6,10 @@ export { decodeDocument } from './decode-document'
 
 export { deleteExpiredDocuments } from './delete-expired-documents'
 
+export { enveloped } from './envelope'
+
+export { stagesOf } from './stages'
+
 export {
   documentExpiredMessage,
   MappingVersionNotOfRun,

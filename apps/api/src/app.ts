@@ -63,6 +63,8 @@ import {
   messageTypeStructureEndpoint,
   moveFlowMappingVersionEndpoint,
   operatorWorkspaceMembersEndpoint,
+  operatorWorkspacesEndpoint,
+  createWorkspaceEndpoint,
   operatorWorkspaceSettingsEndpoint,
   orderLifecycleEndpoint,
   orderLifecyclesEndpoint,
@@ -164,6 +166,7 @@ import {
 } from './mapping-version.js'
 import { createMapping, listMappings, loadMappingDraft, saveMappingDraft } from './mapping.js'
 import { loadMessageTypeStructure } from './message-type.js'
+import { createWorkspace, listWorkspaceSummaries } from './operator-workspaces.js'
 import { listOrderLifecycles, loadOrderLifecycles } from './order-lifecycle.js'
 import { parse, type ValidationError } from './parse.js'
 import {
@@ -458,7 +461,7 @@ function registerRoutes(
   const respondToOperator = async <A>(
     request: FastifyRequest,
     reply: FastifyReply,
-    effect: Effect.Effect<A, Failure, CurrentUser | Db>,
+    effect: Effect.Effect<A, Failure, ChannelEnvironment | CurrentUser | Db>,
     status = 200,
   ) => {
     const user = await resolveUser(auth, database, request)
@@ -993,6 +996,19 @@ function registerRoutes(
         reply,
         restoreMappingVersion(request.params.mappingId, request.params.versionId),
       ),
+  )
+
+  app.get(operatorWorkspacesEndpoint.path, (request, reply) =>
+    respondToOperator(request, reply, listWorkspaceSummaries),
+  )
+
+  app.post(createWorkspaceEndpoint.path, (request, reply) =>
+    respondToOperator(
+      request,
+      reply,
+      createWorkspace(parse(createWorkspaceEndpoint.body, request.body)),
+      201,
+    ),
   )
 
   app.get<{ Params: { workspaceId: string } }>(

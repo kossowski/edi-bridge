@@ -55,7 +55,7 @@ const hidden: MaskedSecret = { lastFour: null }
 
 const tokenAlphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
 
-const newWebhookToken = () =>
+export const newWebhookToken = () =>
   webhookTokenSchema.parse(
     `whk_${Array.from({ length: 32 }, () => tokenAlphabet[randomInt(tokenAlphabet.length)]).join('')}`,
   )
