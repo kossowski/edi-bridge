@@ -5,7 +5,7 @@ import { expect, screen, userEvent, waitFor, within } from 'storybook/test'
 
 import { MappingsScreen } from '@/components/mappings/mappings-screen'
 import { viewerStory } from '@/components/session/session-story-helpers'
-import { darkMode, findOpenDialog, german, mobile } from '@/components/story-helpers'
+import { darkMode, findOpenDialog, german, loadWait, mobile } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import { createMappingEndpoint, type NewMappingMessageType } from '@edi-bridge/contracts'
 import {
@@ -48,10 +48,7 @@ async function badges(canvasElement: HTMLElement, name: string) {
 }
 
 async function openNewMappingSheet(canvasElement: HTMLElement, name = 'New Mapping') {
-  // The button shows once the Mappings load, which can pass the default second under load.
-  await userEvent.click(
-    await within(canvasElement).findByRole('button', { name }, { timeout: 5000 }),
-  )
+  await userEvent.click(await within(canvasElement).findByRole('button', { name }, loadWait))
 
   return within(await findOpenDialog(canvasElement, name))
 }
@@ -618,7 +615,7 @@ export const EmptyWorkspaceDocumentStructureMissing = meta.story({
     msw.use(...mappingHandlers(apiUrl, { mappings: [] }))
   },
   async play({ canvas }) {
-    await canvas.findByRole('combobox', { name: 'Your data format' })
+    await canvas.findByRole('combobox', { name: 'Your data format' }, loadWait)
     await userEvent.click(canvas.getByRole('button', { name: 'Invoices you send' }))
 
     const error = await canvas.findByText('Choose your data format first.')

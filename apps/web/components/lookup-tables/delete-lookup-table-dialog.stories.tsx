@@ -1,8 +1,8 @@
 import { http, HttpResponse } from 'msw'
-import { expect, fn, screen, userEvent, waitFor } from 'storybook/test'
+import { expect, fn, screen, userEvent } from 'storybook/test'
 
 import { DeleteLookupTableDialog } from '@/components/lookup-tables/delete-lookup-table-dialog'
-import { german, waitForFocusInside } from '@/components/story-helpers'
+import { findOpenDialog, german, waitForFocusInside } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import {
   deleteLookupTableEndpoint,
@@ -18,10 +18,9 @@ const units = toLookupTableSummary(seedLookupTableNamed('Units of measure'), {
   get: (id) => seedTradingPartners.find((tradingPartner) => tradingPartner.id === id),
 })
 
-// Waits out the opening fade and the initial focus, so checks and clicks see the settled dialog.
-async function dialog() {
-  const element = await screen.findByRole('dialog')
-  await waitFor(() => expect(element).toBeVisible())
+async function dialog(canvasElement: HTMLElement) {
+  const element = await findOpenDialog(canvasElement, new RegExp(units.name))
+  // A click before the dialog takes the focus can land on the page behind it.
   await waitForFocusInside(element)
 
   return element
@@ -42,8 +41,8 @@ const meta = preview.meta({
 })
 
 export const Default = meta.story({
-  async play() {
-    await dialog()
+  async play({ canvasElement }) {
+    await dialog(canvasElement)
     await expect(
       screen.getByText('The code translation and its 4 values are deleted. This cannot be undone.'),
     ).toBeVisible()
@@ -64,8 +63,8 @@ export const InUse = meta.story({
   beforeEach({ msw }) {
     msw.use(refuseInUse)
   },
-  async play({ args }) {
-    await dialog()
+  async play({ args, canvasElement }) {
+    await dialog(canvasElement)
     await userEvent.click(screen.getByRole('button', { name: 'Delete code translation' }))
 
     await expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -85,8 +84,8 @@ export const GermanInUse = meta.story({
   beforeEach({ msw }) {
     msw.use(refuseInUse)
   },
-  async play() {
-    await dialog()
+  async play({ canvasElement }) {
+    await dialog(canvasElement)
     await userEvent.click(screen.getByRole('button', { name: 'Code-Übersetzung löschen' }))
 
     await expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -97,8 +96,8 @@ export const GermanInUse = meta.story({
 
 export const German = meta.story({
   decorators: [german],
-  async play() {
-    await dialog()
+  async play({ canvasElement }) {
+    await dialog(canvasElement)
     await expect(screen.getByRole('button', { name: 'Code-Übersetzung löschen' })).toBeVisible()
   },
 })
@@ -109,8 +108,8 @@ export const Dark = meta.story({
 
     return () => document.documentElement.classList.remove('dark')
   },
-  async play() {
-    await dialog()
+  async play({ canvasElement }) {
+    await dialog(canvasElement)
     await expect(screen.getByRole('button', { name: 'Delete code translation' })).toBeVisible()
   },
 })

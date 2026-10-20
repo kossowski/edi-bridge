@@ -24,8 +24,8 @@ function failingUpdate(status: number) {
   )
 }
 
-// The closing listbox stays on the page until its next frame, which a busy runner delays.
 async function waitForListboxClosed() {
+  // The closing listbox stays on the page until its next frame, which a busy runner delays.
   await waitFor(() => expect(screen.queryByRole('listbox')).toBeNull())
 }
 
@@ -35,10 +35,12 @@ async function choose(trigger: HTMLElement, option: string | RegExp) {
   await waitForListboxClosed()
 }
 
-async function expectOptions(trigger: HTMLElement, options: unknown[]) {
+async function expectOptions(trigger: HTMLElement, options: RegExp[]) {
   await userEvent.click(trigger)
   await waitFor(() =>
-    expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual(options),
+    expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual(
+      options.map((option) => expect.stringMatching(option)),
+    ),
   )
   await userEvent.keyboard('{Escape}')
   await waitForListboxClosed()
@@ -116,10 +118,10 @@ export const OutboundMessageType = meta.story({
     )
 
     await expectOptions(canvas.getByRole('combobox', { name: 'Inbound connection' }), [
-      expect.stringMatching(/^ERP webhook/),
+      /^ERP webhook/,
     ])
     await expectOptions(canvas.getByRole('combobox', { name: 'Destination connection' }), [
-      expect.stringMatching(/^Hansemarkt SFTP outbox/),
+      /^Hansemarkt SFTP outbox/,
     ])
   },
 })
