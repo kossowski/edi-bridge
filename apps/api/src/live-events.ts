@@ -1,0 +1,99 @@
+import { Effect } from 'effect'
+import { PassThrough } from 'node:stream'
+
+import type { FastifyReply } from 'fastify'
+
+import type { LiveEvent } from '@edi-bridge/contracts'
+import type { LiveEventListener, LiveEventsService } from '@edi-bridge/pipeline'
+
+export interface LiveEventHub {
+  service: LiveEventsService
+  subscribe: (workspaceId: string, listener: LiveEventListener) => () => void
+}
+
+// Without Redis, the api announces nothing and its streams carry only heartbeats.
+export const silentLiveEvents: LiveEventHub = {
+  service: { publish: () => Effect.void },
+  subscribe: () => () => {},
+}
+
+// Cloudflare ends a response idle for 100 s, so a comment keeps the stream open.
+export const defaultHeartbeatMs = 25_000
+
+// Proxies pass the stream on as it is written instead of buffering it.
+const eventStreamHeaders = {
+  'content-type': 'text/event-stream; charset=utf-8',
+  'cache-control': 'no-cache, no-transform',
+  'x-accel-buffering': 'no',
+}
+
+// A client that stops reading reconnects and refetches instead of growing the buffer without bound.
+const maxBufferedBytes = 1024 * 1024
+
+const frame = (event: LiveEvent) => `data:${JSON.stringify(event)}\n\n`
+
+export function liveEventStreams(hub: LiveEventHub, heartbeatMs: number) {
+  const open = new Set<() => void>()
+
+  return {
+    stream: (reply: FastifyReply, workspaceId: string, stillMember: () => Promise<boolean>) => {
+      const stream = new PassThrough()
+
+      const unsubscribe = hub.subscribe(workspaceId, (event) => {
+        stream.write(frame(event))
+
+        // Ending the stream would queue behind the unread bytes, so the response goes at once.
+        if (stream.writableLength > maxBufferedBytes) {
+          reply.raw.destroy()
+        }
+      })
+
+      let checking = false
+
+      // A session can end or a Member leave while the stream stays open.
+      const heartbeat = setInterval(() => {
+        stream.write(':heartbeat\n\n')
+
+        if (checking) {
+          return
+        }
+
+        checking = true
+        void stillMember()
+          .catch(() => false)
+          .then((member) => {
+            checking = false
+
+            if (!member) {
+              end()
+            }
+          })
+      }, heartbeatMs)
+
+      const end = () => {
+        if (!open.has(end)) {
+          return
+        }
+
+        clearInterval(heartbeat)
+        unsubscribe()
+        open.delete(end)
+        stream.end()
+      }
+
+      open.add(end)
+      reply.raw.once('close', end)
+
+      // The first bytes make proxies forward the headers at once.
+      stream.write(':connected\n\n')
+
+      return reply.headers(eventStreamHeaders).send(stream)
+    },
+    // A closing server waits for open responses, so it ends every stream first.
+    endAll: () => {
+      for (const end of open) {
+        end()
+      }
+    },
+  }
+}

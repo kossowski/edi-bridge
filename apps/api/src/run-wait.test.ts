@@ -157,7 +157,29 @@ describe('a failed inbound Run', () => {
   })
 })
 
+const announcedSince = (id: string, count = 0) =>
+  api.liveEvents.published
+    .filter(({ event }) => event.run.id === id)
+    .slice(count)
+    .map(({ workspaceId, event }) => ({
+      workspaceId,
+      type: event.type,
+      run: event.run.id,
+      status: event.run.status,
+    }))
+
 describe('POST /runs/:id/wait-for-trading-partner', () => {
+  it('announces the change of the marked Run to its Workspace', async () => {
+    const id = await processed('orders.edi', invalidOrders)
+    const count = announcedSince(id).length
+
+    await markWaiting(id)
+
+    expect(announcedSince(id, count)).toEqual([
+      { workspaceId: workspace.id, type: 'run.changed', run: id, status: 'failed' },
+    ])
+  })
+
   it('marks a Run that the Trading Partner fixes as waiting for the Trading Partner', async () => {
     const id = await processed('orders.edi', invalidOrders)
     const before = Date.now()
@@ -282,6 +304,20 @@ describe('POST /runs/:id/wait-for-trading-partner', () => {
 })
 
 describe('DELETE /runs/:id/wait-for-trading-partner', () => {
+  it('announces the change of the Run whose wait ended to its Workspace', async () => {
+    const id = await processed('orders.edi', invalidOrders)
+
+    await markWaiting(id)
+
+    const count = announcedSince(id).length
+
+    await endWaiting(id)
+
+    expect(announcedSince(id, count)).toEqual([
+      { workspaceId: workspace.id, type: 'run.changed', run: id, status: 'failed' },
+    ])
+  })
+
   it('ends the mark of a waiting Run', async () => {
     const id = await processed('orders.edi', invalidOrders)
     await markWaiting(id)

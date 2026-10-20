@@ -33,8 +33,10 @@ import { flows, mappingVersions, runs, runSteps, tradingPartners } from '@edi-br
 import {
   isFixedByReprocess,
   Database as PipelineDatabase,
+  publishRunChanges,
   reprocessRun as reprocessInPipeline,
   retryRun as retryDelivery,
+  runSummariesOf,
 } from '@edi-bridge/pipeline'
 
 import { Db, type Database } from './db.js'
@@ -136,9 +138,13 @@ export const listRunSummaries = async (db: Database, ids: readonly string[]) => 
     return []
   }
 
-  const rows = await selectRuns(db, {}).where(inArray(runs.id, [...ids]))
+  const byId = new Map((await runSummariesOf(db, ids)).map(({ run }) => [run.id, run]))
 
-  return ids.flatMap((id) => rows.filter((row) => row.id === id).map(toSummary))
+  return ids.flatMap((id) => {
+    const run = byId.get(id)
+
+    return run === undefined ? [] : [run]
+  })
 }
 
 // A Run not yet processed will be mapped with the Mapping Version its Flow pins.
@@ -377,6 +383,11 @@ export const retryRun = (id: string) =>
     return yield* loadRun(id)
   })
 
+const announceChangeOf = (id: string) =>
+  Effect.flatMap(Db, (db) =>
+    publishRunChanges([id]).pipe(Effect.provideService(PipelineDatabase, db)),
+  )
+
 export const waitForTradingPartnerRun = (id: string) =>
   Effect.gen(function* () {
     const db = yield* Db
@@ -402,6 +413,8 @@ export const waitForTradingPartnerRun = (id: string) =>
     if (!marked) {
       return yield* new Conflict({ message: 'The Run can no longer wait for the Trading Partner' })
     }
+
+    yield* announceChangeOf(id)
 
     return yield* loadRun(id)
   })
@@ -460,6 +473,8 @@ export const endWaitingForTradingPartnerRun = (id: string) =>
         message: 'Only a Run that waits for the Trading Partner can end its wait',
       })
     }
+
+    yield* announceChangeOf(id)
 
     return yield* loadRun(id)
   })
