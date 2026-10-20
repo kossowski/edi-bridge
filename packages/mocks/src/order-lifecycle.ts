@@ -125,7 +125,7 @@ const lifecycleSeeds: LifecycleSeed[] = [
         messageType: 'ORDERS',
         hoursAgo: 30,
         outcome: 'delivered',
-        notSentReason: 'noOutboundChannel',
+        notSentReason: 'unechoableInterchangeHeader',
       },
       { messageType: 'DESADV', hoursAgo: 3, outcome: 'delivered' },
     ],

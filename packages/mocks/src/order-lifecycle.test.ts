@@ -110,7 +110,7 @@ describe('GET /order-lifecycles/:businessReference', () => {
         interchange?.notSentReason,
       ]),
     ).toEqual([
-      ['ORDERS', 'noOutboundChannel'],
+      ['ORDERS', 'unechoableInterchangeHeader'],
       ['DESADV', null],
     ])
   })
@@ -139,7 +139,7 @@ describe('GET /order-lifecycles/:businessReference', () => {
             messageType: 'ORDERS',
             hoursAgo: 30,
             outcome: 'mapping',
-            notSentReason: 'noOutboundChannel',
+            notSentReason: 'unechoableInterchangeHeader',
             reprocessed: { hoursAgo: 28 },
           },
         ],
@@ -153,7 +153,7 @@ describe('GET /order-lifecycles/:businessReference', () => {
       ]),
     ).toEqual([
       [false, null],
-      [true, 'noOutboundChannel'],
+      [true, 'unechoableInterchangeHeader'],
     ])
   })
 
