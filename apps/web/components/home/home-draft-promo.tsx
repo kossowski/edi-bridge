@@ -209,9 +209,10 @@ function DraftAction() {
   const create = useCreateMappingWithDraft()
   const documentStructures = useQuery(documentStructuresQuery)
   const documentStructureId = onlyDocumentStructureId(documentStructures.data)
-  const locked = create.locked || documentStructures.isPending
+  const loading = documentStructures.isPending
+  const locked = create.locked || loading
 
-  if (!documentStructures.isPending && documentStructureId === null) {
+  if (!loading && documentStructureId === null) {
     return (
       <Link href={newMappingHref('ORDERS')} className={cn(buttonVariants({ size: 'lg' }), 'mt-1')}>
         <HugeiconsIcon icon={AiMagicIcon} strokeWidth={2} data-icon="inline-start" />
@@ -224,6 +225,7 @@ function DraftAction() {
     <>
       <Button
         size="lg"
+        aria-busy={loading || undefined}
         aria-disabled={locked || undefined}
         className="mt-1 aria-disabled:cursor-progress aria-disabled:opacity-50"
         onClick={() => {
@@ -231,7 +233,7 @@ function DraftAction() {
             create.start({ messageType: 'ORDERS', documentStructureId })
           }
         }}>
-        {create.locked ? (
+        {locked ? (
           <Spinner role="presentation" aria-hidden data-icon="inline-start" />
         ) : (
           <HugeiconsIcon icon={AiMagicIcon} strokeWidth={2} data-icon="inline-start" />

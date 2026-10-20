@@ -40,7 +40,8 @@ const button = 'Draft a mapping with AI'
 async function findDraftButton(canvas: { findByRole: typeof screen.findByRole }) {
   const draft = await canvas.findByRole('button', { name: button })
 
-  await waitFor(() => expect(draft).not.toHaveAttribute('aria-disabled'))
+  await waitFor(() => expect(draft).not.toHaveAttribute('aria-busy'))
+  await expect(draft).not.toHaveAttribute('aria-disabled')
 
   return draft
 }
@@ -186,6 +187,7 @@ export const DocumentStructuresLoading = meta.story({
     const createBodies = recordCreates(msw)
     const draft = await canvas.findByRole('button', { name: button })
 
+    await expect(draft).toHaveAttribute('aria-busy', 'true')
     await expect(draft).toHaveAttribute('aria-disabled', 'true')
     await userEvent.click(draft)
     await expect(createBodies).toEqual([])
