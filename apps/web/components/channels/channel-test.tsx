@@ -34,7 +34,14 @@ function TestedKey({
   const t = useTranslations('Channel.test.hostKey')
 
   if (hostKey.state === 'matches') {
-    return <p>{t('matches')}</p>
+    return (
+      <div className="flex flex-col gap-2">
+        <p>{t('matches')}</p>
+        <dl>
+          <KeyValue fingerprint={hostKey.fingerprint} label={t('shown')} />
+        </dl>
+      </div>
+    )
   }
 
   const confirmed = channel.type === 'sftp' ? (channel.hostKeyFingerprint ?? null) : null
@@ -99,7 +106,10 @@ function TestOutcome({
     <TestedKey accept={accept} channel={channel} hostKey={result.hostKey} />
   )
 
-  return result.outcome === 'succeeded' ? (
+  // Once the new key is accepted, the mismatch no longer says anything wrong about the server.
+  const mismatchAccepted = result.hostKey?.state === 'mismatch' && accept.isSuccess
+
+  return result.outcome === 'succeeded' || mismatchAccepted ? (
     <div className="flex items-start gap-2 text-sm">
       <HugeiconsIcon
         icon={CheckmarkCircle02Icon}
@@ -109,7 +119,8 @@ function TestOutcome({
       />
       <div className="flex flex-col gap-1">
         <p>
-          {t('succeeded')} <span className="text-muted-foreground">{tested}</span>
+          {result.outcome === 'succeeded' && `${t('succeeded')} `}
+          <span className="text-muted-foreground">{tested}</span>
         </p>
         {hostKey}
       </div>

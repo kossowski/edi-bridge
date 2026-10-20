@@ -115,6 +115,7 @@ function HostKey({ channel }: { channel: SftpChannel }) {
           <div className="flex flex-col gap-1">
             <p className="font-medium">{t('unchecked.title')}</p>
             <p>{t('unchecked.description')}</p>
+            <p>{canChange ? t('unchecked.action') : t('unchecked.viewOnly')}</p>
           </div>
         </div>
       ) : (

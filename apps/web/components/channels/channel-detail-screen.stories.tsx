@@ -78,6 +78,7 @@ export const ConfirmedHostKey = meta.story({
 
     await userEvent.click(section.getByRole('button', { name: /^Test connection/ }))
     await expect(await section.findByText('The server showed the confirmed key.')).toBeVisible()
+    await expect(section.getAllByText(confirmedKeyOf(sftpInbox))).toHaveLength(2)
     await expect(section.queryByRole('button', { name: /^Accept/ })).toBeNull()
   },
 })
@@ -88,6 +89,7 @@ export const UncheckedHostKey = meta.story({
     await canvas.findByRole('heading', { name: 'Host key' })
     const section = hostKeySection(canvasElement)
     await expect(section.getByText("The server's key is not checked yet.")).toBeVisible()
+    await expect(section.getByText(/paste the key when you edit the connection\.$/)).toBeVisible()
 
     await userEvent.click(section.getByRole('button', { name: /^Test connection/ }))
     await expect(await section.findByText('The connection works.')).toBeVisible()
@@ -121,6 +123,8 @@ export const MismatchingHostKey = meta.story({
     await expect(
       await section.findByText('Key accepted. EDI Bridge checks it on every connection.'),
     ).toBeVisible()
+    await expect(section.queryByText('The server showed a different key.')).toBeNull()
+    await expect(section.queryByText(confirmedKeyOf(replacedKeyOutbox))).toBeNull()
     await expect(section.getAllByText(shown)[0]).toBeVisible()
   },
 })
@@ -156,7 +160,7 @@ export const UncheckedHostKeyGerman = meta.story({
   ],
   async play({ canvas }) {
     await expect(
-      await canvas.findByText('Der Schlüssel des Servers wird noch nicht geprüft.'),
+      await canvas.findByText('Der Serverschlüssel wird noch nicht geprüft.'),
     ).toBeVisible()
     await userEvent.click(canvas.getByRole('button', { name: /^Verbindung testen/ }))
     await expect(
@@ -337,6 +341,8 @@ export const ViewerUncheckedHostKey = meta.story({
   ...viewerStory({
     async play({ canvas }) {
       await expect(await canvas.findByText("The server's key is not checked yet.")).toBeVisible()
+      await expect(canvas.getByText('An Admin can confirm the key.')).toBeVisible()
+      await expect(canvas.queryByText(/when you edit the connection/)).toBeNull()
       await expect(canvas.queryByRole('button', { name: /^Test connection/ })).toBeNull()
     },
   }),

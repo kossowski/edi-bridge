@@ -103,7 +103,9 @@ export const PasteHostKey = meta.story({
   async play({ canvas }) {
     const field = canvas.getByLabelText('Host key fingerprint (optional)')
     await expect(field).toHaveValue('')
-    await expect(canvas.getByText(/Ed25519 host key, as ssh-keygen -lf prints it/)).toBeVisible()
+    await expect(
+      canvas.getByText(/host key \(usually Ed25519\), as ssh-keygen -lf prints it/),
+    ).toBeVisible()
     await userEvent.type(field, '16:27:ac:a5')
     await userEvent.click(canvas.getByRole('button', { name: 'Create Channel' }))
     await expect(
