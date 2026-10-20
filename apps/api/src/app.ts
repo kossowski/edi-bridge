@@ -476,10 +476,10 @@ function registerRoutes(
 
   app.get(sessionEndpoint.path, (request, reply) => respond(request, reply, loadSession))
 
-  const liveEventStreamsOfApp = liveEventStreams(liveEvents, liveEventHeartbeatMs)
+  const eventStreams = liveEventStreams(liveEvents, liveEventHeartbeatMs)
 
   app.addHook('preClose', (done) => {
-    liveEventStreamsOfApp.endAll()
+    eventStreams.endAll()
     done()
   })
 
@@ -493,7 +493,7 @@ function registerRoutes(
     const stillMember = async () =>
       (await resolveMember(auth, database, request))?.workspaceId === member.workspaceId
 
-    return liveEventStreamsOfApp.stream(reply, member.workspaceId, stillMember)
+    return eventStreams.stream(reply, member.workspaceId, stillMember)
   })
 
   app.get(currentWorkspaceEndpoint.path, (request, reply) =>
