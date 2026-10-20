@@ -1,5 +1,5 @@
 import cors from '@fastify/cors'
-import { Effect, Match, Predicate } from 'effect'
+import { Effect, Match, Predicate, Tracer } from 'effect'
 import Fastify from 'fastify'
 
 import type { LanguageModel } from 'ai'
@@ -255,6 +255,7 @@ export interface AppDependencies {
   probes: { postgres: Probe; redis: Probe }
   probeTimeoutMs?: number
   runQueue: RunQueueService
+  tracer?: Tracer.Tracer | undefined
   webOrigin?: string | undefined
   webhookRateLimiter: WebhookRateLimiter
 }
@@ -396,6 +397,7 @@ function registerRoutes(
     probes,
     probeTimeoutMs = 2000,
     runQueue,
+    tracer = Tracer.nativeTracer,
     webOrigin,
     webhookRateLimiter,
   }: AppDependencies,
@@ -442,6 +444,7 @@ function registerRoutes(
         Effect.provideService(ChannelReach, reach),
         Effect.provideService(RunQueue, runQueue),
         Effect.provideService(LiveEvents, liveEvents.service),
+        Effect.provideService(Tracer.Tracer, tracer),
       ),
     )
 

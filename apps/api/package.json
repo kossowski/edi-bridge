@@ -25,6 +25,8 @@
     "@edi-bridge/mapping": "workspace:*",
     "@edi-bridge/pipeline": "workspace:*",
     "@fastify/cors": "^11.3.1",
+    "@sentry/core": "^11.8.0",
+    "@sentry/node": "^11.8.0",
     "ai": "^7.0.143",
     "better-auth": "^1.7.7",
     "bullmq": "^6.3.16",

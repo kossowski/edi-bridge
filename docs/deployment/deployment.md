@@ -69,29 +69,32 @@ Each application's Dokploy **Environment** settings contain values with the form
 
 `<postgres-password>` and `<redis-password>` represent the corresponding passwords stored in Dokploy. Passwords in connection URLs require URL encoding if they contain characters with a special meaning in URLs.
 
-| Application | Variable                       | Value template                                                                 |
-| ----------- | ------------------------------ | ------------------------------------------------------------------------------ |
-| web         | `NODE_ENV`                     | `production`                                                                   |
-| web         | `HOSTNAME`                     | `0.0.0.0`                                                                      |
-| web         | `PORT`                         | `3000`                                                                         |
-| api         | `NODE_ENV`                     | `production`                                                                   |
-| api         | `API_PORT`                     | `3001`                                                                         |
-| api, worker | `DATABASE_URL`                 | `postgres://edi_bridge:<postgres-password>@<postgres-service>:5432/edi_bridge` |
-| api         | `WEB_ORIGIN`                   | Not set; see below                                                             |
-| api         | `BETTER_AUTH_URL`              | `https://edi-bridge.example.com`                                               |
-| api         | `BETTER_AUTH_SECRET`           | `<auth-secret>`                                                                |
-| api, worker | `CHANNEL_SECRET_KEY`           | `<channel-secret-key>`                                                         |
-| api         | `API_PUBLIC_URL`               | Not set; see below                                                             |
-| api         | `ANTHROPIC_API_KEY`            | `<anthropic-api-key>`                                                          |
-| api         | `AI_MODEL`                     | Not set; see below                                                             |
-| api, worker | `REDIS_URL`                    | `redis://:<redis-password>@<redis-service>:6379`                               |
-| worker      | `NODE_ENV`                     | `production`                                                                   |
-| worker      | `WORKER_HEALTH_PORT`           | `3002`                                                                         |
-| worker      | `RUN_REQUEUE_INTERVAL_SECONDS` | Not set; see below                                                             |
-| worker      | `RUN_STUCK_AFTER_MINUTES`      | Not set; see below                                                             |
-| worker      | `SENTRY_DSN`                   | `<sentry-dsn>`; see [Error monitoring](#error-monitoring)                      |
-| worker      | `SENTRY_ENVIRONMENT`           | `production`                                                                   |
-| worker      | `SENTRY_TRACES_SAMPLE_RATE`    | Not set; see [Error monitoring](#error-monitoring)                             |
+| Application | Variable                       | Value template                                                                               |
+| ----------- | ------------------------------ | -------------------------------------------------------------------------------------------- |
+| web         | `NODE_ENV`                     | `production`                                                                                 |
+| web         | `HOSTNAME`                     | `0.0.0.0`                                                                                    |
+| web         | `PORT`                         | `3000`                                                                                       |
+| api         | `NODE_ENV`                     | `production`                                                                                 |
+| api         | `API_PORT`                     | `3001`                                                                                       |
+| api, worker | `DATABASE_URL`                 | `postgres://edi_bridge:<postgres-password>@<postgres-service>:5432/edi_bridge`               |
+| api         | `WEB_ORIGIN`                   | Not set; see below                                                                           |
+| api         | `BETTER_AUTH_URL`              | `https://edi-bridge.example.com`                                                             |
+| api         | `BETTER_AUTH_SECRET`           | `<auth-secret>`                                                                              |
+| api, worker | `CHANNEL_SECRET_KEY`           | `<channel-secret-key>`                                                                       |
+| api         | `API_PUBLIC_URL`               | Not set; see below                                                                           |
+| api         | `ANTHROPIC_API_KEY`            | `<anthropic-api-key>`                                                                        |
+| api         | `AI_MODEL`                     | Not set; see below                                                                           |
+| api         | `SENTRY_DSN`                   | `<api-sentry-dsn>`; see [Error monitoring of the API](#error-monitoring-of-the-api)          |
+| api         | `SENTRY_ENVIRONMENT`           | `production`                                                                                 |
+| api         | `SENTRY_TRACES_SAMPLE_RATE`    | Not set; see [Error monitoring of the API](#error-monitoring-of-the-api)                     |
+| api, worker | `REDIS_URL`                    | `redis://:<redis-password>@<redis-service>:6379`                                             |
+| worker      | `NODE_ENV`                     | `production`                                                                                 |
+| worker      | `WORKER_HEALTH_PORT`           | `3002`                                                                                       |
+| worker      | `RUN_REQUEUE_INTERVAL_SECONDS` | Not set; see below                                                                           |
+| worker      | `RUN_STUCK_AFTER_MINUTES`      | Not set; see below                                                                           |
+| worker      | `SENTRY_DSN`                   | `<worker-sentry-dsn>`; see [Error monitoring of the worker](#error-monitoring-of-the-worker) |
+| worker      | `SENTRY_ENVIRONMENT`           | `production`                                                                                 |
+| worker      | `SENTRY_TRACES_SAMPLE_RATE`    | Not set; see [Error monitoring of the worker](#error-monitoring-of-the-worker)               |
 
 These runtime variables require neither Docker build arguments nor a repository `.env` file.
 
@@ -111,13 +114,19 @@ These runtime variables require neither Docker build arguments nor a repository 
 
 `AI_MODEL` is the Anthropic model that drafts the Mappings. Its default is `claude-sonnet-5-5`. Set it only to draft with another model.
 
-## Error monitoring
+## Error monitoring of the worker
 
 The worker reports Defects and uncaught errors to Sentry, and sends a sample of its traces. Sentry is optional: without `SENTRY_DSN`, the worker starts and sends nothing.
 
-`<sentry-dsn>` is the DSN of the Sentry project, stored in Dokploy. `SENTRY_ENVIRONMENT` is the environment that Sentry files the events under. `SENTRY_TRACES_SAMPLE_RATE` is the share of Runs whose traces the worker sends, from `0` to `1`. Its default is `0.1`. A Run whose receipt was traced continues the trace of its receipt, and a Run whose receipt was not traced sends no trace. A Run queued without the trace of a receipt, for example by the sweep, a Retry or a Reprocess, is sampled anew at this rate.
+The API and the worker each read `SENTRY_DSN` from the environment of their own Dokploy service. Use one Sentry project for each application, so the events of each application stay apart.
+
+`<worker-sentry-dsn>` is the DSN of the Sentry project of the worker, stored in Dokploy. `SENTRY_ENVIRONMENT` is the environment that Sentry files the events under, for example `production` or `staging`. `SENTRY_TRACES_SAMPLE_RATE` is the share of Runs whose traces the worker sends, from `0` to `1`. Its default is `0.1`. A Run whose receipt was traced continues the trace of its receipt, and a Run whose receipt was not traced sends no trace. A Run queued without the trace of a receipt, for example by the sweep, a Retry or a Reprocess, is sampled anew at this rate.
 
 A Defect event carries the failure code, the Workspace, Run, Trading Partner and Channel ids as tags, and the stack frames of the Defect. It carries no Document contents, Channel secrets or error messages. An uncaught error arrives with the stack frames and the type of the error and its causes, without their error messages. A Run that fails at parse, validation or setup, or an inbound Channel that fails to poll, sends no event. A failed Run job is not reported a second time: the processing of the Run reports its Defect.
+
+## Error monitoring of the API
+
+`<api-sentry-dsn>` is the DSN of the Sentry project of the API, stored in Dokploy. Without it, the API sends nothing to Sentry. With it, the API reports unexpected errors, the requests that fail with HTTP 5xx, but no rejected request with HTTP 4xx. The API sends traces of its requests. The trace of a webhook request or a Manual Submission continues in the worker that processes its Runs. Reports and traces leave out request bodies, headers, cookies, error messages and logs, because they can contain Documents, Channel secrets or session tokens. `SENTRY_ENVIRONMENT` is the environment that Sentry files the events under, for example `production` or `staging`. `SENTRY_TRACES_SAMPLE_RATE` is the share of requests that the API traces, from `0` to `1`. Its default is `0.1`.
 
 ## API URL of the web application
 
