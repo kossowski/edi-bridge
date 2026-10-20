@@ -1121,7 +1121,7 @@ describe('a Run whose Document expired', () => {
     expect(body).toMatchObject({ id: run.id, status: 'received', replacedBy: null })
   })
 
-  it('seeds a failed mapping Run that the Workspace would reprocess, deleted after its receipt', async () => {
+  it('seeds a failed mapping Run that the Workspace would reprocess, deleted after it was received', async () => {
     const runs = createRuns({ count: 2000 })
     const reprocessed = seedReprocessed(runs)
     const documentDeletedAt = seedExpiredDocuments(runs, reprocessed)

@@ -2,6 +2,7 @@ import { http, HttpResponse } from 'msw'
 
 import {
   directionOf,
+  documentRetentionDays,
   type Interchange,
   interchangeEndpoint,
   interchangeSchema,
@@ -132,8 +133,8 @@ export function seedReprocessed(runs: ReadonlyArray<RunSummary> = seedRuns()): R
   })
 }
 
-// Retention deletes a Document no sooner than 7 days after its receipt.
-const shortestRetention = 7 * 24 * 60 * 60 * 1000
+// Retention deletes a Document no sooner than its shortest period after it was received.
+const shortestRetention = documentRetentionDays.min * 24 * 60 * 60 * 1000
 
 export function seedExpiredDocuments(
   runs: ReadonlyArray<RunSummary> = seedRuns(),
