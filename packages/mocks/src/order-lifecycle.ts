@@ -46,7 +46,8 @@ export const orderLifecycleReferences = {
   serverError: '5000',
 } as const
 
-type AcknowledgementOutcome = Extract<AcknowledgementState, 'accepted' | 'rejected'>
+// Untracked: handed over before Acknowledgements were tracked, so it has none.
+type AcknowledgementOutcome = Extract<AcknowledgementState, 'accepted' | 'rejected'> | 'untracked'
 
 type MessageSeed = {
   messageType: OrderLifecycleMessageType
@@ -139,7 +140,7 @@ const lifecycleSeeds: LifecycleSeed[] = [
         messageType: 'DESADV',
         hoursAgo: 8 * 24,
         outcome: 'delivered',
-        acknowledgement: 'accepted',
+        acknowledgement: 'untracked',
       },
       {
         messageType: 'INVOIC',
@@ -211,7 +212,11 @@ function acknowledgementOf(
   outcome: AcknowledgementOutcome | undefined,
   tradingPartner: Pick<TradingPartner, 'acknowledgementTimeLimitHours'>,
   now: Date,
-): AcknowledgementState {
+): AcknowledgementState | null {
+  if (outcome === 'untracked') {
+    return null
+  }
+
   return (
     outcome ?? (overdueSinceOf(sentAt, tradingPartner) <= now.getTime() ? 'overdue' : 'pending')
   )

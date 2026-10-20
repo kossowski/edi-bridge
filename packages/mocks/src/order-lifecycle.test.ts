@@ -172,6 +172,23 @@ describe('GET /order-lifecycles/:businessReference', () => {
     ])
   })
 
+  it('counts a DESADV sent before Acknowledgements were tracked as done', async () => {
+    server.use(orderLifecycleHandler(apiUrl))
+
+    const lifecycles = await lifecyclesOf(orderLifecycleReferences.multiPartner)
+
+    const hansemarkt = lifecycles.find(
+      ({ tradingPartner }) => tradingPartner.name === 'Hansemarkt GmbH',
+    )!
+
+    expect(stepsOf(hansemarkt)).toEqual([
+      ['ORDERS', 'delivered', null],
+      ['DESADV', 'delivered', null],
+      ['INVOIC', 'delivered', 'accepted'],
+    ])
+    expect(orderLifecycleStatusOf(hansemarkt.messages)).toBe('done')
+  })
+
   it('shows failed Runs, the Run that reprocessed one and a rejected Acknowledgement', async () => {
     server.use(orderLifecycleHandler(apiUrl))
 
@@ -306,9 +323,9 @@ describe('GET /order-lifecycles', () => {
     expect(body!.orderLifecycles).toEqual([
       expect.objectContaining({
         businessReference: orderLifecycleReferences.partial,
-        status: 'waiting-for-trading-partner',
+        status: 'needs-attention',
         steps: [
-          { messageType: 'ORDERS', state: 'done' },
+          { messageType: 'ORDERS', state: 'needs-attention' },
           { messageType: 'DESADV', state: 'waiting-for-trading-partner' },
           { messageType: 'INVOIC', state: 'open' },
         ],
