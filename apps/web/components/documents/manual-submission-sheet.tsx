@@ -27,6 +27,7 @@ import {
   runKeys,
 } from '@/lib/api/queries'
 import { documentHref } from '@/lib/navigation'
+import { encodeBase64 } from '@edi-bridge/contracts'
 import { Alert, AlertDescription } from '@edi-bridge/ui/components/alert'
 import { Button, buttonVariants } from '@edi-bridge/ui/components/button'
 import {
@@ -321,7 +322,14 @@ function ManualSubmissionForm({
     setFileProblem(problem)
 
     if (channel !== undefined && file !== null && content !== null && problem === null) {
-      submission.mutate({ channel, document: { fileName: file.name, content } })
+      submission.mutate({
+        channel,
+        document: {
+          fileName: file.name,
+          content: encodeBase64(new TextEncoder().encode(content)),
+          encoding: 'utf-8',
+        },
+      })
     } else {
       document.getElementById(channel === undefined ? `${id}-channel` : `${id}-file`)?.focus()
     }

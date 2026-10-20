@@ -191,6 +191,7 @@ export {
   adjustDocumentStructure,
   applyLabels,
   documentStructureLeaves,
+  decodeBase64,
   DocumentStructureProblemError,
   encodeBase64,
   findNode,
@@ -291,12 +292,19 @@ export {
 } from './interchange'
 
 export {
+  type DocumentEncoding,
+  documentEncodings,
+  documentEncodingSchema,
   documentSchema,
+  documentUndecodableProblem,
+  type DocumentUndecodableProblem,
+  documentUndecodableProblemSchema,
+  documentUndecodableStatus,
   type ManualSubmission,
   type ManualSubmissionInput,
   manualSubmissionInputSchema,
   manualSubmissionSchema,
-  maxDocumentLength,
+  maxDocumentBytes,
   submitDocumentEndpoint,
   type SubmittedDocument,
 } from './manual-submission'

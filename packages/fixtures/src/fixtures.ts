@@ -1,10 +1,11 @@
-import type { MessageType } from '@edi-bridge/contracts'
+import type { DocumentEncoding, MessageType } from '@edi-bridge/contracts'
 import type { ParseErrorCode, ValidationErrorCode } from '@edi-bridge/edifact'
 import type { DocumentReadErrorCode, MappingErrorCode } from '@edi-bridge/mapping'
 
 export type FixtureFormat = 'edifact' | 'json' | 'csv'
 
-export type FixtureEncoding = 'iso-8859-1' | 'utf-8' | 'windows-1252'
+// A fixture can be sent as a Manual Submission only in an encoding the contract allows.
+export type FixtureEncoding = DocumentEncoding
 
 export type FixtureFailure =
   | { stage: 'parse'; code: ParseErrorCode }

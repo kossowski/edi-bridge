@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { maxDocumentLength } from '@edi-bridge/contracts'
+import { maxDocumentBytes } from '@edi-bridge/contracts'
 
 import { documentProblem, parseMessageType } from './manual-submission'
 
@@ -14,8 +14,8 @@ describe('documentProblem', () => {
   })
 
   it('accepts a file up to the contract limit and rejects a longer one', () => {
-    expect(documentProblem('x'.repeat(maxDocumentLength))).toBeNull()
-    expect(documentProblem('x'.repeat(maxDocumentLength + 1))).toBe('tooLarge')
+    expect(documentProblem('x'.repeat(maxDocumentBytes))).toBeNull()
+    expect(documentProblem('x'.repeat(maxDocumentBytes + 1))).toBe('tooLarge')
   })
 })
 

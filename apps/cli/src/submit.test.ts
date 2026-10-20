@@ -111,7 +111,7 @@ describe('submit', () => {
   })
 
   // The ERP webhook routes a Document without a Message Type to its only outbound Flow.
-  it('decodes the file in the encoding that --encoding names', async () => {
+  it('sends the file with the encoding that --encoding names', async () => {
     const result = await cli([
       'submit',
       '--channel',
@@ -138,12 +138,12 @@ describe('submit', () => {
     [
       'the file is not valid in the default encoding utf-8',
       ['--channel', 'ERP webhook', dispatchFile],
-      'is not valid utf-8; name its encoding with --encoding',
+      'is not valid utf-8. Choose another encoding, such as Windows-1252 for a typical German CSV.',
     ],
     [
       'the encoding is unknown',
       ['--channel', 'ERP webhook', '--encoding', 'latin-9000', 'invoice.json'],
-      'Unknown encoding "latin-9000"',
+      'Unknown encoding "latin-9000"; name one of utf-8, iso-8859-1, windows-1252',
     ],
     [
       'the Channel name is unknown',
@@ -168,7 +168,7 @@ describe('submit', () => {
     [
       'the Channel is missing',
       ['invoice.json'],
-      'Usage: submit --channel <inbound Channel name> [--encoding <label>] <file>',
+      'Usage: submit --channel <inbound Channel name> [--encoding <encoding>] <file>',
     ],
   ])('fails when %s', async (_, args, message) => {
     const result = await cli(['submit', ...args])

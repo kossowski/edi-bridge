@@ -36,6 +36,7 @@ import {
   endWaitingForTradingPartnerRunEndpoint,
   documentStructureEndpoint,
   documentStructuresEndpoint,
+  documentUndecodableStatus,
   flowEndpoint,
   flowsEndpoint,
   inferDocumentStructureEndpoint,
@@ -59,7 +60,7 @@ import {
   maxLookupTableCsvLength,
   mappingVersionEndpoint,
   mappingVersionsEndpoint,
-  maxDocumentLength,
+  maxDocumentBytes,
   messageTypeStructureEndpoint,
   moveFlowMappingVersionEndpoint,
   operatorWorkspaceMembersEndpoint,
@@ -224,6 +225,7 @@ import type {
   AiReviewOpen,
   Conflict,
   DocumentStructureRejected,
+  DocumentUndecodable,
   Forbidden,
   InviteUnusable,
   NotFound,
@@ -254,6 +256,7 @@ type Failure =
   | AiReviewOpen
   | Conflict
   | DocumentStructureRejected
+  | DocumentUndecodable
   | Forbidden
   | InviteUnusable
   | NotFound
@@ -282,6 +285,7 @@ const statusOfTag: Record<Exclude<Failure['_tag'], 'ReceiptRejected'>, number> =
   InviteUnusable: inviteUnusableStatus,
   Unprocessable: 422,
   DocumentStructureRejected: 422,
+  DocumentUndecodable: documentUndecodableStatus,
   AiReviewOpen: aiReviewOpenStatus,
   AiBudgetExhausted: aiBudgetExhaustedStatus,
   TestInterchangeRefused: testInterchangeRefusedStatus,
@@ -293,7 +297,10 @@ const statusOf = Match.type<Failure>().pipe(
 )
 
 const bodyOf = (error: Failure) => {
-  if (Predicate.isTagged(error, 'DocumentStructureRejected')) {
+  if (
+    Predicate.isTagged(error, 'DocumentStructureRejected') ||
+    Predicate.isTagged(error, 'DocumentUndecodable')
+  ) {
     return error.problem
   }
 
@@ -323,10 +330,11 @@ const lookupTableImportBodyLimit = 6 * maxLookupTableCsvLength + 1024
 // Base64 takes 4 characters per 3 bytes; 1 MiB covers the name, labels and JSON around the Document.
 const documentStructureBodyLimit = Math.ceil(maxEncodedFileBytes / 3) * 4 + 1024 * 1024
 
-const manualSubmissionBodyLimit = 6 * maxDocumentLength + 1024
+// Base64 takes 4 characters per 3 bytes; 4 KiB covers the file name, escaped, and the JSON around.
+const manualSubmissionBodyLimit = Math.ceil(maxDocumentBytes / 3) * 4 + 4096
 
-// UTF-8 takes at most 3 bytes per UTF-16 unit; Fastify buffers the body before the token check.
-const webhookBodyLimit = 3 * maxDocumentLength
+// Fastify buffers the body before the token check.
+const webhookBodyLimit = maxDocumentBytes
 
 const eventStreamHeaders = { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' }
 

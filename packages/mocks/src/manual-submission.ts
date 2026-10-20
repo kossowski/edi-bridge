@@ -1,6 +1,15 @@
 import { http, HttpResponse } from 'msw'
 
-import { directionOf, submitDocumentEndpoint, type TradingPartner } from '@edi-bridge/contracts'
+import {
+  decodeBase64,
+  directionOf,
+  type DocumentEncoding,
+  documentUndecodableProblem,
+  documentUndecodableStatus,
+  submitDocumentEndpoint,
+  type TradingPartner,
+} from '@edi-bridge/contracts'
+import { decodeBytes, decodeInterchange, hexOf } from '@edi-bridge/edifact'
 
 import { type ChannelRecord, type ChannelStore, toChannelStore } from './channel'
 import { type FlowRecord, type FlowStore, toFlowStore } from './flow'
@@ -20,6 +29,30 @@ export function messageTypesOf(content: string): string[] | null {
   }
 
   return [...content.matchAll(messageHeader)].flatMap(([, type]) => (type ? [type] : []))
+}
+
+// The rule of the api: an Interchange in the character set its UNB names, any other Document in
+// the encoding it names.
+function decodedContent(content: string, encoding: DocumentEncoding) {
+  const bytes = decodeBase64(content)
+  const interchange = decodeInterchange(bytes)
+
+  if (interchange !== undefined) {
+    return 'text' in interchange
+      ? { text: interchange.text }
+      : { problem: documentUndecodableProblem(interchange.error.message, null) }
+  }
+
+  const decoded = decodeBytes(bytes, encoding)
+
+  return 'text' in decoded
+    ? { text: decoded.text }
+    : {
+        problem: documentUndecodableProblem(
+          `Byte ${String(decoded.invalidAt + 1)} (${hexOf(bytes[decoded.invalidAt] ?? 0)}) is not valid ${encoding}`,
+          encoding,
+        ),
+      }
 }
 
 type Outcome = { flow: FlowRecord; failed: boolean }
@@ -76,6 +109,12 @@ export function manualSubmissionHandler(
       return badRequest(body.error.message)
     }
 
+    const decoded = decodedContent(body.data.document.content, body.data.document.encoding)
+
+    if ('problem' in decoded) {
+      return HttpResponse.json(decoded.problem, { status: documentUndecodableStatus })
+    }
+
     const channel = channelStore.get(body.data.channelId)
 
     if (!channel) {
@@ -97,10 +136,7 @@ export function manualSubmissionHandler(
       return unprocessable('No Flow routes Documents from this Channel')
     }
 
-    const { outcomes: routedOutcomes, notRouted } = routingOf(body.data.document.content, [
-      first,
-      ...rest,
-    ])
+    const { outcomes: routedOutcomes, notRouted } = routingOf(decoded.text, [first, ...rest])
 
     if (routedOutcomes.length === 0) {
       return unprocessable('No Flow on this Channel routes a Message of this Document')

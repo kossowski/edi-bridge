@@ -1,7 +1,13 @@
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
-import { type ManualSubmissionInput, submitDocumentEndpoint } from '@edi-bridge/contracts'
+import {
+  type DocumentEncoding,
+  documentUndecodableProblemSchema,
+  encodeBase64,
+  type ManualSubmissionInput,
+  submitDocumentEndpoint,
+} from '@edi-bridge/contracts'
 
 import { seedChannels } from './channel'
 import { createFlowStore, seedFlows } from './flow'
@@ -42,6 +48,13 @@ const mixed = [
   "UNH+3+PRICAT:D:96A:UN:EAN008'BGM+9+PL-1+9'UNT+3+3'",
   "UNZ+3+4712'",
 ].join('\n')
+
+// btoa takes each character as one byte, its ISO 8859-1 code point.
+function documentOf(fileName: string, text: string, encoding: DocumentEncoding = 'utf-8') {
+  const content = encoding === 'utf-8' ? encodeBase64(new TextEncoder().encode(text)) : btoa(text)
+
+  return { fileName, content, encoding }
+}
 
 function use(runs = createRunStore([])) {
   server.use(manualSubmissionHandler(apiUrl, { runs, flows: createFlowStore() }))
@@ -85,7 +98,7 @@ describe('manualSubmissionHandler', () => {
 
     const { runs: created, notRouted } = await submitted({
       channelId: inbox.id,
-      document: { fileName: 'orders.edi', content: twoOrders },
+      document: documentOf('orders.edi', twoOrders),
     })
 
     expect(created).toHaveLength(2)
@@ -109,10 +122,10 @@ describe('manualSubmissionHandler', () => {
       runs: [run],
     } = await submitted({
       channelId: inbox.id,
-      document: {
-        fileName: 'contrl.edi',
-        content: "UNB+UNOC:3+4012345000016:14+4098765000013:14+261009:1015+1'UNH+1+CONTRL:D:3:UN'",
-      },
+      document: documentOf(
+        'contrl.edi',
+        "UNB+UNOC:3+4012345000016:14+4098765000013:14+261009:1015+1'UNH+1+CONTRL:D:3:UN'",
+      ),
     })
 
     const flow = seedFlows.find(
@@ -128,7 +141,7 @@ describe('manualSubmissionHandler', () => {
 
     const { runs: created, notRouted } = await submitted({
       channelId: inbox.id,
-      document: { fileName: 'mixed.edi', content: mixed },
+      document: documentOf('mixed.edi', mixed),
     })
 
     expect(created).toEqual([expect.objectContaining({ messageType: 'ORDERS' })])
@@ -141,11 +154,10 @@ describe('manualSubmissionHandler', () => {
 
     const response = await submit({
       channelId: inbox.id,
-      document: {
-        fileName: 'pricat.edi',
-        content:
-          "UNB+UNOC:3+4012345000016:14+4098765000013:14+261009:1015+1'UNH+1+PRICAT:D:96A:UN'",
-      },
+      document: documentOf(
+        'pricat.edi',
+        "UNB+UNOC:3+4012345000016:14+4098765000013:14+261009:1015+1'UNH+1+PRICAT:D:96A:UN'",
+      ),
     })
 
     expect(response.status).toBe(422)
@@ -157,7 +169,7 @@ describe('manualSubmissionHandler', () => {
 
     const { runs: created } = await submitted({
       channelId: inbox.id,
-      document: { fileName: 'notes.txt', content: 'Please ship by Friday.' },
+      document: documentOf('notes.txt', 'Please ship by Friday.'),
     })
 
     expect(created).toEqual([
@@ -170,7 +182,7 @@ describe('manualSubmissionHandler', () => {
 
     const { runs: created } = await submitted({
       channelId: erpWebhook.id,
-      document: { fileName: 'desadv.json', content: '{"deliveryNote": "DN-1"}' },
+      document: documentOf('desadv.json', '{"deliveryNote": "DN-1"}'),
     })
 
     expect(created).toEqual([expect.objectContaining({ status: 'delivered', failureStage: null })])
@@ -181,7 +193,7 @@ describe('manualSubmissionHandler', () => {
 
     const response = await submit({
       channelId: outbox.id,
-      document: { fileName: 'orders.edi', content: twoOrders },
+      document: documentOf('orders.edi', twoOrders),
     })
 
     expect(response.status).toBe(422)
@@ -192,7 +204,7 @@ describe('manualSubmissionHandler', () => {
 
     const response = await submit({
       channelId: '10000000-0000-4000-8000-0000000000ff',
-      document: { fileName: 'orders.edi', content: twoOrders },
+      document: documentOf('orders.edi', twoOrders),
     })
 
     expect(response.status).toBe(422)
@@ -209,10 +221,65 @@ describe('manualSubmissionHandler', () => {
 
     const response = await submit({
       channelId: inbox.id,
-      document: { fileName: 'orders.edi', content: twoOrders },
+      document: documentOf('orders.edi', twoOrders),
     })
 
     expect(response.status).toBe(422)
+  })
+
+  it('routes a Latin-1 Interchange by the character set its UNB names', async () => {
+    use()
+
+    const { runs: created } = await submitted({
+      channelId: inbox.id,
+      document: documentOf('orders.edi', twoOrders.replace('PO-1', 'Lüneburg'), 'iso-8859-1'),
+    })
+
+    expect(created).toEqual([
+      expect.objectContaining({ messageType: 'ORDERS' }),
+      expect.objectContaining({ messageType: 'ORDERS' }),
+    ])
+  })
+
+  it('refuses a Document not valid in its encoding and suggests another one', async () => {
+    const runs = use()
+
+    const response = await submit({
+      channelId: erpWebhook.id,
+      document: {
+        ...documentOf('dispatch.csv', 'Käufer;Menge\n', 'windows-1252'),
+        encoding: 'utf-8',
+      },
+    })
+
+    expect(response.status).toBe(422)
+    expect(documentUndecodableProblemSchema.parse(await response.json())).toEqual({
+      code: 'documentUndecodable',
+      encoding: 'utf-8',
+      message:
+        'Byte 2 (0xE4) is not valid utf-8. Choose another encoding, such as Windows-1252 for a typical German CSV.',
+    })
+    expect(runs.all()).toHaveLength(0)
+  })
+
+  it('refuses an Interchange not valid in its character set without suggesting an encoding', async () => {
+    use()
+
+    const response = await submit({
+      channelId: inbox.id,
+      document: documentOf(
+        'orders.edi',
+        twoOrders.replace('UNOC', 'UNOA').replace('PO-1', 'Lüneburg'),
+        'iso-8859-1',
+      ),
+    })
+
+    expect(response.status).toBe(422)
+    expect(documentUndecodableProblemSchema.parse(await response.json())).toMatchObject({
+      code: 'documentUndecodable',
+      encoding: null,
+      message: expect.stringMatching(/^Byte \d+ \(0xFC\) is not valid in UNOA \(ASCII\), at .+\.$/),
+    })
   })
 
   it('rejects an empty Document', async () => {
@@ -220,7 +287,7 @@ describe('manualSubmissionHandler', () => {
 
     const response = await submit({
       channelId: inbox.id,
-      document: { fileName: 'empty.edi', content: '' },
+      document: documentOf('empty.edi', ''),
     })
 
     expect(response.status).toBe(400)

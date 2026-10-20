@@ -87,6 +87,7 @@ import {
   ownWorkspace,
   signIn,
   startTestApi,
+  submittedDocument,
   type TestApi,
   testAuth,
   testChannels,
@@ -472,7 +473,7 @@ const changes: Change[] = [
     () => ({
       method: 'POST',
       url: submitDocumentEndpoint.path,
-      body: { channelId: ids.channel, document: { fileName: 'invoice.json', content: '{}' } },
+      body: { channelId: ids.channel, document: submittedDocument('invoice.json', '{}') },
     }),
   ],
   [
