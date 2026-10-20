@@ -15,6 +15,7 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { linkClass } from '@/components/detail-parts'
 import {
   awaitsReceiptConfirmation,
+  awaitsTestHandover,
   type PartnerActivityProps,
   testRejected,
 } from '@/components/trading-partners/partner-page-helpers'
@@ -26,7 +27,11 @@ import {
 } from '@/components/trading-partners/partner-setup'
 import { useSession } from '@/hooks/use-session'
 import { sendTestInterchange, switchToProduction, testInterchangeRefusalOf } from '@/lib/api/client'
-import { currentWorkspaceQuery, storeSavedTradingPartner } from '@/lib/api/queries'
+import {
+  currentWorkspaceQuery,
+  storeSavedTradingPartner,
+  tradingPartnerKeys,
+} from '@/lib/api/queries'
 import { documentHref, flowHref } from '@/lib/navigation'
 import {
   canSendTestInterchange,
@@ -103,25 +108,27 @@ function SendTestDocument({
   const queryClient = useQueryClient()
 
   const send = useMutation({
+    mutationKey: tradingPartnerKeys.testInterchange(tradingPartner.id),
     mutationFn: () => sendTestInterchange(tradingPartner.id),
     onSuccess: (updated) => storeSavedTradingPartner(queryClient, updated),
   })
 
   const refusal = testInterchangeRefusalOf(send.error)
+  const sending = send.isPending || awaitsTestHandover(tradingPartner, send.isSuccess)
 
   return (
     <div className="flex flex-col gap-2">
       <Button
         size="sm"
         variant={again ? 'outline' : 'default'}
-        aria-disabled={send.isPending || undefined}
+        aria-disabled={sending || undefined}
         className="w-fit aria-disabled:cursor-progress aria-disabled:opacity-50"
         onClick={() => {
-          if (!send.isPending) {
+          if (!sending) {
             send.mutate()
           }
         }}>
-        {send.isPending
+        {sending
           ? t('actions.sending')
           : again
             ? t('actions.resend')

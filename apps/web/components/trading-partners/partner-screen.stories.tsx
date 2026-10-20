@@ -94,6 +94,12 @@ async function connectionItem(canvasElement: HTMLElement, list: string, way: str
   return within(items.getByText(way).closest('li')!)
 }
 
+// Returning to the tab checks at once, so a story need not wait for the 10 s poll.
+function checkNow() {
+  focusManager.setFocused(false)
+  focusManager.setFocused(undefined)
+}
+
 const meta = preview.meta({
   title: 'Trading Partners/PartnerScreen',
   component: PartnerScreen,
@@ -166,7 +172,7 @@ export const SendTestDocument = meta.story({
     msw.use(
       ...createHandlers(apiUrl, {
         tradingPartners: withReadyForTest,
-        testInterchange: { contrlDelayMs: null },
+        testInterchange: { handoverDelayMs: 0, contrlDelayMs: null },
       }),
     )
   },
@@ -174,9 +180,17 @@ export const SendTestDocument = meta.story({
     const current = await canvas.findByRole('listitem', { current: 'step' }, activityLoaded)
     await expect(current).toHaveTextContent('Send a test document')
     await userEvent.click(within(current).getByRole('button', { name: 'Send a test document' }))
-    await expect(
-      await canvas.findByText(/Waiting for the receipt confirmation from Spreewald Frische GmbH/),
-    ).toBeVisible()
+    await expect(within(current).getByRole('button', { name: 'Sending…' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    )
+    // The api answers before the hand-over, so the page checks again until it is recorded.
+    await waitFor(() => {
+      checkNow()
+      expect(
+        canvas.getByText(/Waiting for the receipt confirmation from Spreewald Frische GmbH/),
+      ).toBeVisible()
+    })
     await expect(canvas.getByRole('button', { name: 'Send the test again' })).toBeVisible()
     await expect(canvas.queryByRole('button', { name: 'Go live' })).toBeNull()
   },
@@ -273,7 +287,7 @@ export const ConfirmationArrives = meta.story({
     msw.use(
       ...createHandlers(apiUrl, {
         tradingPartners: withReadyForTest,
-        testInterchange: { contrlDelayMs: 0 },
+        testInterchange: { handoverDelayMs: 0, contrlDelayMs: 0 },
       }),
     )
   },
@@ -281,16 +295,19 @@ export const ConfirmationArrives = meta.story({
     await userEvent.click(
       await canvas.findByRole('button', { name: 'Send a test document' }, activityLoaded),
     )
-    await expect(await canvas.findByText(/Waiting for the receipt confirmation/)).toBeVisible()
-    // Returning to the tab checks at once, so the story need not wait for the 10 s poll.
-    focusManager.setFocused(false)
-    focusManager.setFocused(undefined)
-    await expect(
-      await canvas.findByText(
-        'The receipt confirmation from Spreewald Frische GmbH arrived. You can go live now.',
-        { selector: ':not([role="status"])' },
-      ),
-    ).toBeVisible()
+    await waitFor(() => {
+      checkNow()
+      expect(canvas.getByText(/Waiting for the receipt confirmation/)).toBeVisible()
+    })
+    await waitFor(() => {
+      checkNow()
+      expect(
+        canvas.getByText(
+          'The receipt confirmation from Spreewald Frische GmbH arrived. You can go live now.',
+          { selector: ':not([role="status"])' },
+        ),
+      ).toBeVisible()
+    })
     const goLive = canvas.getByRole('button', { name: 'Go live' })
     await userEvent.click(goLive)
 
@@ -319,7 +336,7 @@ export const TestRejected = meta.story({
     msw.use(
       ...createHandlers(apiUrl, {
         tradingPartners: withReadyForTest,
-        testInterchange: { contrlDelayMs: 0, rejectingRunId: rejectedRun!.id },
+        testInterchange: { handoverDelayMs: 0, contrlDelayMs: 0, rejectingRunId: rejectedRun!.id },
       }),
     )
   },
@@ -327,13 +344,19 @@ export const TestRejected = meta.story({
     await userEvent.click(
       await canvas.findByRole('button', { name: 'Send a test document' }, activityLoaded),
     )
-    await expect(await canvas.findByText(/Waiting for the receipt confirmation/)).toBeVisible()
-    focusManager.setFocused(false)
-    focusManager.setFocused(undefined)
-    const current = await canvas.findByRole('listitem', { current: 'step' })
-    await expect(
-      await within(current).findByText('Spreewald Frische GmbH rejected the test document.'),
-    ).toBeVisible()
+    await waitFor(() => {
+      checkNow()
+      expect(canvas.getByText(/Waiting for the receipt confirmation/)).toBeVisible()
+    })
+    await waitFor(() => {
+      checkNow()
+      expect(
+        canvas.getByText('Spreewald Frische GmbH rejected the test document.', {
+          selector: ':not([role="status"])',
+        }),
+      ).toBeVisible()
+    })
+    const current = canvas.getByRole('listitem', { current: 'step' })
     await expect(within(current).getByRole('link', { name: 'See why' })).toHaveAttribute(
       'href',
       `/documents/${rejectedRun!.id}`,

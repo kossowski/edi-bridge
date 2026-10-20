@@ -235,6 +235,7 @@ export function toTradingPartnerStore(
 }
 
 export type TestInterchangeOptions = {
+  handoverDelayMs?: number
   contrlDelayMs?: number | null
   rejectingRunId?: string
   refusal?: Exclude<TestInterchangeRefusal, { reason: 'notAwaited' }>
@@ -262,7 +263,7 @@ export function tradingPartnerHandlers(
   {
     tradingPartners = seedTradingPartners,
     workspace = seedWorkspace,
-    testInterchange: { contrlDelayMs = 5000, rejectingRunId, refusal } = {},
+    testInterchange: { handoverDelayMs = 1000, contrlDelayMs = 5000, rejectingRunId, refusal } = {},
     session = seedSession,
   }: {
     tradingPartners?: ReadonlyArray<TradingPartner> | TradingPartnerStore
@@ -274,6 +275,7 @@ export function tradingPartnerHandlers(
   const store = toTradingPartnerStore(tradingPartners)
   const sessionStore = toSessionStore(session)
   const workspaceStore = toWorkspaceStore(workspace)
+  const handoverDueAt = new Map<string, number>()
   const contrlDueAt = new Map<string, number>()
 
   function receiveDueContrls() {
@@ -300,6 +302,38 @@ export function tradingPartnerHandlers(
     }
   }
 
+  // Like the worker, which records only the first hand-over of a Trading Partner in Test Mode.
+  function handOverDueInterchanges() {
+    for (const [id, dueAt] of handoverDueAt) {
+      const tradingPartner = store.get(id)
+
+      if (dueAt > Date.now() || !tradingPartner) {
+        continue
+      }
+
+      handoverDueAt.delete(id)
+
+      store.set({
+        ...tradingPartner,
+        onboarding: {
+          ...tradingPartner.onboarding,
+          testInterchangeSentAt:
+            tradingPartner.onboarding.testInterchangeSentAt ?? new Date(dueAt).toISOString(),
+        },
+      })
+
+      if (contrlDelayMs !== null) {
+        contrlDueAt.set(id, dueAt + contrlDelayMs)
+      }
+    }
+  }
+
+  // CONTRLs first, so a CONTRL arrives at the earliest on the check after its hand-over.
+  function advance() {
+    receiveDueContrls()
+    handOverDueInterchanges()
+  }
+
   function glnTaken(gln: string | null, ownId?: string) {
     return (
       gln !== null &&
@@ -324,7 +358,7 @@ export function tradingPartnerHandlers(
 
   return [
     http.get(`${apiUrl}${tradingPartnersEndpoint.path}`, () => {
-      receiveDueContrls()
+      advance()
 
       return HttpResponse.json([...store.all()].sort((a, b) => a.name.localeCompare(b.name, 'de')))
     }),
@@ -333,7 +367,7 @@ export function tradingPartnerHandlers(
         return undefined
       }
 
-      receiveDueContrls()
+      advance()
       const tradingPartner = store.get(params.id)
 
       return tradingPartner ? HttpResponse.json(tradingPartner) : notFound()
@@ -395,7 +429,7 @@ export function tradingPartnerHandlers(
     http.post<{ id: string }>(
       `${apiUrl}${switchToProductionEndpoint.path}`,
       adminOnly(sessionStore, ({ params }) => {
-        receiveDueContrls()
+        advance()
         const existing = store.get(params.id)
 
         if (!existing) {
@@ -415,7 +449,7 @@ export function tradingPartnerHandlers(
     http.post<{ id: string }>(
       `${apiUrl}${sendTestInterchangeEndpoint.path}`,
       adminOnly(sessionStore, ({ params }) => {
-        receiveDueContrls()
+        advance()
         const existing = store.get(params.id)
 
         if (!existing) {
@@ -430,25 +464,15 @@ export function tradingPartnerHandlers(
           return refuseTestInterchange(refusal)
         }
 
-        const sentAt = Date.now()
-
+        // The api answers before the worker hands the test Interchange over.
         const updated: TradingPartner = {
           ...existing,
-          onboarding: {
-            testInterchangeSentAt: new Date(sentAt).toISOString(),
-            contrlReceivedAt: null,
-            testRejectedAt: null,
-            testRejectedRunId: null,
-          },
+          onboarding: { ...existing.onboarding, testRejectedAt: null, testRejectedRunId: null },
         }
 
         store.set(updated)
-
-        if (contrlDelayMs === null) {
-          contrlDueAt.delete(existing.id)
-        } else {
-          contrlDueAt.set(existing.id, sentAt + contrlDelayMs)
-        }
+        contrlDueAt.delete(existing.id)
+        handoverDueAt.set(existing.id, Date.now() + handoverDelayMs)
 
         return HttpResponse.json(updated)
       }),

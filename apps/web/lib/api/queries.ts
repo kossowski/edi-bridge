@@ -574,6 +574,7 @@ export const tradingPartnerKeys = {
   detail: (id: string) => [...tradingPartnerKeys.all(), 'detail', id] as const,
   activities: () => [...tradingPartnerKeys.all(), 'activities'] as const,
   activity: (id: string) => [...tradingPartnerKeys.detail(id), 'activity'] as const,
+  testInterchange: (id: string) => [...tradingPartnerKeys.detail(id), 'test-interchange'] as const,
 }
 
 export const tradingPartnersQuery = queryOptions({

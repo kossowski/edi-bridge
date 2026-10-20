@@ -349,37 +349,90 @@ describe('POST /trading-partners/:id/test-interchange', () => {
     return tradingPartnerSchema.parse(await response.json())
   }
 
-  it('records the test Interchange and receives its CONTRL after the delay', async () => {
+  it('answers before the handover and records the test Interchange after the delay', async () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(sentAt)
 
     server.use(
       ...tradingPartnerHandlers(apiUrl, {
         tradingPartners: [notStarted],
-        testInterchange: { contrlDelayMs: 60_000 },
+        testInterchange: { handoverDelayMs: 1000, contrlDelayMs: null },
       }),
     )
 
     const response = await send('POST', toPath(sendTestInterchangeEndpoint.path, notStarted))
 
-    expect(tradingPartnerSchema.parse(await response.json()).onboarding).toEqual({
-      testInterchangeSentAt: '2026-10-10T12:00:00.000Z',
-      contrlReceivedAt: null,
-      testRejectedAt: null,
-      testRejectedRunId: null,
-    })
+    expect(tradingPartnerSchema.parse(await response.json()).onboarding).toEqual(
+      notStarted.onboarding,
+    )
 
-    vi.setSystemTime(new Date('2026-10-10T12:00:59.000Z'))
+    vi.setSystemTime(new Date('2026-10-10T12:00:00.999Z'))
+    expect((await getTradingPartner(notStarted.id)).onboarding.testInterchangeSentAt).toBeNull()
+
+    vi.setSystemTime(new Date('2026-10-10T12:00:05.000Z'))
+    expect((await getTradingPartner(notStarted.id)).onboarding.testInterchangeSentAt).toBe(
+      '2026-10-10T12:00:01.000Z',
+    )
+  })
+
+  it('hands the test Interchange over after a second by default', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(sentAt)
+    server.use(...tradingPartnerHandlers(apiUrl, { tradingPartners: [notStarted] }))
+
+    await send('POST', toPath(sendTestInterchangeEndpoint.path, notStarted))
+    vi.setSystemTime(new Date('2026-10-10T12:00:01.000Z'))
+
+    expect((await getTradingPartner(notStarted.id)).onboarding.testInterchangeSentAt).toBe(
+      '2026-10-10T12:00:01.000Z',
+    )
+  })
+
+  it('receives the CONTRL the delay after the handover', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(sentAt)
+
+    server.use(
+      ...tradingPartnerHandlers(apiUrl, {
+        tradingPartners: [notStarted],
+        testInterchange: { handoverDelayMs: 1000, contrlDelayMs: 60_000 },
+      }),
+    )
+
+    await send('POST', toPath(sendTestInterchangeEndpoint.path, notStarted))
+    vi.setSystemTime(new Date('2026-10-10T12:00:01.000Z'))
+    await getTradingPartner(notStarted.id)
+
+    vi.setSystemTime(new Date('2026-10-10T12:01:00.999Z'))
     expect((await getTradingPartner(notStarted.id)).onboarding.contrlReceivedAt).toBeNull()
 
     vi.setSystemTime(new Date('2026-10-10T12:01:30.000Z'))
 
     expect((await listTradingPartners())[0]?.onboarding).toEqual({
-      testInterchangeSentAt: '2026-10-10T12:00:00.000Z',
-      contrlReceivedAt: '2026-10-10T12:01:00.000Z',
+      testInterchangeSentAt: '2026-10-10T12:00:01.000Z',
+      contrlReceivedAt: '2026-10-10T12:01:01.000Z',
       testRejectedAt: null,
       testRejectedRunId: null,
     })
+  })
+
+  it('answers with the CONTRL at the earliest on the check after the handover', async () => {
+    server.use(
+      ...tradingPartnerHandlers(apiUrl, {
+        tradingPartners: [notStarted],
+        testInterchange: { handoverDelayMs: 0, contrlDelayMs: 0 },
+      }),
+    )
+
+    await send('POST', toPath(sendTestInterchangeEndpoint.path, notStarted))
+
+    expect((await getTradingPartner(notStarted.id)).onboarding).toMatchObject({
+      testInterchangeSentAt: expect.any(String),
+      contrlReceivedAt: null,
+    })
+    expect((await getTradingPartner(notStarted.id)).onboarding.contrlReceivedAt).toEqual(
+      expect.any(String),
+    )
   })
 
   it('records a rejecting CONTRL after the delay, with the Run of the rejected test', async () => {
@@ -390,17 +443,19 @@ describe('POST /trading-partners/:id/test-interchange', () => {
     server.use(
       ...tradingPartnerHandlers(apiUrl, {
         tradingPartners: [notStarted],
-        testInterchange: { contrlDelayMs: 60_000, rejectingRunId },
+        testInterchange: { handoverDelayMs: 1000, contrlDelayMs: 60_000, rejectingRunId },
       }),
     )
 
     await send('POST', toPath(sendTestInterchangeEndpoint.path, notStarted))
+    vi.setSystemTime(new Date('2026-10-10T12:00:01.000Z'))
+    await getTradingPartner(notStarted.id)
     vi.setSystemTime(new Date('2026-10-10T12:01:30.000Z'))
 
     expect((await getTradingPartner(notStarted.id)).onboarding).toEqual({
-      testInterchangeSentAt: '2026-10-10T12:00:00.000Z',
+      testInterchangeSentAt: '2026-10-10T12:00:01.000Z',
       contrlReceivedAt: null,
-      testRejectedAt: '2026-10-10T12:01:00.000Z',
+      testRejectedAt: '2026-10-10T12:01:01.000Z',
       testRejectedRunId: rejectingRunId,
     })
   })
@@ -425,7 +480,9 @@ describe('POST /trading-partners/:id/test-interchange', () => {
 
     const response = await send('POST', toPath(sendTestInterchangeEndpoint.path, rejected))
 
-    expect(tradingPartnerSchema.parse(await response.json()).onboarding).toMatchObject({
+    expect(tradingPartnerSchema.parse(await response.json()).onboarding).toEqual({
+      testInterchangeSentAt: '2026-10-09T08:00:00.000Z',
+      contrlReceivedAt: null,
       testRejectedAt: null,
       testRejectedRunId: null,
     })
@@ -435,11 +492,12 @@ describe('POST /trading-partners/:id/test-interchange', () => {
     server.use(
       ...tradingPartnerHandlers(apiUrl, {
         tradingPartners: [notStarted],
-        testInterchange: { contrlDelayMs: 0 },
+        testInterchange: { handoverDelayMs: 0, contrlDelayMs: 0 },
       }),
     )
 
     await send('POST', toPath(sendTestInterchangeEndpoint.path, notStarted))
+    await getTradingPartner(notStarted.id)
     const response = await send('POST', toPath(switchToProductionEndpoint.path, notStarted))
 
     expect(response.status).toBe(200)

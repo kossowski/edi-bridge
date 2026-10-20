@@ -14,6 +14,7 @@ import {
   sendTestInterchangeEndpoint,
   switchToProductionEndpoint,
   toPath,
+  tradingPartnerEndpoint,
   type TradingPartnerInput,
   tradingPartnerSchema,
   updateCompanyIdentityEndpoint,
@@ -110,7 +111,7 @@ describe('GET /workspaces/current/first-steps', () => {
         channels: [],
         tradingPartners: [],
         mappingVersions: [],
-        testInterchange: { contrlDelayMs: 0 },
+        testInterchange: { handoverDelayMs: 0, contrlDelayMs: 0 },
       }),
     )
 
@@ -154,6 +155,8 @@ describe('GET /workspaces/current/first-steps', () => {
     const { id } = tradingPartner
 
     await send('POST', toPath(sendTestInterchangeEndpoint.path, { id }))
+    // The worker hands the test Interchange over after the api answered the send.
+    await fetch(`${apiUrl}${toPath(tradingPartnerEndpoint.path, { id })}`)
     expect(await progress()).toMatchObject({ done: 5, next: 'production' })
 
     await send('POST', toPath(switchToProductionEndpoint.path, { id }))

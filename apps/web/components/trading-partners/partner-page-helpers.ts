@@ -29,14 +29,26 @@ export function awaitsReceiptConfirmation(
   )
 }
 
-// One indexed row per check, so an open page polling every 10 s is cheap for the api.
-const receiptConfirmationPollMs = 10_000
-
-export function receiptConfirmationPollInterval(
-  tradingPartner: Pick<TradingPartner, 'testMode' | 'onboarding'> | undefined,
+// The api answers the test send before the worker hands the test Interchange over.
+export function awaitsTestHandover(
+  tradingPartner: Pick<TradingPartner, 'testMode' | 'onboarding'>,
+  testSent: boolean,
 ) {
-  return tradingPartner && awaitsReceiptConfirmation(tradingPartner)
-    ? receiptConfirmationPollMs
+  return (
+    testSent && tradingPartner.testMode && tradingPartner.onboarding.testInterchangeSentAt === null
+  )
+}
+
+// One indexed row per check, so an open page polling every 10 s is cheap for the api.
+const onboardingPollMs = 10_000
+
+export function onboardingPollInterval(
+  tradingPartner: Pick<TradingPartner, 'testMode' | 'onboarding'> | undefined,
+  testSent: boolean,
+) {
+  return tradingPartner &&
+    (awaitsTestHandover(tradingPartner, testSent) || awaitsReceiptConfirmation(tradingPartner))
+    ? onboardingPollMs
     : false
 }
 
