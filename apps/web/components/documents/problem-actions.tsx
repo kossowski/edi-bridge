@@ -56,6 +56,16 @@ export function reprocessMapping(run: FailedRun): ReprocessMapping | null {
   )
 }
 
+// Mirrors isFixedByReprocess in the api: trying a Defect again outside delivery reprocesses it.
+export function retryReprocesses(run: FailedRun): boolean {
+  return (
+    run.problem.reason === 'defect' &&
+    run.failureStage !== 'delivery' &&
+    run.problem.whoFixes !== 'tradingPartner' &&
+    run.mappingVersion !== null
+  )
+}
+
 function UnpublishedChanges({ mappingId }: { mappingId: string }) {
   const t = useTranslations('Document.actions.unpublished')
   const draft = useQuery(mappingDraftQuery(mappingId))
@@ -156,7 +166,15 @@ export function ProcessAgainStep({ run, mapping }: { run: FailedRun; mapping: Re
   )
 }
 
-export function DocumentExpiredStep({ run, deletedAt }: { run: FailedRun; deletedAt: string }) {
+export function DocumentExpiredStep({
+  run,
+  deletedAt,
+  afterFix,
+}: {
+  run: FailedRun
+  deletedAt: string
+  afterFix: boolean
+}) {
   const t = useTranslations('Document.problem.steps')
   const format = useFormatter()
 
@@ -165,6 +183,7 @@ export function DocumentExpiredStep({ run, deletedAt }: { run: FailedRun; delete
       {t.rich('documentExpired', {
         direction: run.direction,
         tradingPartner: run.tradingPartner.name,
+        afterFix: afterFix ? 'yes' : 'no',
         deletedAt: format.dateTime(new Date(deletedAt), { dateStyle: 'medium' }),
         time: (chunks) => <time dateTime={deletedAt}>{chunks}</time>,
       })}
@@ -179,7 +198,9 @@ export function TryAgainStep({ run, secondary }: { run: FailedRun; secondary: bo
 
   return (
     <div className="flex min-w-0 flex-col items-start gap-2">
-      <p>{t('problem.steps.tryAgain', { stage: run.failureStage })}</p>
+      <p>
+        {t('problem.steps.tryAgain', { action: retryReprocesses(run) ? 'reprocess' : 'retry' })}
+      </p>
       {canChange ? (
         <Button
           disabled={retry.isPending}

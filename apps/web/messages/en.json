@@ -814,7 +814,7 @@
         },
         "defect": {
           "title": "EDI Bridge hit an internal error",
-          "description": "EDI Bridge hit an internal error while {stage, select, parse {reading the file} validation {checking the content} mapping {translating the document} other {delivering the document}}. Try again; if it happens again, the error is logged for the team."
+          "description": "EDI Bridge hit an internal error while {stage, select, parse {reading the file} validation {checking the content} mapping {translating the document} other {delivering the document}}.{retry, select, documentExpired {} other { Try again; if it happens again, the error is logged for the team.}}"
         }
       },
       "whoFixes": {
@@ -830,10 +830,10 @@
         "fixCauseWithoutTarget": "Fix the cause described here. EDI Bridge cannot process this document again, so {direction, select, inbound {ask {tradingPartner} to send it again} other {send it again from your ERP}}.",
         "checkConnection": "If it keeps failing, check the connection details.",
         "processAgain": "Process it again. EDI Bridge uses the original file, so {direction, select, inbound {{tradingPartner} does} other {your ERP does}} not have to send anything again.",
-        "tryAgain": "{stage, select, delivery {Try again. The finished document is sent once more, nothing is translated again.} other {Try again. EDI Bridge processes the original file once more with the same mapping version.}}",
+        "tryAgain": "{action, select, reprocess {Try again. EDI Bridge processes the original file once more with the same mapping version.} other {Try again. The finished document is sent once more, nothing is translated again.}}",
         "tellTradingPartner": "Tell {tradingPartner} and ask for a corrected file. The message includes the technical detail their IT team needs. Their contact details are on the partner page.",
         "markWaiting": "Mark it so your team knows you are waiting for {tradingPartner}.",
-        "documentExpired": "EDI Bridge deleted the original file on <time>{deletedAt}</time>, when the retention period ended, so this document cannot be processed again. {direction, select, inbound {Ask {tradingPartner} to send it again.} other {Send it again from your ERP.}}"
+        "documentExpired": "EDI Bridge deleted the original file on <time>{deletedAt}</time>, when the retention period ended, so this document cannot be processed again. {afterFix, select, yes {Fixing the cause helps only the documents that arrive from now on. } other {}}{direction, select, inbound {Ask {tradingPartner} to send it again.} other {Send it again from your ERP.}}"
       },
       "fixLink": {
         "mapping": "Open “{name}” at this field",

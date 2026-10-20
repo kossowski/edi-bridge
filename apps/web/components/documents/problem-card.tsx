@@ -16,6 +16,7 @@ import {
   ProcessAgainStep,
   ProcessedAgain,
   reprocessMapping,
+  retryReprocesses,
   TryAgainStep,
   useFreshlyReprocessed,
 } from '@/components/documents/problem-actions'
@@ -29,8 +30,14 @@ import type { FixTarget } from '@edi-bridge/contracts'
 
 export type WhatToDoStep = { key: string; content: ReactNode }
 
-function useProblemText({ problem, error, direction, failureStage, tradingPartner }: FailedRun) {
+// Trying again reprocesses the Run, which needs the Document that retention may have deleted.
+function retryDocumentDeletedAt(run: FailedRun): string | null {
+  return retryReprocesses(run) ? run.documentDeletedAt : null
+}
+
+function useProblemText(run: FailedRun) {
   const t = useTranslations('Document.problem.reason')
+  const { problem, error, direction, failureStage, tradingPartner } = run
   const { fixTarget } = problem
   const field = fixTarget?.kind === 'mapping' ? fixTarget.fieldPath : null
   const lookupTable = fixTarget?.kind === 'lookupTable' ? fixTarget : null
@@ -103,7 +110,10 @@ function useProblemText({ problem, error, direction, failureStage, tradingPartne
     case 'defect': {
       return {
         title: t('defect.title'),
-        description: t('defect.description', { stage: failureStage }),
+        description: t('defect.description', {
+          stage: failureStage,
+          retry: retryDocumentDeletedAt(run) === null ? 'available' : 'documentExpired',
+        }),
       }
     }
   }
@@ -158,10 +168,10 @@ function fixStep(text: string, run: FailedRun, target: FixTarget, primary: boole
   }
 }
 
-function documentExpiredStep(run: FailedRun, deletedAt: string): WhatToDoStep {
+function documentExpiredStep(run: FailedRun, deletedAt: string, afterFix: boolean): WhatToDoStep {
   return {
     key: 'documentExpired',
-    content: <DocumentExpiredStep deletedAt={deletedAt} run={run} />,
+    content: <DocumentExpiredStep afterFix={afterFix} deletedAt={deletedAt} run={run} />,
   }
 }
 
@@ -199,20 +209,17 @@ export function useFixSteps(run: FailedRun): WhatToDoStep[] {
                     key: 'processAgain',
                     content: <ProcessAgainStep mapping={mapping} run={run} />,
                   }
-                : documentExpiredStep(run, run.documentDeletedAt),
+                : documentExpiredStep(run, run.documentDeletedAt, target !== null),
             ]
           : []),
       ]
     }
 
     case 'retry': {
-      // Before delivery, trying a Defect again reprocesses the Run, which needs its Document.
-      if (
-        problem.reason === 'defect' &&
-        run.failureStage !== 'delivery' &&
-        run.documentDeletedAt !== null
-      ) {
-        return [documentExpiredStep(run, run.documentDeletedAt)]
+      const deletedAt = retryDocumentDeletedAt(run)
+
+      if (deletedAt !== null) {
+        return [documentExpiredStep(run, deletedAt, false)]
       }
 
       // The setup has to be complete before trying again can work.

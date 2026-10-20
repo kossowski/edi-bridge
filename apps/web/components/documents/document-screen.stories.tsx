@@ -19,6 +19,7 @@ import {
   retryRunEndpoint,
   runDetailSchema,
   runEndpoint,
+  runSummarySchema,
   type RunDetail,
   type RunError,
   type RunProblem,
@@ -133,12 +134,16 @@ const expired = storyRun(48, 'INVOIC', 'mapping', { defect: false })
 
 const expiredDefect = storyRun(49, 'ORDERS', 'mapping', { defect: true })
 
-const expiredDefectAtDelivery = storyRun(50, 'ORDERS', 'delivery', { defect: true })
+// The mocks draw a Defect only at mapping, so the delivery one sets its problem.
+const expiredDefectAtDelivery = runSummarySchema.parse({
+  ...storyRun(50, 'ORDERS', 'delivery'),
+  problem: { reason: 'defect' },
+})
 
 const documentDeletedAt = '2026-10-08T08:00:00.000Z'
 
 const expiredFromErp =
-  'EDI Bridge deleted the original file on Oct 8, 2026, when the retention period ended, so this document cannot be processed again. Send it again from your ERP.'
+  'EDI Bridge deleted the original file on Oct 8, 2026, when the retention period ended, so this document cannot be processed again. Fixing the cause helps only the documents that arrive from now on. Send it again from your ERP.'
 
 const expiredFromPartner = `EDI Bridge deleted the original file on Oct 8, 2026, when the retention period ended, so this document cannot be processed again. Ask ${partner.name} to send it again.`
 
@@ -660,6 +665,7 @@ export const DocumentExpired = meta.story({
   args: { id: expired.id },
   async play({ canvas }) {
     await expect(await canvas.findByText(paragraph(expiredFromErp))).toBeVisible()
+    await expect(canvas.getByText('Fix the cause.')).toBeVisible()
     await expect(canvas.getByText('Oct 8, 2026').getAttribute('datetime')).toBe(documentDeletedAt)
     await expect(canvas.queryByRole('button', { name: 'Process again' })).toBeNull()
     await expect(canvas.queryByRole('combobox', { name: 'Version' })).toBeNull()
@@ -673,7 +679,7 @@ export const GermanDocumentExpired = meta.story({
     await expect(
       await canvas.findByText(
         paragraph(
-          'EDI Bridge hat die Originaldatei am 08.10.2026 gelöscht, als die Aufbewahrungsdauer abgelaufen war. Dieser Beleg lässt sich deshalb nicht erneut verarbeiten. Senden Sie ihn erneut aus Ihrem ERP.',
+          'EDI Bridge hat die Originaldatei am 08.10.2026 gelöscht, als die Aufbewahrungsdauer abgelaufen war. Dieser Beleg lässt sich deshalb nicht erneut verarbeiten. Das Beheben der Ursache hilft nur den Belegen, die ab jetzt eingehen. Senden Sie ihn erneut aus Ihrem ERP.',
         ),
       ),
     ).toBeVisible()
@@ -695,7 +701,32 @@ export const DefectDocumentExpired = meta.story({
   args: { id: expiredDefect.id },
   async play({ canvas }) {
     await expect(await canvas.findByText(paragraph(expiredFromPartner))).toBeVisible()
+    await expect(
+      canvas.getByText(
+        paragraph('EDI Bridge hit an internal error while translating the document.'),
+      ),
+    ).toBeVisible()
+    await expect(canvas.queryByText('Try again;', { exact: false })).toBeNull()
     await expect(canvas.queryByRole('button', { name: 'Try again' })).toBeNull()
+  },
+})
+
+export const GermanDefectDocumentExpired = meta.story({
+  args: { id: expiredDefect.id },
+  decorators: [german],
+  async play({ canvas }) {
+    await expect(
+      await canvas.findByText(
+        paragraph(
+          `EDI Bridge hat die Originaldatei am 08.10.2026 gelöscht, als die Aufbewahrungsdauer abgelaufen war. Dieser Beleg lässt sich deshalb nicht erneut verarbeiten. Bitten Sie ${partner.name}, ihn erneut zu senden.`,
+        ),
+      ),
+    ).toBeVisible()
+    await expect(
+      canvas.getByText(
+        paragraph('In EDI Bridge ist beim Übersetzen des Belegs ein interner Fehler aufgetreten.'),
+      ),
+    ).toBeVisible()
   },
 })
 
@@ -708,6 +739,11 @@ export const DefectAtDeliveryDocumentExpired = meta.story({
       ),
     ).toBeVisible()
     await expect(canvas.queryByText(paragraph(expiredFromPartner))).toBeNull()
+    await expect(
+      canvas.getByText(
+        'EDI Bridge hit an internal error while delivering the document. Try again; if it happens again, the error is logged for the team.',
+      ),
+    ).toBeVisible()
     await userEvent.click(canvas.getByRole('button', { name: 'Try again' }))
     await expect(await canvas.findByText('Delivering again')).toBeVisible()
   },
