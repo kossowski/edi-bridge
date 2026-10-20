@@ -70,6 +70,7 @@ describe('the Document storage', () => {
       content: invoice,
       interchangeSender: '4012345000009',
       interchangeControlReference: '1',
+      contentHash: 'a1b2',
     })
 
     await expect(storage.read(workspaceId, stored.id)).resolves.toEqual({
@@ -80,6 +81,7 @@ describe('the Document storage', () => {
       content: invoice,
       interchangeSender: '4012345000009',
       interchangeControlReference: '1',
+      contentHash: 'a1b2',
       receivedAt: stored.receivedAt,
     })
   })
