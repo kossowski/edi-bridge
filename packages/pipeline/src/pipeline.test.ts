@@ -2538,7 +2538,7 @@ describe('the processing of an inbound Run', () => {
         .set({ waitingForTradingPartnerSince: new Date() })
         .where(eq(runs.id, runId))
 
-    it('replaces the newest waiting Run of its Flow with its Business Reference and ends the mark', async () => {
+    it('replaces the newest waiting Run of its Flow with its document number and ends the mark', async () => {
       const into = await ordersWorkspace('Resend Foods')
       const older = idOf((await receiveInterchange(into, invalidOrders('128576')))[0])
       const [newer] = await receiveInterchange(into, invalidOrders('128576'))
@@ -2572,7 +2572,51 @@ describe('the processing of an inbound Run', () => {
       expect(second).toMatchObject({ replacesRunId: older })
     })
 
-    it('leaves a waiting Run of another Business Reference or without one', async () => {
+    // An order number in RFF+ON makes it the Business Reference, so each Message of the order shares it.
+    const ofOrder = (order: string, documentNumber: string, messageFunction: string) =>
+      sentAnew(
+        interchangeOf([
+          ordersMessage.flatMap((line) =>
+            line === "BGM+220:::+128576+9'"
+              ? [`BGM+220:::+${documentNumber}+${messageFunction}'`]
+              : line === "NAD+BY+4398765000004::9'"
+                ? [`RFF+ON:${order}'`, line]
+                : line.startsWith('UNT')
+                  ? ["UNT+23+ME0001'"]
+                  : [line],
+          ),
+        ]),
+      )
+
+    it('replaces the waiting Run of its document number, not another Message of its order', async () => {
+      const into = await ordersWorkspace('Document Number Foods')
+      const waiting = idOf((await receiveInterchange(into, ofOrder('4500017', '128576', '99')))[0])
+
+      await markWaiting(waiting)
+
+      const [other] = await receiveInterchange(into, ofOrder('4500017', '128577', '9'))
+
+      expect(other).toMatchObject({
+        status: 'delivered',
+        businessReference: '4500017',
+        documentNumber: '128577',
+        replacesRunId: null,
+      })
+      await expect(readRun(connection.db, waiting)).resolves.not.toMatchObject({
+        waitingForTradingPartnerSince: null,
+      })
+
+      const [resend] = await receiveInterchange(into, ofOrder('4500017', '128576', '9'))
+
+      expect(resend).toMatchObject({ status: 'delivered', replacesRunId: waiting })
+      await expect(readRun(connection.db, waiting)).resolves.toMatchObject({
+        businessReference: '4500017',
+        documentNumber: '128576',
+        waitingForTradingPartnerSince: null,
+      })
+    })
+
+    it('leaves a waiting Run of another document number or without one', async () => {
       const into = await ordersWorkspace('Other Order Foods')
       const other = idOf((await receiveInterchange(into, invalidOrders('900001')))[0])
 

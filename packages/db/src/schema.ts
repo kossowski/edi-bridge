@@ -537,6 +537,8 @@ export const runs = pgTable(
     status: runStatus().notNull().default('received'),
     failureStage: failureStage(),
     businessReference: text(),
+    // The BGM number, so a resend replaces the Run of its own Message, not another of its order.
+    documentNumber: text(),
     error: jsonb().$type<RunError>(),
     problem: jsonb().$type<Omit<RunProblem, 'whoFixes'>>(),
     waitingForTradingPartnerSince: timestamp({ withTimezone: true, mode: 'date' }),
