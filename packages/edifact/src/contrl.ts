@@ -1,3 +1,4 @@
+import { type CharacterSetError } from './character-set'
 import { defaultDelimiters } from './delimiters'
 import { messageIdentifierElement } from './message-identifier'
 import { isBrokenMessage } from './model'
@@ -71,6 +72,8 @@ const validationErrorCodes: Record<ValidationErrorCode, string> = {
 }
 
 type ReceivedError = ParseError | ValidationError
+
+const invalidCharacterCode = validationErrorCodes['invalid-character']
 
 const syntaxErrorCode = (error: ReceivedError) =>
   error instanceof ParseError ? parseErrorCodes[error.code] : validationErrorCodes[error.code]
@@ -275,7 +278,23 @@ const rejection = (
   ...(serviceSegmentError(error, segmentAt) ?? [[syntaxErrorCode(error)]]),
 ]
 
-export const buildContrl = (text: string, messageReference: string): Message => {
+// A UCI names only a service segment, so a byte in another segment rejects without a position.
+const invalidCharacterRejection = (
+  { position, tag }: CharacterSetError,
+  segmentAt: (segment: number) => Segment | undefined,
+): Element[] => {
+  const segment = segmentAt(position.segment)
+
+  return serviceSegmentTags.has(tag)
+    ? [[rejected], [invalidCharacterCode], [tag], dataElementIdentification(segment, position)]
+    : [[rejected], [invalidCharacterCode]]
+}
+
+export const buildContrl = (
+  text: string,
+  messageReference: string,
+  { invalidCharacter }: { invalidCharacter?: CharacterSetError | undefined } = {},
+): Message => {
   const {
     hasServiceStringAdvice,
     header,
@@ -304,6 +323,18 @@ export const buildContrl = (text: string, messageReference: string): Message => 
   }
 
   const responses = () => {
+    // The text holds U+FFFD in place of the invalid bytes, so nothing read from it is accepted.
+    if (invalidCharacter) {
+      return [
+        interchangeResponse(
+          ...invalidCharacterRejection(
+            invalidCharacter,
+            (segment) => received[segment - firstSegment],
+          ),
+        ),
+      ]
+    }
+
     if (envelope instanceof ParseError) {
       return [
         interchangeResponse(...rejection(envelope, (segment) => received[segment - firstSegment])),

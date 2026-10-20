@@ -679,6 +679,68 @@ describe('buildContrl', () => {
     },
   )
 
+  const undecodable = (text: string) => {
+    const decoded = decodeInterchange(Buffer.from(text, 'latin1'))
+
+    if (decoded === undefined || !('error' in decoded)) {
+      throw new Error('The Interchange decoded in its character set')
+    }
+
+    return { readable: decoded.readable, invalidCharacter: decoded.error }
+  }
+
+  it.each([
+    [
+      'a Message',
+      `UNB+UNOW:3+7300015200048:14+7350000001266:14+221125:1605+88776655'${orders('M1', "BGM+220+PäO1+9'", ...validOrder.slice(1))}UNZ+1+88776655'`,
+      "UCI+88776655+7300015200048:14+7350000001266:14+4+21'",
+    ],
+    [
+      'its header',
+      `UNB+UNOW:3+7300015200048:14+7350000001266:14+221125:1605+88776655++äPP'${orders('M1', ...validOrder)}UNZ+1+88776655'`,
+      "UCI+88776655+7300015200048:14+7350000001266:14+4+21+UNB+7'",
+    ],
+    [
+      'a Message header',
+      `UNB+UNOW:3+7300015200048:14+7350000001266:14+221125:1605+88776655'${orders('Mä1', ...validOrder)}UNZ+1+88776655'`,
+      "UCI+88776655+7300015200048:14+7350000001266:14+4+21+UNH+1'",
+    ],
+    [
+      'its trailer',
+      `UNB+UNOW:3+7300015200048:14+7350000001266:14+221125:1605+88776655'${orders('M1', ...validOrder)}UNZ+1+88776655ä'`,
+      "UCI+88776655+7300015200048:14+7350000001266:14+4+21+UNZ+2'",
+    ],
+    [
+      'a broken Message',
+      `UNB+UNOW:3+7300015200048:14+7350000001266:14+221125:1605+88776655'UNH+M1+ORDERS:D:96A:UN:EAN008'BGM+220+PäO1+9'UNZ+1+88776655'`,
+      "UCI+88776655+7300015200048:14+7350000001266:14+4+21'",
+    ],
+  ])(
+    'rejects an Interchange with a byte not valid in its character set in %s',
+    (_case, text, response) => {
+      const { readable, invalidCharacter } = undecodable(text)
+      const contrl = buildContrl(readable, 'C1', { invalidCharacter })
+
+      expect(serializeMessage(contrl).split('\n')).toEqual([
+        "UNH+C1+CONTRL:D:3:UN:EAN002'",
+        response,
+        "UNT+3+C1'",
+      ])
+      expect(readBack(contrl)).toMatchObject({ action: 'rejected' })
+    },
+  )
+
+  it('builds no CONTRL when the header it echoes holds a byte not valid in its character set', () => {
+    const { readable, invalidCharacter } = undecodable(
+      `UNB+UNOW:3+73000152000ä:14+7350000001266:14+221125:1605+88776655'UNZ+0+88776655'`,
+    )
+
+    const error = thrownBy(() => buildContrl(readable, 'C1', { invalidCharacter }))
+
+    expect(error).toBeInstanceOf(BuildContrlError)
+    expect(error).toMatchObject({ code: 'unechoable-interchange-header' })
+  })
+
   it.each([
     [
       'control reference',
