@@ -155,7 +155,7 @@ const statAndOpenDirectory = (
   })
 }
 
-// A Channel without a stored fingerprint connects unchecked until an Admin confirms one.
+// Unchecked without a fingerprint, so Channels set up before host key checks keep working.
 export const sftpSession = <A>(
   login: SftpLogin,
   timeoutMs: number,
