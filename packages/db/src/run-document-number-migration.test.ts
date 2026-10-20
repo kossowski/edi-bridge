@@ -21,7 +21,7 @@ type RunOwners = {
 
 const graph = sql`${JSON.stringify(emptyGraph)}::jsonb`
 
-// Plain SQL with only the columns of migration 0024, so later schema changes leave the old rows intact.
+// Plain SQL with only the columns of migration 0025, so later schema changes leave the old rows intact.
 async function insertRunOwners(db: Connection['db']) {
   return only(
     db.execute<RunOwners>(sql`
@@ -102,7 +102,7 @@ let inboundWithoutReferenceRunId: string
 let outboundRunId: string
 
 beforeAll(async () => {
-  testDatabase = await startTestDatabase({ upTo: '0024_sftp_file_duplicates' })
+  testDatabase = await startTestDatabase({ upTo: '0025_document_expiry' })
   connection = connect(testDatabase.url)
 
   const owners = await insertRunOwners(connection.db)
@@ -126,7 +126,7 @@ afterAll(async () => {
 
 const storedRun = (id: string) => only(connection.db.select().from(runs).where(eq(runs.id, id)))
 
-describe('migration 0025 on a Run stored before the document number', () => {
+describe('migration 0026 on a Run stored before the document number', () => {
   it('gives an inbound Run its Business Reference, the BGM number, as the document number', async () => {
     await expect(storedRun(inboundRunId)).resolves.toMatchObject({
       businessReference: '128576',
