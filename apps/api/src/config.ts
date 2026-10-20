@@ -6,8 +6,15 @@ import { localDatabaseUrl } from '@edi-bridge/db'
 import { aiModelFromEnv } from './ai-model.js'
 
 import type { ChannelSettings } from './channel.js'
+import type { SentryConfig } from './sentry.js'
 
 const channelReachTimeoutMs = 10_000
+
+const defaultTracesSampleRate = 0.1
+
+// An empty value in an env file leaves the variable unset.
+const unsetWhenEmpty = <T extends z.ZodType>(schema: T) =>
+  z.preprocess((value) => (value === '' ? undefined : value), schema.optional())
 
 const envSchema = (production: boolean) =>
   z.object({
@@ -21,6 +28,9 @@ const envSchema = (production: boolean) =>
       : z.string().min(32).default('edi-bridge-development-secret-not-for-production'),
     CHANNEL_SECRET_KEY: secretKeyEnv(production),
     API_PUBLIC_URL: z.url().optional(),
+    SENTRY_DSN: unsetWhenEmpty(z.url()),
+    SENTRY_ENVIRONMENT: unsetWhenEmpty(z.string()),
+    SENTRY_TRACES_SAMPLE_RATE: unsetWhenEmpty(z.coerce.number().min(0).max(1)),
   })
 
 export function loadConfig(source: NodeJS.ProcessEnv) {
@@ -55,6 +65,14 @@ export function loadConfig(source: NodeJS.ProcessEnv) {
       reachTimeoutMs: channelReachTimeoutMs,
     } satisfies ChannelSettings,
     aiModel: aiModelFromEnv(source),
+    sentry:
+      env.data.SENTRY_DSN === undefined
+        ? null
+        : ({
+            dsn: env.data.SENTRY_DSN,
+            environment: env.data.SENTRY_ENVIRONMENT,
+            tracesSampleRate: env.data.SENTRY_TRACES_SAMPLE_RATE ?? defaultTracesSampleRate,
+          } satisfies SentryConfig),
   }
 }
 

@@ -1,6 +1,6 @@
 import { hashPassword } from 'better-auth/crypto'
 import { eq } from 'drizzle-orm'
-import { Effect } from 'effect'
+import { Effect, type Tracer } from 'effect'
 import { z } from 'zod'
 
 import type { LanguageModel } from 'ai'
@@ -390,11 +390,15 @@ export async function startTestApi({
   aiModel = null,
   liveEventHeartbeatMs,
   logger = false,
+  runQueue = testRunQueue(),
+  tracer,
 }: {
   aiTimeoutMs?: number
   aiModel?: LanguageModel | null
   liveEventHeartbeatMs?: number
   logger?: FastifyServerOptions['logger']
+  runQueue?: ReturnType<typeof testRunQueue>
+  tracer?: Tracer.Tracer
 } = {}) {
   const testDatabase = await startTestDatabase()
   const connection = connect(testDatabase.url)
@@ -404,7 +408,6 @@ export async function startTestApi({
   await addMember(connection.db, ownViewer)
   await addMember(connection.db, otherAdmin)
 
-  const runQueue = testRunQueue()
   const liveEvents = memoryLiveEvents()
 
   const app = buildApp({
@@ -418,6 +421,7 @@ export async function startTestApi({
     logger,
     probes: { postgres: up, redis: up },
     runQueue: runQueue.service,
+    tracer,
     webOrigin,
     webhookRateLimiter: memoryWebhookRateLimiter(),
   })

@@ -62,3 +62,43 @@ describe('the AI model', () => {
     expect(loadConfig(production).aiModel).toBeNull()
   })
 })
+
+describe('Sentry', () => {
+  const dsn = 'https://public-key@sentry.example.com/1'
+
+  it('is off without SENTRY_DSN, in production too', () => {
+    expect(loadConfig(production).sentry).toBeNull()
+  })
+
+  it('is off with an empty SENTRY_DSN', () => {
+    expect(loadConfig({ SENTRY_DSN: '', SENTRY_TRACES_SAMPLE_RATE: '' }).sentry).toBeNull()
+  })
+
+  it('samples a tenth of the traces by default', () => {
+    expect(loadConfig({ SENTRY_DSN: dsn }).sentry).toEqual({
+      dsn,
+      environment: undefined,
+      tracesSampleRate: 0.1,
+    })
+  })
+
+  it('reports to the environment and samples at the rate that are set', () => {
+    expect(
+      loadConfig({
+        SENTRY_DSN: dsn,
+        SENTRY_ENVIRONMENT: 'staging',
+        SENTRY_TRACES_SAMPLE_RATE: '0.2',
+      }).sentry,
+    ).toEqual({ dsn, environment: 'staging', tracesSampleRate: 0.2 })
+  })
+
+  it('refuses a sample rate outside 0 to 1', () => {
+    expect(() => loadConfig({ SENTRY_DSN: dsn, SENTRY_TRACES_SAMPLE_RATE: '20' })).toThrow(
+      /SENTRY_TRACES_SAMPLE_RATE/,
+    )
+  })
+
+  it('refuses a DSN that is no URL', () => {
+    expect(() => loadConfig({ SENTRY_DSN: 'public-key' })).toThrow(/SENTRY_DSN/)
+  })
+})

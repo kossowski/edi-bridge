@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/node'
 import { Redis } from 'ioredis'
 import postgres from 'postgres'
 
@@ -6,7 +7,12 @@ import { bullmqRunQueue, liveEventSubscriber, redisLiveEvents } from '@edi-bridg
 
 import { buildApp } from './app.js'
 import { config } from './config.js'
+import { sentryFlushTimeoutMs, sentryOptions, sentryTracer } from './sentry.js'
 import { redisWebhookRateLimiter } from './webhook-rate-limit.js'
+
+if (config.sentry !== null) {
+  Sentry.init(sentryOptions(config.sentry))
+}
 
 await migrate(config.databaseUrl)
 
@@ -40,6 +46,7 @@ const app = buildApp({
     },
   },
   runQueue: runQueue.service,
+  tracer: config.sentry === null ? undefined : sentryTracer,
   webOrigin: config.webOrigin,
   webhookRateLimiter: redisWebhookRateLimiter(redis),
 })
@@ -56,6 +63,10 @@ async function shutdown(): Promise<void> {
   await connection.close()
   await sql.end({ timeout: 5 })
   redis.disconnect()
+
+  if (config.sentry !== null) {
+    await Sentry.close(sentryFlushTimeoutMs)
+  }
 }
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
