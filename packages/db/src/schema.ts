@@ -487,9 +487,24 @@ export const documents = pgTable(
       .references(() => channels.id),
     fileName: text().notNull(),
     content: text().notNull(),
+    // The UNB keys that make a later copy of the Interchange a Duplicate; null for no Interchange.
+    interchangeSender: text(),
+    interchangeControlReference: text(),
     receivedAt: timestamp({ withTimezone: true, mode: 'date' }).notNull().defaultNow(),
   },
-  (table) => [index().on(table.workspaceId), index().on(table.channelId)],
+  (table) => [
+    index().on(table.workspaceId),
+    index().on(table.channelId),
+    index('documents_interchange_index').on(
+      table.workspaceId,
+      table.interchangeSender,
+      table.interchangeControlReference,
+    ),
+    check(
+      'documents_interchange',
+      sql`num_nonnulls(${table.interchangeSender}, ${table.interchangeControlReference}) in (0, 2)`,
+    ),
+  ],
 )
 
 export const runStatus = pgEnum('run_status', runStatuses)
@@ -536,6 +551,7 @@ export const runs = pgTable(
     replacesRunId: uuid()
       .unique()
       .references((): AnyPgColumn => runs.id),
+    duplicateOfRunId: uuid().references((): AnyPgColumn => runs.id),
     receivedAt: timestamp({ withTimezone: true, mode: 'date' }).notNull().defaultNow(),
     updatedAt: updatedAt(),
   },
@@ -546,6 +562,7 @@ export const runs = pgTable(
     index().on(table.tradingPartnerId),
     index().on(table.mappingVersionId),
     index().on(table.tradingPartnerId, table.controlReference),
+    index().on(table.duplicateOfRunId),
     // The Overdue check reads only the Interchanges that still await an Acknowledgement.
     index('runs_pending_acknowledgement_index')
       .on(table.handedOverAt)
@@ -573,6 +590,10 @@ export const runs = pgTable(
       sql`${table.acknowledgementState} is null or (${table.handedOverAt} is not null and ${table.controlReference} is not null)`,
     ),
     check('runs_message_index', sql`${table.messageIndex} >= 1`),
+    check(
+      'runs_duplicate',
+      sql`(${table.status} = 'duplicate') = (${table.duplicateOfRunId} is not null)`,
+    ),
   ],
 )
 

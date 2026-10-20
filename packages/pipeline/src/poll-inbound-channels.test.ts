@@ -443,6 +443,48 @@ describe('the polling of inbound SFTP Channels', () => {
     expect(await storedOn(box.channelId)).toHaveLength(1)
   })
 
+  it('records a stored file received again after a restart as a Duplicate', async () => {
+    const orders = await addOrdersFlow(connection.db, workspace, { url: 'http://erp.invalid/' })
+    const box = await outbox({ 'orders.edi': threeOrders }, { flowId: orders.flowId })
+
+    const beforeRestart = await startPolling({
+      ...download,
+      remove: () => Effect.fail(new DownloadFailed({ reason: 'timedOut' })),
+    })
+
+    await beforeRestart.pollAgain(box.channelId)
+    await received(box.channelId, 1)
+    await stopPolling?.()
+
+    const afterRestart = await startPolling()
+
+    await afterRestart.pollAgain(box.channelId)
+    await removed(box)
+
+    const [first, second] = (await storedOn(box.channelId)).toSorted(
+      (a, b) => a.receivedAt.getTime() - b.receivedAt.getTime(),
+    )
+
+    const runsOf = (documentId: string) =>
+      connection.db
+        .select({ id: runs.id, status: runs.status, duplicateOfRunId: runs.duplicateOfRunId })
+        .from(runs)
+        .where(eq(runs.documentId, documentId))
+        .orderBy(runs.messageIndex)
+
+    const originals = await runsOf(first?.id ?? '')
+    const anyId: unknown = expect.any(String)
+
+    expect(originals.map(({ status }) => status)).toEqual(['received', 'received', 'received'])
+    expect(await runsOf(second?.id ?? '')).toEqual(
+      originals.map(({ id }) => ({
+        id: anyId,
+        status: 'duplicate',
+        duplicateOfRunId: id,
+      })),
+    )
+  })
+
   it('does not receive a file twice when a poll is still running at the next interval', async () => {
     const box = await outbox({ 'slow.edi': threeOrders })
     const { promise: released, resolve: release } = Promise.withResolvers<void>()

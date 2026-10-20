@@ -1,9 +1,18 @@
-import { and, eq } from 'drizzle-orm'
+import { aliasedTable, and, asc, eq, isNull, ne, notExists, sql } from 'drizzle-orm'
 import { DateTime, Effect, Result } from 'effect'
 
 import { directionOf } from '@edi-bridge/contracts'
-import { channels, flows, type RawDocument, runs, runSteps, tradingPartners } from '@edi-bridge/db'
-import { ParseError, parseMessages } from '@edi-bridge/edifact'
+import {
+  channels,
+  documents as storedDocuments,
+  flows,
+  type RawDocument,
+  runs,
+  runSteps,
+  tradingPartners,
+  type Transaction,
+} from '@edi-bridge/db'
+import { ParseError, parseMessages, readInterchange } from '@edi-bridge/edifact'
 
 import { answerDocument } from './acknowledgement'
 import { ReceiptRejected } from './errors'
@@ -36,6 +45,8 @@ type Declared = { sender: string | undefined; messages: DeclaredMessage[] }
 type ChannelFlow = { flow: Flow; tradingPartnerGln: string | null }
 
 type RoutedMessage = { flow: Flow; messageIndex: number | null }
+
+type InterchangeKey = { sender: string; controlReference: string }
 
 // A Document without an Interchange envelope declares no Message Types.
 function declaredMessagesOf(content: string): Declared {
@@ -108,6 +119,73 @@ function route(content: string, channelFlows: readonly ChannelFlow[]) {
   return Effect.succeed({ routed, notRouted })
 }
 
+function interchangeKeyOf(content: string): InterchangeKey | undefined {
+  try {
+    const { header } = readInterchange(content)
+    const sender = header?.elements[1]?.[0]
+    const controlReference = header?.elements[4]?.[0]
+
+    return sender && controlReference ? { sender, controlReference } : undefined
+  } catch (error) {
+    if (error instanceof ParseError) {
+      return undefined
+    }
+
+    throw error
+  }
+}
+
+const reprocessed = aliasedTable(runs, 'reprocessed')
+
+// The lock holds a concurrent copy back until this one's Runs are stored, so only one is the original.
+async function originalRunsOf(
+  tx: Transaction,
+  workspaceId: string,
+  documentId: string,
+  { sender, controlReference }: InterchangeKey,
+) {
+  await tx.execute(
+    sql`select pg_advisory_xact_lock(hashtextextended(${JSON.stringify([workspaceId, sender, controlReference])}, 0))`,
+  )
+
+  const found = await tx
+    .select({ id: runs.id, messageIndex: runs.messageIndex })
+    .from(runs)
+    .innerJoin(storedDocuments, eq(storedDocuments.id, runs.documentId))
+    .where(
+      and(
+        eq(storedDocuments.workspaceId, workspaceId),
+        eq(storedDocuments.interchangeSender, sender),
+        eq(storedDocuments.interchangeControlReference, controlReference),
+        ne(storedDocuments.id, documentId),
+        isNull(runs.duplicateOfRunId),
+        // A Reprocess Run replaces a Run of its own Document, which stays the original.
+        notExists(
+          tx
+            .select()
+            .from(reprocessed)
+            .where(
+              and(
+                eq(reprocessed.id, runs.replacesRunId),
+                eq(reprocessed.documentId, runs.documentId),
+              ),
+            ),
+        ),
+      ),
+    )
+    .orderBy(asc(storedDocuments.receivedAt), asc(storedDocuments.id))
+
+  const originals = new Map<number, string>()
+
+  for (const { id, messageIndex } of found) {
+    if (messageIndex !== null && !originals.has(messageIndex)) {
+      originals.set(messageIndex, id)
+    }
+  }
+
+  return originals
+}
+
 const nameCollator = new Intl.Collator('de')
 
 const checkInboundChannel = (workspaceId: string, channelId: string) =>
@@ -163,6 +241,7 @@ export const receive = (arriving: ArrivingDocument) =>
     yield* checkInboundChannel(arriving.workspaceId, arriving.channelId)
 
     const documents = yield* Documents
+    const key = interchangeKeyOf(arriving.content)
 
     const document = yield* Effect.promise(() =>
       documents.store({
@@ -170,6 +249,8 @@ export const receive = (arriving: ArrivingDocument) =>
         channelId: arriving.channelId,
         fileName: arriving.fileName,
         content: arriving.content,
+        interchangeSender: key?.sender ?? null,
+        interchangeControlReference: key?.controlReference ?? null,
       }),
     )
 
@@ -190,9 +271,16 @@ export const receive = (arriving: ArrivingDocument) =>
     const db = yield* Database
 
     const created = yield* Effect.promise(() =>
-      db.transaction((tx) =>
-        Promise.all(
+      db.transaction(async (tx) => {
+        const originals =
+          key === undefined
+            ? new Map<number, string>()
+            : await originalRunsOf(tx, arriving.workspaceId, document.id, key)
+
+        return Promise.all(
           routed.map(async ({ flow, messageIndex }) => {
+            const duplicateOfRunId = messageIndex === null ? undefined : originals.get(messageIndex)
+
             const [run] = await tx
               .insert(runs)
               .values({
@@ -203,6 +291,10 @@ export const receive = (arriving: ArrivingDocument) =>
                 manualSubmission: arriving.manualSubmission,
                 receivedAt: document.receivedAt,
                 messageIndex,
+                ...(duplicateOfRunId !== undefined && {
+                  status: 'duplicate' as const,
+                  duplicateOfRunId,
+                }),
               })
               .returning()
 
@@ -221,20 +313,26 @@ export const receive = (arriving: ArrivingDocument) =>
                       startedAt: receiptStartedAt,
                       finishedAt: DateTime.toDateUtc(receiptFinishedAt),
                     }
-                  : { runId: run.id, position, stage },
+                  : {
+                      runId: run.id,
+                      position,
+                      stage,
+                      ...(duplicateOfRunId !== undefined && { status: 'skipped' as const }),
+                    },
               ),
             )
 
             return run
           }),
-        ),
-      ),
+        )
+      }),
     )
 
     const queue = yield* RunQueue
+    const received = created.filter(({ status }) => status === 'received')
 
     // The Runs are stored already, so one not queued stays received until the next sweep.
-    const [, notQueued] = yield* Effect.partition(created, (run) =>
+    const [, notQueued] = yield* Effect.partition(received, (run) =>
       queue.enqueue({ workspaceId: arriving.workspaceId, runId: run.id }),
     )
 
