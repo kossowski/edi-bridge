@@ -48,7 +48,7 @@ export function DocumentStructuresScreen() {
   const summaries = useQuery(documentStructuresQuery)
   const canChange = useCanChange()
   const [search, setSearch] = useState('')
-  const title = t('Sidebar.items.dataFormats.label')
+  const title = t('Sidebar.items.documentStructures.label')
 
   const busy = summaries.isPending
   const all = summaries.data ?? []

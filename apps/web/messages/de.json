@@ -73,7 +73,7 @@
         "label": "Code-Übersetzungen",
         "hint": "Codes, die übersetzt werden, z. B. Einheit ST wird PCE"
       },
-      "dataFormats": {
+      "documentStructures": {
         "label": "Ihre Datenformate",
         "hint": "Der Aufbau der Dateien aus Ihren eigenen Systemen"
       },
@@ -2299,7 +2299,7 @@
     "path": {
       "inbound": "geht in",
       "outbound": "geht an",
-      "dataFormat": "Ihr Datenformat:",
+      "documentStructure": "Ihr Datenformat:",
       "noPartner": "Noch kein Handelspartner"
     },
     "title": {
@@ -2352,7 +2352,7 @@
       "creating": "Mapping wird angelegt…",
       "failed": "Das Mapping konnte nicht angelegt werden. Versuchen Sie es erneut.",
       "noDocumentStructure": "Legen Sie zuerst Ihr Datenformat an, damit die KI die Form Ihrer Dateien kennt.",
-      "addDataFormat": "Datenformat anlegen",
+      "addDocumentStructure": "Datenformat anlegen",
       "documentStructureGone": "Dieses Datenformat gibt es nicht mehr. Wählen Sie ein anderes."
     },
     "first": {

@@ -5,7 +5,7 @@ import { expect, screen, userEvent, waitFor, within } from 'storybook/test'
 
 import { MappingsScreen } from '@/components/mappings/mappings-screen'
 import { viewerStory } from '@/components/session/session-story-helpers'
-import { darkMode, german, mobile } from '@/components/story-helpers'
+import { darkMode, findOpenDialog, german, mobile } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import { createMappingEndpoint, type NewMappingMessageType } from '@edi-bridge/contracts'
 import {
@@ -50,7 +50,7 @@ async function badges(canvasElement: HTMLElement, name: string) {
 async function openNewMappingSheet(canvasElement: HTMLElement, name = 'New Mapping') {
   await userEvent.click(await within(canvasElement).findByRole('button', { name }))
 
-  return within(await screen.findByRole('dialog', { name }))
+  return within(await findOpenDialog(canvasElement, name))
 }
 
 // SAFETY: the seed holds a Document Structure for every Message Type.

@@ -81,7 +81,7 @@ function MappingPath({ mapping }: { mapping: MappingSummary }) {
       direction={mapping.direction}
       erp={
         <span className="min-w-0 sm:truncate">
-          <span className="sr-only">{t('dataFormat')} </span>
+          <span className="sr-only">{t('documentStructure')} </span>
           {mapping.documentStructureName}
         </span>
       }
