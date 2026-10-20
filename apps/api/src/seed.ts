@@ -54,6 +54,7 @@ import {
   seedArticles,
   seedChannelDomain,
   seedCompany,
+  seedOnboardingPartner,
   type SeedOrder,
   type SeedTradingPartner,
   seedTradingPartners,
@@ -379,6 +380,36 @@ async function seedSetup(
         .returning(),
     )
 
+  type ChannelOwner = { name: string; slug: string }
+
+  const sftpOf = ({ slug }: ChannelOwner, tradingPartnerId: string) => ({
+    type: 'sftp' as const,
+    tradingPartnerId,
+    host: `sftp.${slug}.${seedChannelDomain}`,
+    port: 22,
+    username: 'edi-bridge-seed',
+    authentication: 'password' as const,
+  })
+
+  const sftpOutbox = (owner: ChannelOwner, tradingPartnerId: string) =>
+    channel({
+      ...sftpOf(owner, tradingPartnerId),
+      direction: 'inbound',
+      name: `${owner.name} outbox`,
+      remotePath: '/outbox',
+      pollingIntervalMinutes: 5,
+    })
+
+  const ordersFlowOf = (owner: ChannelOwner, tradingPartnerId: string, inboundChannelId: string) =>
+    flow({
+      tradingPartnerId,
+      messageType: 'ORDERS',
+      name: `Orders from ${owner.name}`,
+      inboundChannelId,
+      destinationChannelId: erpInbox.id,
+      mappingVersionId: ordersMapping.versionId,
+    })
+
   const partners = []
 
   for (const seed of seedTradingPartners) {
@@ -411,38 +442,16 @@ async function seedSetup(
       )
     }
 
-    const sftp = {
-      type: 'sftp' as const,
-      tradingPartnerId: row.id,
-      host: `sftp.${seed.slug}.${seedChannelDomain}`,
-      port: 22,
-      username: 'edi-bridge-seed',
-      authentication: 'password' as const,
-    }
-
-    const inbound = await channel({
-      ...sftp,
-      direction: 'inbound',
-      name: `${seed.name} outbox`,
-      remotePath: '/outbox',
-      pollingIntervalMinutes: 5,
-    })
+    const inbound = await sftpOutbox(seed, row.id)
 
     const outbound = await channel({
-      ...sftp,
+      ...sftpOf(seed, row.id),
       direction: 'outbound',
       name: `${seed.name} inbox`,
       remotePath: '/inbox',
     })
 
-    const ordersFlow = await flow({
-      tradingPartnerId: row.id,
-      messageType: 'ORDERS',
-      name: `Orders from ${seed.name}`,
-      inboundChannelId: inbound.id,
-      destinationChannelId: erpInbox.id,
-      mappingVersionId: ordersMapping.versionId,
-    })
+    const ordersFlow = await ordersFlowOf(seed, row.id, inbound.id)
 
     const invoicFlow = await flow({
       tradingPartnerId: row.id,
@@ -455,6 +464,25 @@ async function seedSetup(
 
     partners.push({ seed, row, inbound, outbound, ordersFlow, invoicFlow })
   }
+
+  const onboarding = await one(
+    tx
+      .insert(tradingPartners)
+      .values({
+        workspaceId,
+        name: seedOnboardingPartner.name,
+        gln: seedOnboardingPartner.gln,
+        characterSet: 'UNOC',
+        acknowledgementTimeLimitHours: seedOnboardingPartner.acknowledgementTimeLimitHours,
+        messageTypes: seedOnboardingPartner.messageTypes,
+        testMode: true,
+      })
+      .returning(),
+  )
+
+  const onboardingOutbox = await sftpOutbox(seedOnboardingPartner, onboarding.id)
+
+  await ordersFlowOf(seedOnboardingPartner, onboarding.id, onboardingOutbox.id)
 
   return {
     partners,

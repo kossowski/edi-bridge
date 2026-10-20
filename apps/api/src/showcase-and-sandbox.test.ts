@@ -10,6 +10,7 @@ import {
   sessionSchema,
   showcaseSignInEndpoint,
   signedInSchema,
+  tradingPartnerActivitiesEndpoint,
 } from '@edi-bridge/contracts'
 import { members, runs, sessions, users, workspaces } from '@edi-bridge/db'
 
@@ -185,6 +186,25 @@ describe('POST /auth/sign-in/showcase', () => {
       workspace: { name: 'Lindenhof Feinkost GmbH', kind: 'showcase' },
       role: 'viewer',
     })
+  })
+
+  it('shows a Trading Partner that misses the Channel of a needed direction', async () => {
+    const viewer = signedInClient(api.app, await showcaseSignIn())
+
+    const activities = tradingPartnerActivitiesEndpoint.response.parse(
+      (await viewer.inject({ method: 'GET', url: tradingPartnerActivitiesEndpoint.path })).json(),
+    )
+
+    expect(
+      activities.filter(({ channelDirections, neededDirections }) =>
+        neededDirections.some((direction) => !channelDirections.includes(direction)),
+      ),
+    ).toEqual([
+      expect.objectContaining({
+        channelDirections: ['inbound'],
+        neededDirections: ['inbound', 'outbound'],
+      }),
+    ])
   })
 
   it('lets the Viewer change nothing', async () => {
