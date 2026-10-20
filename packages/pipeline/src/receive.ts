@@ -277,6 +277,70 @@ const routeOnChannel = ({ workspaceId, channelId, content }: ArrivingDocument) =
       : routing
   })
 
+type RunToStore = {
+  flow: Flow
+  run: Pick<
+    typeof runs.$inferInsert,
+    'workspaceId' | 'documentId' | 'manualSubmission' | 'receivedAt' | 'messageIndex'
+  >
+  duplicateOfRunId?: string | undefined
+  receipt: { startedAt: Date; finishedAt: Date }
+}
+
+export async function storeRun(
+  tx: Transaction,
+  { flow, run: columns, duplicateOfRunId, receipt }: RunToStore,
+) {
+  const [run] = await tx
+    .insert(runs)
+    .values({
+      ...columns,
+      flowId: flow.id,
+      tradingPartnerId: flow.tradingPartnerId,
+      ...(duplicateOfRunId !== undefined && {
+        status: 'duplicate' as const,
+        duplicateOfRunId,
+      }),
+    })
+    .returning()
+
+  if (run === undefined) {
+    throw new Error('Run insert returned no row')
+  }
+
+  await tx.insert(runSteps).values(
+    stagesOf(flow).map((stage, position) =>
+      stage === 'receipt'
+        ? { runId: run.id, position, stage, status: 'succeeded' as const, ...receipt }
+        : {
+            runId: run.id,
+            position,
+            stage,
+            ...(duplicateOfRunId !== undefined && { status: 'skipped' as const }),
+          },
+    ),
+  )
+
+  return run
+}
+
+// The Runs are stored already, so one not queued stays received until the next sweep.
+export const queueReceived = (created: readonly ReceivedRun[]) =>
+  Effect.gen(function* () {
+    const queue = yield* RunQueue
+
+    const [, notQueued] = yield* Effect.partition(
+      created.filter(({ status }) => status === 'received'),
+      (run) => queue.enqueue({ workspaceId: run.workspaceId, runId: run.id }),
+    )
+
+    if (notQueued.length > 0) {
+      yield* Effect.logWarning('Received Runs not queued until the next sweep', notQueued)
+    }
+
+    return notQueued.map(({ runId }) => runId)
+  })
+
 export const receive = (arriving: ArrivingDocument) =>
   Effect.gen(function* () {
     const receiptStartedAt = yield* DateTime.nowAsDate
@@ -334,72 +398,33 @@ export const receive = (arriving: ArrivingDocument) =>
         })
 
         return Promise.all(
-          routed.map(async ({ flow, messageIndex }) => {
-            const duplicateOfRunId = originals.get(messageIndex)
-
-            const [run] = await tx
-              .insert(runs)
-              .values({
+          routed.map(({ flow, messageIndex }) =>
+            storeRun(tx, {
+              flow,
+              run: {
                 workspaceId: arriving.workspaceId,
                 documentId: document.id,
-                flowId: flow.id,
-                tradingPartnerId: flow.tradingPartnerId,
                 manualSubmission: arriving.manualSubmission,
                 receivedAt: document.receivedAt,
                 messageIndex,
-                ...(duplicateOfRunId !== undefined && {
-                  status: 'duplicate' as const,
-                  duplicateOfRunId,
-                }),
-              })
-              .returning()
-
-            if (run === undefined) {
-              throw new Error('Run insert returned no row')
-            }
-
-            await tx.insert(runSteps).values(
-              stagesOf(flow).map((stage, position) =>
-                stage === 'receipt'
-                  ? {
-                      runId: run.id,
-                      position,
-                      stage,
-                      status: 'succeeded' as const,
-                      startedAt: receiptStartedAt,
-                      finishedAt: DateTime.toDateUtc(receiptFinishedAt),
-                    }
-                  : {
-                      runId: run.id,
-                      position,
-                      stage,
-                      ...(duplicateOfRunId !== undefined && { status: 'skipped' as const }),
-                    },
-              ),
-            )
-
-            return run
-          }),
+              },
+              duplicateOfRunId: originals.get(messageIndex),
+              receipt: {
+                startedAt: receiptStartedAt,
+                finishedAt: DateTime.toDateUtc(receiptFinishedAt),
+              },
+            }),
+          ),
         )
       }),
     )
 
-    const queue = yield* RunQueue
-    const received = created.filter(({ status }) => status === 'received')
-
-    // The Runs are stored already, so one not queued stays received until the next sweep.
-    const [, notQueued] = yield* Effect.partition(received, (run) =>
-      queue.enqueue({ workspaceId: arriving.workspaceId, runId: run.id }),
-    )
-
-    if (notQueued.length > 0) {
-      yield* Effect.logWarning('Received Runs not queued until the next sweep', notQueued)
-    }
+    const notQueued = yield* queueReceived(created)
 
     return {
       document,
       runs: created,
       notRouted,
-      notQueued: notQueued.map(({ runId }) => runId),
+      notQueued,
     } satisfies Receipt
   })

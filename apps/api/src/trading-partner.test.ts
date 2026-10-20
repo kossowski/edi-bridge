@@ -1,9 +1,21 @@
 import { eq } from 'drizzle-orm'
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  afterAll,
+  afterEach,
+  assert,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
 
 import {
+  canSendTestInterchange,
   canSwitchToProduction,
   createTradingPartnerEndpoint,
+  sendTestInterchangeEndpoint,
   switchToProductionEndpoint,
   tradingPartnerActivitiesEndpoint,
   tradingPartnerActivityEndpoint,
@@ -11,10 +23,22 @@ import {
   tradingPartnerEndpoint,
   tradingPartnerSchema,
   tradingPartnersEndpoint,
+  testInterchangeRefusedProblem,
+  testInterchangeRefusedStatus,
   updateTradingPartnerEndpoint,
   withCheckDigit,
 } from '@edi-bridge/contracts'
-import { type Connection, documents, runs, tradingPartners, workspaces } from '@edi-bridge/db'
+import {
+  type Connection,
+  documents,
+  documentStructures,
+  flows,
+  mappings,
+  mappingVersions,
+  runs,
+  tradingPartners,
+  workspaces,
+} from '@edi-bridge/db'
 import { type InvoiceWorkspace, seedInvoiceWorkspace } from '@edi-bridge/pipeline/testing'
 
 import {
@@ -589,5 +613,394 @@ describe('POST /trading-partners/:id/production', () => {
 
     expect(response.statusCode).toBe(404)
     expect((await get(created.id, otherAdmin)).json()).toMatchObject({ testMode: true })
+  })
+})
+
+describe('POST /trading-partners/:id/test-interchange', () => {
+  const postTest = (id: string, target = admin) =>
+    target.inject({ method: 'POST', url: sendTestInterchangeEndpoint.path.replace(':id', id) })
+
+  let seeded: InvoiceWorkspace | undefined
+
+  let seededAdmin: Client
+
+  afterEach(async () => {
+    if (seeded !== undefined) {
+      await connection.db.delete(workspaces).where(eq(workspaces.id, seeded.id))
+      seeded = undefined
+    }
+  })
+
+  const sample = {
+    sampleFileName: 'invoice-sample.json',
+    sampleText: '{"invoiceNumber":"87441"}',
+    sampleTakenAt: new Date('2026-10-01T08:00:00.000Z'),
+  }
+
+  const noSample = { sampleFileName: null, sampleText: null, sampleTakenAt: null }
+
+  const setSample = (documentStructureId: string, values: typeof sample | typeof noSample) =>
+    connection.db
+      .update(documentStructures)
+      .set(values)
+      .where(eq(documentStructures.id, documentStructureId))
+
+  const setPartner = (values: Partial<typeof tradingPartners.$inferInsert>) =>
+    connection.db
+      .update(tradingPartners)
+      .set(values)
+      .where(eq(tradingPartners.id, seeded?.tradingPartnerId ?? ''))
+
+  // A Workspace with an outbound INVOIC Flow to a Trading Partner in Test Mode.
+  const seedTestingWorkspace = async (name: string) => {
+    const into = await seedInvoiceWorkspace(connection.db, name)
+    const slug = name.toLowerCase().replaceAll(' ', '-')
+
+    const member = {
+      name: `${name} admin`,
+      email: `admin@${slug}.example`,
+      password: `${slug}-admin-password`,
+      workspaceId: into.id,
+      role: 'admin' as const,
+    }
+
+    await addMember(connection.db, member)
+    seeded = into
+    seededAdmin = await signIn(api.app, member)
+    await setPartner({ testMode: true })
+    await setSample(into.documentStructureId, sample)
+
+    return into
+  }
+
+  const runsOf = (into: InvoiceWorkspace) =>
+    connection.db
+      .select({
+        id: runs.id,
+        flowId: runs.flowId,
+        manualSubmission: runs.manualSubmission,
+        status: runs.status,
+        fileName: documents.fileName,
+        content: documents.content,
+      })
+      .from(runs)
+      .innerJoin(documents, eq(documents.id, runs.documentId))
+      .where(eq(runs.workspaceId, into.id))
+
+  // A second outbound Flow with its own Mapping on its own Document Structure.
+  const addInvoiceFlow = async (into: InvoiceWorkspace, name: string) => {
+    const [mapping] = await connection.db
+      .select()
+      .from(mappings)
+      .where(eq(mappings.id, into.mappingId))
+
+    const [version] = await connection.db
+      .select()
+      .from(mappingVersions)
+      .where(eq(mappingVersions.id, into.mappingVersionId))
+
+    const [structure] = await connection.db
+      .select()
+      .from(documentStructures)
+      .where(eq(documentStructures.id, into.documentStructureId))
+
+    assert(mapping && version && structure)
+
+    const [otherStructure] = await connection.db
+      .insert(documentStructures)
+      .values({ ...structure, id: undefined, name: `${name} structure`, ...noSample })
+      .returning()
+
+    assert(otherStructure)
+
+    const [otherMapping] = await connection.db
+      .insert(mappings)
+      .values({
+        ...mapping,
+        id: undefined,
+        name: `${name} mapping`,
+        documentStructureId: otherStructure.id,
+      })
+      .returning()
+
+    assert(otherMapping)
+
+    const [otherVersion] = await connection.db
+      .insert(mappingVersions)
+      .values({ ...version, id: undefined, mappingId: otherMapping.id })
+      .returning()
+
+    assert(otherVersion)
+
+    const [flow] = await connection.db
+      .insert(flows)
+      .values({
+        workspaceId: into.id,
+        tradingPartnerId: into.tradingPartnerId,
+        messageType: 'INVOIC',
+        name,
+        inboundChannelId: into.inboundChannelId,
+        destinationChannelId: into.outboundChannelId,
+        mappingVersionId: otherVersion.id,
+      })
+      .returning()
+
+    assert(flow)
+
+    return { flowId: flow.id, documentStructureId: otherStructure.id }
+  }
+
+  it('runs the sample of the outbound Flow as a Run and answers the Trading Partner', async () => {
+    const into = await seedTestingWorkspace('Sample Test Foods')
+    const queuedBefore = api.runQueue.queued.length
+
+    const before = tradingPartnerSchema.parse(
+      (await get(into.tradingPartnerId, seededAdmin)).json(),
+    )
+
+    const response = await postTest(into.tradingPartnerId, seededAdmin)
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json()).toEqual(before)
+
+    const [sent, ...more] = await runsOf(into)
+
+    expect(more).toEqual([])
+    assert(sent)
+    const { id: runId, ...run } = sent
+    expect(run).toEqual({
+      flowId: into.flowId,
+      manualSubmission: true,
+      status: 'received',
+      fileName: 'invoice-sample.json',
+      content: '{"invoiceNumber":"87441"}',
+    })
+    expect(api.runQueue.queued.slice(queuedBefore)).toEqual([{ workspaceId: into.id, runId }])
+  })
+
+  it('clears the rejection of the earlier test Interchange', async () => {
+    const into = await seedTestingWorkspace('Resent Test Foods')
+
+    await postTest(into.tradingPartnerId, seededAdmin)
+
+    const [rejected] = await runsOf(into)
+
+    await connection.db
+      .update(runs)
+      .set({ status: 'delivered', handedOverAt: new Date('2026-10-06T14:03:00.000Z') })
+      .where(eq(runs.id, rejected?.id ?? ''))
+    await setPartner({
+      testInterchangeSentAt: new Date('2026-10-06T14:03:00.000Z'),
+      testRejectedAt: new Date('2026-10-06T14:05:00.000Z'),
+      testRejectedRunId: rejected?.id,
+    })
+
+    const response = await postTest(into.tradingPartnerId, seededAdmin)
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json()).toMatchObject({
+      onboarding: {
+        testInterchangeSentAt: '2026-10-06T14:03:00.000Z',
+        contrlReceivedAt: null,
+        testRejectedAt: null,
+        testRejectedRunId: null,
+      },
+    })
+    await expect(runsOf(into)).resolves.toHaveLength(2)
+  })
+
+  it.each<{
+    state: string
+    sendable: boolean
+    earlier: Partial<typeof runs.$inferInsert>
+  }>([
+    { state: 'waits for processing', sendable: false, earlier: { status: 'received' } },
+    { state: 'is in processing', sendable: false, earlier: { status: 'processing' } },
+    {
+      state: 'was handed over',
+      sendable: true,
+      earlier: { status: 'delivered', handedOverAt: new Date('2026-10-06T14:03:00.000Z') },
+    },
+    {
+      state: 'failed',
+      sendable: true,
+      earlier: {
+        status: 'failed',
+        failureStage: 'delivery',
+        error: { code: 'unreachable', message: 'Unreachable', position: null, details: null },
+        problem: { reason: 'defect', fixTarget: null },
+      },
+    },
+  ])(
+    'answers a second test while the earlier test Run $state',
+    async ({ state, sendable, earlier }) => {
+      const into = await seedTestingWorkspace(`Second Test Foods ${state}`)
+
+      await postTest(into.tradingPartnerId, seededAdmin)
+
+      const [first] = await runsOf(into)
+
+      await connection.db
+        .update(runs)
+        .set(earlier)
+        .where(eq(runs.id, first?.id ?? ''))
+
+      const queuedBefore = api.runQueue.queued.length
+
+      const response = await postTest(into.tradingPartnerId, seededAdmin)
+
+      expect(response.statusCode).toBe(sendable ? 200 : testInterchangeRefusedStatus)
+
+      if (!sendable) {
+        expect(response.json()).toEqual(testInterchangeRefusedProblem({ reason: 'notAwaited' }))
+      }
+
+      await expect(runsOf(into)).resolves.toHaveLength(sendable ? 2 : 1)
+      expect(api.runQueue.queued.slice(queuedBefore)).toHaveLength(sendable ? 1 : 0)
+    },
+  )
+
+  it('refuses the second of two tests sent right after another', async () => {
+    const into = await seedTestingWorkspace('Twice Test Foods')
+
+    const first = await postTest(into.tradingPartnerId, seededAdmin)
+    const second = await postTest(into.tradingPartnerId, seededAdmin)
+
+    expect(first.statusCode).toBe(200)
+    expect(second.statusCode).toBe(testInterchangeRefusedStatus)
+    expect(second.json()).toEqual(testInterchangeRefusedProblem({ reason: 'notAwaited' }))
+    await expect(runsOf(into)).resolves.toHaveLength(1)
+  })
+
+  it('refuses one of two tests sent at once', async () => {
+    const into = await seedTestingWorkspace('At Once Test Foods')
+
+    const responses = await Promise.all([
+      postTest(into.tradingPartnerId, seededAdmin),
+      postTest(into.tradingPartnerId, seededAdmin),
+    ])
+
+    expect(responses.map(({ statusCode }) => statusCode).toSorted()).toEqual([
+      200,
+      testInterchangeRefusedStatus,
+    ])
+    await expect(runsOf(into)).resolves.toHaveLength(1)
+  })
+
+  it('sends the sample of the first outbound Flow by name that has one', async () => {
+    const into = await seedTestingWorkspace('Several Flows Foods')
+    const withoutSample = await addInvoiceFlow(into, 'A invoices without sample')
+    const later = await addInvoiceFlow(into, 'Z invoices with sample')
+
+    await setSample(later.documentStructureId, sample)
+
+    const response = await postTest(into.tradingPartnerId, seededAdmin)
+
+    expect(response.statusCode).toBe(200)
+    expect(withoutSample.flowId).not.toBe(into.flowId)
+    await expect(runsOf(into)).resolves.toMatchObject([{ flowId: into.flowId }])
+  })
+
+  it.each<{
+    state: string
+    sendable: boolean
+    workspaceGln?: string | null
+    partner?: Partial<typeof tradingPartners.$inferInsert>
+  }>([
+    { state: 'no test Interchange was sent', sendable: true },
+    {
+      state: 'a test Interchange was sent',
+      sendable: true,
+      partner: { testInterchangeSentAt: new Date('2026-10-06T14:03:00.000Z') },
+    },
+    { state: 'the Workspace has no GLN', sendable: false, workspaceGln: null },
+    { state: 'the Trading Partner has no GLN', sendable: false, partner: { gln: null } },
+    {
+      state: 'a CONTRL was received',
+      sendable: false,
+      partner: { contrlReceivedAt: new Date('2026-10-06T14:05:00.000Z') },
+    },
+    { state: 'it is in production', sendable: false, partner: { testMode: false } },
+  ])(
+    'answers as canSendTestInterchange does while $state',
+    async ({ state, sendable, workspaceGln, partner = { testMode: true } }) => {
+      const into = await seedTestingWorkspace(`Awaited Foods ${state}`)
+
+      if (workspaceGln !== undefined) {
+        await connection.db
+          .update(workspaces)
+          .set({ gln: workspaceGln })
+          .where(eq(workspaces.id, into.id))
+      }
+
+      await setPartner(partner)
+
+      const before = tradingPartnerSchema.parse(
+        (await get(into.tradingPartnerId, seededAdmin)).json(),
+      )
+
+      const [workspace] = await connection.db
+        .select({ gln: workspaces.gln })
+        .from(workspaces)
+        .where(eq(workspaces.id, into.id))
+
+      expect(canSendTestInterchange(before, workspace?.gln ?? null)).toBe(sendable)
+
+      const response = await postTest(into.tradingPartnerId, seededAdmin)
+
+      expect(response.statusCode).toBe(sendable ? 200 : testInterchangeRefusedStatus)
+      expect(response.json()).toEqual(
+        sendable ? before : testInterchangeRefusedProblem({ reason: 'notAwaited' }),
+      )
+      await expect(runsOf(into)).resolves.toHaveLength(sendable ? 1 : 0)
+    },
+  )
+
+  it('refuses without an outbound Flow to the Trading Partner', async () => {
+    const into = await seedTestingWorkspace('Flowless Test Foods')
+
+    await connection.db.delete(flows).where(eq(flows.id, into.flowId))
+
+    const response = await postTest(into.tradingPartnerId, seededAdmin)
+
+    expect(response.statusCode).toBe(testInterchangeRefusedStatus)
+    expect(response.json()).toEqual(testInterchangeRefusedProblem({ reason: 'noOutboundFlow' }))
+  })
+
+  it('refuses without a sample on the Document Structure of any outbound Flow and names the first Flow', async () => {
+    const into = await seedTestingWorkspace('Sampleless Test Foods')
+
+    await setSample(into.documentStructureId, noSample)
+    await addInvoiceFlow(into, 'Z invoices without sample')
+
+    const response = await postTest(into.tradingPartnerId, seededAdmin)
+
+    expect(response.statusCode).toBe(testInterchangeRefusedStatus)
+    expect(response.json()).toEqual(
+      testInterchangeRefusedProblem({
+        reason: 'sampleMissing',
+        flow: { id: into.flowId, name: 'Invoices to Hanse Retail' },
+      }),
+    )
+    await expect(runsOf(into)).resolves.toEqual([])
+  })
+
+  it.each([
+    ['an unknown id', unknownId],
+    ['an id that is no uuid', 'hansemarkt'],
+  ])('answers 404 for %s', async (_case, id) => {
+    const response = await postTest(id)
+
+    expect(response.statusCode).toBe(404)
+    expect(response.json()).toEqual({ message: 'Not found' })
+  })
+
+  it('answers 404 for a Trading Partner of another Workspace', async () => {
+    const into = await seedTestingWorkspace('Foreign Test Foods')
+
+    const response = await postTest(into.tradingPartnerId)
+
+    expect(response.statusCode).toBe(404)
+    await expect(runsOf(into)).resolves.toEqual([])
   })
 })

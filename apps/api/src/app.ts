@@ -20,6 +20,8 @@ import {
   receiveWebhookEndpoint,
   regenerateWebhookTokenEndpoint,
   testChannelEndpoint,
+  testInterchangeRefusedProblem,
+  testInterchangeRefusedStatus,
   updateChannelEndpoint,
   createDocumentStructureEndpoint,
   createFlowEndpoint,
@@ -70,6 +72,7 @@ import {
   runEndpoint,
   runsEndpoint,
   saveMappingDraftEndpoint,
+  sendTestInterchangeEndpoint,
   sessionEndpoint,
   submitDocumentEndpoint,
   tradingPartnerActivitiesEndpoint,
@@ -95,6 +98,7 @@ import {
   type ReceiptRejection,
   RunQueue,
   type RunQueueService,
+  type TestInterchangeRefused,
 } from '@edi-bridge/pipeline'
 
 import { loadAiBudget } from './ai-budget.js'
@@ -171,6 +175,7 @@ import {
   listTradingPartners,
   loadTradingPartner,
   loadTradingPartnerActivity,
+  sendTestInterchange,
   switchToProduction,
   updateTradingPartner,
 } from './trading-partner.js'
@@ -227,6 +232,7 @@ type Failure =
   | NotFound
   | RateLimited
   | ReceiptRejected
+  | TestInterchangeRefused
   | Unauthorized
   | Unprocessable
   | ValidationError
@@ -251,6 +257,7 @@ const statusOfTag: Record<Exclude<Failure['_tag'], 'ReceiptRejected'>, number> =
   DocumentStructureRejected: 422,
   AiReviewOpen: aiReviewOpenStatus,
   AiBudgetExhausted: aiBudgetExhaustedStatus,
+  TestInterchangeRefused: testInterchangeRefusedStatus,
 }
 
 const statusOf = Match.type<Failure>().pipe(
@@ -269,6 +276,10 @@ const bodyOf = (error: Failure) => {
       message: error.message,
       budget: error.budget,
     } satisfies AiBudgetExhaustedProblem
+  }
+
+  if (Predicate.isTagged(error, 'TestInterchangeRefused')) {
+    return testInterchangeRefusedProblem(error.refusal)
   }
 
   return Predicate.isTagged(error, 'InviteUnusable')
@@ -520,6 +531,10 @@ function registerRoutes(
 
   app.post<{ Params: { id: string } }>(switchToProductionEndpoint.path, (request, reply) =>
     respond(request, reply, switchToProduction(request.params.id)),
+  )
+
+  app.post<{ Params: { id: string } }>(sendTestInterchangeEndpoint.path, (request, reply) =>
+    respond(request, reply, sendTestInterchange(request.params.id)),
   )
 
   app.get(channelsEndpoint.path, (request, reply) => respond(request, reply, listChannels))

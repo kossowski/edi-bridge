@@ -15,6 +15,10 @@ import {
   tradingPartners,
   workspaces,
 } from '@edi-bridge/db'
+import {
+  Database as PipelineDatabase,
+  sendTestInterchange as sendInPipeline,
+} from '@edi-bridge/pipeline'
 
 import { Db, type Database, type Transaction } from './db.js'
 import { dayMs } from './duration.js'
@@ -318,4 +322,18 @@ export const switchToProduction = (id: string) =>
     yield* loadTradingPartner(id)
 
     return yield* new Conflict({ message: 'Onboarding is not complete' })
+  })
+
+export const sendTestInterchange = (id: string) =>
+  Effect.gen(function* () {
+    const { id: tradingPartnerId } = yield* loadTradingPartner(id)
+
+    const db = yield* Db
+    const workspace = yield* CurrentWorkspace
+
+    yield* sendInPipeline({ workspaceId: workspace.id, tradingPartnerId }).pipe(
+      Effect.provideService(PipelineDatabase, db),
+    )
+
+    return yield* loadTradingPartner(id)
   })
