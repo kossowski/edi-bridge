@@ -304,9 +304,8 @@ describe('GET /runs/:id', () => {
         'destinationUnreachable:true',
       ]),
     )
-    expect(
-      details.filter(({ interchange }) => interchange !== null).every(({ message }) => message),
-    ).toBe(true)
+    // Like the api, every one keeps the Message it built, with or without an Interchange.
+    expect(details.every(({ message }) => message?.segments[0]?.tag === 'UNH')).toBe(true)
   })
 
   it('fails an outbound Run at validation with the codes of the edifact package', async () => {
@@ -816,6 +815,33 @@ describe('POST /runs/:id/retry', () => {
       mappingVersion: before?.mappingVersion,
     })
     expect((await post(toPath(retryRunEndpoint.path, { id: run.id }))).status).toBe(409)
+  })
+
+  it('refuses an outbound Run that failed at validation with its built Message, and offers Reprocess', async () => {
+    const run = createRun({
+      id: '00000000-0000-4000-8000-000000000002',
+      tradingPartner: hansemarkt,
+      messageType: 'INVOIC',
+      flow: invoicFlow,
+      status: 'failed',
+      failureStage: 'validation',
+    })
+
+    server.use(...runDetailHandlers(apiUrl, { runs: [run] }))
+
+    const { status } = await post(toPath(retryRunEndpoint.path, { id: run.id }))
+    const { body } = await getRun(run.id)
+
+    expect(status).toBe(409)
+    expect(body).toMatchObject({
+      status: 'failed',
+      failureStage: 'validation',
+      interchange: null,
+      problem: { whoFixes: 'you' },
+      replacedBy: null,
+    })
+    expect(body?.message?.segments[0]?.tag).toBe('UNH')
+    expect(body?.mappingVersion).not.toBeNull()
   })
 
   it.each(['parse', 'validation', 'mapping'] as const)(

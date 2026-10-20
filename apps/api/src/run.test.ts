@@ -1,7 +1,8 @@
 import { eq } from 'drizzle-orm'
 import { Effect } from 'effect'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { z } from 'zod'
+
+import type { z } from 'zod'
 
 import {
   manualSubmissionSchema,
@@ -25,6 +26,8 @@ import {
 import {
   addMember,
   type Client,
+  failingSegmentOf,
+  invalidInvoice,
   signIn,
   startTestApi,
   submittedDocument,
@@ -40,11 +43,6 @@ let admin: Client
 const day = 24 * 60 * 60 * 1000
 
 const sevenDaysAgo = new Date(Date.now() - 7 * day).toISOString()
-
-const invalidInvoice = JSON.stringify({
-  ...z.looseObject({}).parse(JSON.parse(goldenInvoice)),
-  invoiceNumber: 'INV-'.repeat(10),
-})
 
 // Received in this order: the processed Run ten days ago, then the failed one, then the received one.
 let processed: string
@@ -284,8 +282,8 @@ describe('GET /runs/:id', () => {
       waitingForTradingPartnerSince: null,
       // Validation stopped the Run before it had an Interchange to hand over.
       interchange: null,
-      message: null,
     })
+    expect(failingSegmentOf(run)).toMatchObject({ tag: 'BGM' })
     expect(run.steps.map(({ status }) => status)).toEqual([
       'succeeded',
       'succeeded',

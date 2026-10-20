@@ -29,8 +29,10 @@ import {
 import {
   addMember,
   type Client,
+  deliveryInputOf,
   documentDeletedAt,
   expireDocumentOf,
+  invalidInvoice,
   signIn,
   startTestApi,
   submittedDocument,
@@ -219,6 +221,28 @@ describe('POST /runs/:id/retry', () => {
     expect(response.statusCode, response.body).toBe(409)
     expect(api.runQueue.queued).toEqual([])
     await expect(detail(id)).resolves.toMatchObject({ status: 'failed', failureStage: 'mapping' })
+  })
+
+  it('answers 409 for a Run that failed at validation with its built Message, and offers Reprocess', async () => {
+    const id = await processed(invalidInvoice, unreachable)
+
+    // The pipeline keeps the Message it built when validation fails.
+    await expect(deliveryInputOf(api.connection.db, id)).resolves.toMatchObject({
+      header: { tag: 'UNH' },
+    })
+
+    const response = await retry(id)
+
+    expect(response.statusCode, response.body).toBe(409)
+    expect(response.json()).toEqual({ message: new RunNotRetryable({ runId: id }).message })
+    expect(api.runQueue.queued).toEqual([])
+    await expect(detail(id)).resolves.toMatchObject({
+      status: 'failed',
+      failureStage: 'validation',
+      problem: { reason: 'invalidContent', whoFixes: 'you' },
+      mappingVersion: { id: workspace.mappingVersionId },
+      replacedBy: null,
+    })
   })
 
   it('answers 409 for a Run that failed at delivery without a stored output or delivery input', async () => {

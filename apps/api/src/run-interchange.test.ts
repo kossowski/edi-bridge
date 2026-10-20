@@ -17,7 +17,7 @@ import {
   webhookAuthorization,
   webhookTokenHeader,
 } from '@edi-bridge/contracts'
-import { runs } from '@edi-bridge/db'
+import { runs, tradingPartners } from '@edi-bridge/db'
 import { type DeliveryService, processRun } from '@edi-bridge/pipeline'
 import {
   addOrdersFlow,
@@ -31,6 +31,10 @@ import {
 import {
   addMember,
   type Client,
+  deliveryInputOf,
+  failingSegmentOf,
+  invalidInvoice,
+  invalidInvoiceNumber,
   signIn,
   startTestApi,
   submittedDocument,
@@ -218,13 +222,13 @@ describe('an outbound Run', () => {
   const unreachable: DeliveryService = () =>
     Effect.fail(new DeliveryFailed({ reason: 'hostUnreachable' }))
 
-  const submitted = async (delivery: DeliveryService) => {
+  const submitted = async (delivery: DeliveryService, content = goldenInvoice) => {
     const response = await admin.inject({
       method: submitDocumentEndpoint.method,
       url: submitDocumentEndpoint.path,
       body: {
         channelId: workspace.inboundChannelId,
-        document: submittedDocument('invoice.json', goldenInvoice),
+        document: submittedDocument('invoice.json', content),
       },
     })
 
@@ -249,5 +253,80 @@ describe('an outbound Run', () => {
       interchange: { id: runId, raw: unbSegment },
     })
     expect(run.message).toMatchObject({ messageType: 'INVOIC' })
+  })
+
+  it('shows the Message it built at the failing position when validation failed', async () => {
+    const runId = await submitted(unreachable, invalidInvoice)
+    const message = await deliveryInputOf(api.connection.db, runId)
+
+    const run = await detail(runId)
+
+    expect(run).toMatchObject({
+      status: 'failed',
+      failureStage: 'validation',
+      interchange: null,
+      error: { code: 'too-long-element', position: { segment: 2, tag: 'BGM', element: 2 } },
+    })
+    expect(run.message).toMatchObject({
+      reference: message.header.elements[0]?.[0],
+      messageType: 'INVOIC',
+    })
+    expect(run.message?.segments[0]).toMatchObject({ tag: 'UNH', name: 'Message header' })
+    expect(failingSegmentOf(run)).toEqual({
+      tag: 'BGM',
+      name: 'Beginning of message',
+      elements: [['380'], [invalidInvoiceNumber], ['9']],
+    })
+    expect(run.message?.segments).toHaveLength(message.segments.length + 2)
+  })
+
+  it('shows the Message it built when delivery failed before the Interchange was built', async () => {
+    const withTradingPartner = eq(tradingPartners.id, workspace.tradingPartnerId)
+
+    const [tradingPartner] = await api.connection.db
+      .select({ gln: tradingPartners.gln })
+      .from(tradingPartners)
+      .where(withTradingPartner)
+
+    await api.connection.db.update(tradingPartners).set({ gln: null }).where(withTradingPartner)
+
+    try {
+      const runId = await submitted(unreachable)
+
+      const message = await deliveryInputOf(api.connection.db, runId)
+
+      const run = await detail(runId)
+
+      expect(run).toMatchObject({
+        status: 'failed',
+        failureStage: 'delivery',
+        error: { code: 'glnMissing' },
+        interchange: null,
+      })
+      expect(run.message).toMatchObject({ messageType: 'INVOIC' })
+      expect(run.message?.segments.map(({ tag }) => tag)).toEqual([
+        message.header.tag,
+        ...message.segments.map(({ tag }) => tag),
+        message.trailer.tag,
+      ])
+    } finally {
+      await api.connection.db
+        .update(tradingPartners)
+        .set({ gln: tradingPartner?.gln })
+        .where(withTradingPartner)
+    }
+  })
+
+  it('has no Message when mapping failed, and its error says why', async () => {
+    const runId = await submitted(unreachable, 'not json')
+    const anyText: unknown = expect.any(String)
+
+    await expect(detail(runId)).resolves.toMatchObject({
+      status: 'failed',
+      failureStage: 'mapping',
+      interchange: null,
+      message: null,
+      error: { message: anyText },
+    })
   })
 })
