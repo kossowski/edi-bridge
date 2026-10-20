@@ -40,7 +40,14 @@ const messageReasons: ReadonlyArray<[MessageReason, (message: OrderLifecycleMess
     ['confirmationNotSent', ({ interchange }) => interchange?.notSentReason != null],
     ['resendAwaited', ({ run }) => run.status === 'failed'],
     ['confirmationPending', ({ interchange }) => interchange?.acknowledgement === 'pending'],
-    ['inProgress', ({ run }) => run.status === 'received' || run.status === 'processing'],
+    [
+      'inProgress',
+      ({ direction, run, interchange }) =>
+        run.status === 'received' ||
+        run.status === 'processing' ||
+        // A delivered outbound Message counts as done only with its Interchange.
+        (direction === 'outbound' && run.status === 'delivered' && interchange === null),
+    ],
   ]
 
 export function confirmationNotTracked({ direction, run, interchange }: OrderLifecycleMessage) {

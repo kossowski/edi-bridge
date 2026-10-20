@@ -115,13 +115,15 @@ describe('orderVerdictOf for a sent document without receipt confirmation', () =
     ).toMatchObject({ status: 'on-track', reason: 'nextDocument', messageType: 'INVOIC' })
   })
 
-  it('calls a delivered dispatch advice without an Interchange done', () => {
+  it('keeps a delivered dispatch advice without an Interchange in progress', () => {
     const { messages } = withDispatchAdvice(() => null)
     const invoic = full.messages.find(({ messageType }) => messageType === 'INVOIC')!
 
     expect(orderVerdictOf({ ...full, messages: [...messages, invoic] })).toMatchObject({
-      status: 'done',
-      reason: 'done',
+      status: 'on-track',
+      reason: 'inProgress',
+      messageType: 'DESADV',
+      direction: 'outbound',
     })
   })
 })
