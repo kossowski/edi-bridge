@@ -47,6 +47,7 @@ import {
   retryRunEndpoint,
   type RunListQuery,
   runDetailSchema,
+  lookupTableMissingCodeHintsEndpoint,
   lookupTableMissingCodesEndpoint,
   runEndpoint,
   runListSchema,
@@ -792,6 +793,25 @@ describe('createHandlers', () => {
       inferDocumentStructureEndpoint.response.parse(await inference.json()).fieldNamesNotice
         ?.reason,
     ).toBe('aiBudgetExhausted')
+  })
+
+  it('explains the missing codes without AI when the AI budget is used up', async () => {
+    server.use(
+      ...createHandlers(apiUrl, { lookupTableMissingCodeHintsNotice: 'aiBudgetExhausted' }),
+    )
+    const units = seedLookupTableNamed('Units of measure')
+
+    const response = await fetch(
+      `${apiUrl}${toPath(lookupTableMissingCodeHintsEndpoint.path, units)}`,
+      { method: 'POST' },
+    )
+
+    expect(
+      lookupTableMissingCodeHintsEndpoint.response.parse(await response.json()).notice,
+    ).toEqual({
+      reason: 'aiBudgetExhausted',
+      message: 'AI budget used up for today; codes explained without AI',
+    })
   })
 
   it('refuses suggested values with the budget of the Workspace when it is used up', async () => {

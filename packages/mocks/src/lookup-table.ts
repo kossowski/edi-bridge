@@ -1,6 +1,7 @@
 import { delay, http, HttpResponse } from 'msw'
 
 import {
+  type AiNoticeReason,
   applyLookupTableImport,
   classifyLookupTableImport,
   codeMeaningsOf,
@@ -21,6 +22,7 @@ import {
   languageQuerySchema,
   type LookupTableImportRow,
   type LookupTableInput,
+  lookupTableMissingCodeHintsEndpoint,
   lookupTableMissingCodesEndpoint,
   type LookupTableScope,
   type LookupTableScopeInput,
@@ -31,6 +33,7 @@ import {
   type LookupTableUse,
   type MissingCode,
   type MissingCodeCounts,
+  missingCodeHintsNotices,
   type RunSummary,
   type TradingPartner,
   type TradingPartnerSummary,
@@ -43,7 +46,7 @@ import { aiBudgetOf } from './ai-budget'
 import { type ChannelRecord, type ChannelStore, seedChannels, toChannelStore } from './channel'
 import { type FlowRecord, type FlowStore, seedFlows, toFlowStore } from './flow'
 import { lookupTableFailureOf } from './interchange'
-import { firstValuesOf, hintFor } from './lookup-table-codes'
+import { aiHintFor, firstValuesOf, hintFor, knownMeaningOf } from './lookup-table-codes'
 import {
   type LookupTableRecord,
   type LookupTableStore,
@@ -389,6 +392,7 @@ function stateHandlers(apiUrl: string, state: LookupTablesState) {
     http.get(`${apiUrl}${lookupTablesEndpoint.path}`, respond),
     http.get(`${apiUrl}${lookupTableSuggestionsEndpoint.path}`, respond),
     http.get(`${apiUrl}${lookupTableMissingCodesEndpoint.path}`, respond),
+    http.post(`${apiUrl}${lookupTableMissingCodeHintsEndpoint.path}`, respond),
     http.get(`${apiUrl}${lookupTableEndpoint.path}`, respond),
   ]
 }
@@ -411,6 +415,7 @@ export function lookupTableHandlers(
     session = seedSession,
     settings,
     suggestions,
+    missingCodeHintsNotice,
     ...world
   }: {
     lookupTables?: ReadonlyArray<LookupTableRecord> | LookupTableStore | LookupTablesState
@@ -418,6 +423,7 @@ export function lookupTableHandlers(
     session?: Session | null | SessionStore
     settings?: WorkspaceSettings | WorkspaceSettingsStore
     suggestions?: LookupTableSuggestionsState | undefined
+    missingCodeHintsNotice?: AiNoticeReason | undefined
   } & LookupTableWorld = {},
 ) {
   if (lookupTables === 'loading' || lookupTables === 'error') {
@@ -547,6 +553,33 @@ export function lookupTableHandlers(
           ? HttpResponse.json(usageOf(table, query.data.language).missingCodes)
           : notFound()
       },
+    ),
+    http.post<{ id: string }>(
+      `${apiUrl}${lookupTableMissingCodeHintsEndpoint.path}`,
+      adminOnly(sessionStore, ({ params, request }) => {
+        const query = languageOf(request)
+
+        if (!query.success) {
+          return badRequest(query.error.message)
+        }
+
+        const table = store.get(params.id)
+
+        if (!table) {
+          return notFound()
+        }
+
+        const { language } = query.data
+        const hintOf = missingCodeHintsNotice ? knownMeaningOf : aiHintFor
+
+        return HttpResponse.json({
+          hints: usageOf(table, language).missingCodes.map(({ code }) => ({
+            code,
+            ...hintOf(table.kind, code, language),
+          })),
+          notice: missingCodeHintsNotice ? missingCodeHintsNotices[missingCodeHintsNotice] : null,
+        })
+      }),
     ),
     http.post(
       `${apiUrl}${createLookupTableEndpoint.path}`,

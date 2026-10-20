@@ -375,6 +375,7 @@ export function createHandlers(
     documentStructureFieldNamesNotice,
     lookupTables = seedLookupTables,
     lookupTableSuggestions,
+    lookupTableMissingCodeHintsNotice,
     mappingSamples = seedMappingSamples,
     mappingVersions,
     liveEvents = { mode: 'quiet' },
@@ -397,6 +398,7 @@ export function createHandlers(
     documentStructureFieldNamesNotice?: AiNoticeReason
     lookupTables?: ReadonlyArray<LookupTableRecord>
     lookupTableSuggestions?: LookupTableSuggestionsState
+    lookupTableMissingCodeHintsNotice?: AiNoticeReason
     mappingSamples?: ReadonlyArray<MappingSampleRecord>
     mappingVersions?: ReadonlyArray<MappingVersionRecord> | MappingVersionStore
     liveEvents?: Omit<LiveEventsOptions, 'runs' | 'bus'>
@@ -579,6 +581,7 @@ export function createHandlers(
       session: sessionStore,
       settings: workspaceSettingsStore,
       suggestions: lookupTableSuggestions,
+      missingCodeHintsNotice: lookupTableMissingCodeHintsNotice,
     }),
   ]
 }
