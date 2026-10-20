@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  type AcknowledgementNotSentReason,
   type AcknowledgementState,
   openMessageTypes,
   type OrderLifecycleMessage,
   type OrderLifecycleMessageType,
   orderLifecycleListQuerySchema,
+  orderLifecycleMessageSchema,
   orderLifecycleStatusOf,
   toOrderLifecycleSummary,
 } from './order-lifecycle'
@@ -17,7 +19,8 @@ let sequence = 0
 type MessageOptions = {
   failed?: FailureStage
   status?: 'received' | 'processing' | 'duplicate'
-  acknowledgement?: AcknowledgementState
+  acknowledgement?: AcknowledgementState | null
+  notSentReason?: AcknowledgementNotSentReason
   replacedBy?: OrderLifecycleMessage
   waitingSince?: string
 }
@@ -31,6 +34,9 @@ function message(
   const id = `00000000-0000-4000-8000-${String(sequence).padStart(12, '0')}`
   const direction = messageType === 'ORDERS' ? 'inbound' : 'outbound'
   const replacedBy = options.replacedBy ? { id: options.replacedBy.run.id } : null
+
+  const acknowledgement =
+    options.acknowledgement === undefined ? 'accepted' : options.acknowledgement
 
   return {
     messageType,
@@ -56,8 +62,8 @@ function message(
       : {
           id,
           controlReference: String(sequence),
-          acknowledgement:
-            direction === 'outbound' ? (options.acknowledgement ?? 'accepted') : null,
+          acknowledgement: direction === 'outbound' ? acknowledgement : null,
+          notSentReason: options.notSentReason ?? null,
         },
   }
 }
@@ -151,6 +157,60 @@ describe('orderLifecycleStatusOf', () => {
     ).toBe('needs-attention')
   })
 
+  it('is done when a sent Interchange was handed over before Acknowledgements were tracked', () => {
+    expect(
+      orderLifecycleStatusOf([
+        message('ORDERS'),
+        message('DESADV', { acknowledgement: null }),
+        message('INVOIC'),
+      ]),
+    ).toBe('done')
+  })
+
+  it('is on track while a delivered outbound Message has no Interchange', () => {
+    expect(
+      orderLifecycleStatusOf([
+        message('ORDERS'),
+        { ...message('DESADV'), interchange: null },
+        message('INVOIC'),
+      ]),
+    ).toBe('on-track')
+  })
+
+  it('needs attention while the CONTRL to a received Interchange was not sent', () => {
+    expect(
+      orderLifecycleStatusOf([
+        message('ORDERS', { notSentReason: 'noOutboundChannel' }),
+        message('DESADV'),
+        message('INVOIC'),
+      ]),
+    ).toBe('needs-attention')
+  })
+
+  it('no longer needs attention for a not-sent CONTRL once its Run was replaced', () => {
+    const replacing = message('ORDERS')
+
+    expect(
+      orderLifecycleStatusOf([
+        message('ORDERS', { notSentReason: 'workspaceGlnMissing', replacedBy: replacing }),
+        replacing,
+        message('DESADV'),
+        message('INVOIC'),
+      ]),
+    ).toBe('done')
+  })
+
+  it('ignores the not-sent CONTRL of a duplicate Run', () => {
+    expect(
+      orderLifecycleStatusOf([
+        message('ORDERS'),
+        message('ORDERS', { status: 'duplicate', notSentReason: 'ambiguousChannel' }),
+        message('DESADV'),
+        message('INVOIC'),
+      ]),
+    ).toBe('done')
+  })
+
   it('ignores a duplicate Run', () => {
     expect(
       orderLifecycleStatusOf([
@@ -238,5 +298,32 @@ describe('openMessageTypes', () => {
         { messageType: 'INVOIC' },
       ]),
     ).toEqual([])
+  })
+})
+
+describe('orderLifecycleMessageSchema', () => {
+  it('keeps why the CONTRL to a received Interchange was not sent', () => {
+    const orders = message('ORDERS', { notSentReason: 'ambiguousChannel' })
+
+    expect(orderLifecycleMessageSchema.parse(orders).interchange?.notSentReason).toBe(
+      'ambiguousChannel',
+    )
+  })
+
+  it('rejects an unknown not-sent reason', () => {
+    const orders = message('ORDERS')
+
+    expect(
+      orderLifecycleMessageSchema.safeParse({
+        ...orders,
+        interchange: { ...orders.interchange, notSentReason: 'partnerAsleep' },
+      }).success,
+    ).toBe(false)
+  })
+
+  it('rejects a not-sent reason on a sent Interchange', () => {
+    const desadv = message('DESADV', { notSentReason: 'noOutboundChannel' })
+
+    expect(orderLifecycleMessageSchema.safeParse(desadv).success).toBe(false)
   })
 })

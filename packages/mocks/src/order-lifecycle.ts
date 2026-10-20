@@ -1,6 +1,7 @@
 import { delay, http, HttpResponse } from 'msw'
 
 import {
+  type AcknowledgementNotSentReason,
   type AcknowledgementState,
   businessReferenceSchema,
   directionOf,
@@ -45,15 +46,17 @@ export const orderLifecycleReferences = {
   serverError: '5000',
 } as const
 
-type AcknowledgementOutcome = Extract<AcknowledgementState, 'accepted' | 'rejected'>
+// Untracked: handed over before Acknowledgements were tracked, so it has none.
+type AcknowledgementOutcome = Extract<AcknowledgementState, 'accepted' | 'rejected'> | 'untracked'
 
 type MessageSeed = {
   messageType: OrderLifecycleMessageType
   hoursAgo: number
   outcome: 'delivered' | FailureStage
   acknowledgement?: AcknowledgementOutcome | undefined
+  notSentReason?: AcknowledgementNotSentReason | undefined
   waitingHoursAgo?: number
-  reprocessed?: { hoursAgo: number; acknowledgement: AcknowledgementOutcome }
+  reprocessed?: { hoursAgo: number; acknowledgement?: AcknowledgementOutcome | undefined }
 }
 
 type LifecycleSeed = {
@@ -119,7 +122,12 @@ const lifecycleSeeds: LifecycleSeed[] = [
     businessReference: orderLifecycleReferences.partial,
     tradingPartner: 'Rheinkauf eG',
     messages: [
-      { messageType: 'ORDERS', hoursAgo: 30, outcome: 'delivered' },
+      {
+        messageType: 'ORDERS',
+        hoursAgo: 30,
+        outcome: 'delivered',
+        notSentReason: 'unechoableInterchangeHeader',
+      },
       { messageType: 'DESADV', hoursAgo: 3, outcome: 'delivered' },
     ],
   },
@@ -132,7 +140,7 @@ const lifecycleSeeds: LifecycleSeed[] = [
         messageType: 'DESADV',
         hoursAgo: 8 * 24,
         outcome: 'delivered',
-        acknowledgement: 'accepted',
+        acknowledgement: 'untracked',
       },
       {
         messageType: 'INVOIC',
@@ -204,7 +212,11 @@ function acknowledgementOf(
   outcome: AcknowledgementOutcome | undefined,
   tradingPartner: Pick<TradingPartner, 'acknowledgementTimeLimitHours'>,
   now: Date,
-): AcknowledgementState {
+): AcknowledgementState | null {
+  if (outcome === 'untracked') {
+    return null
+  }
+
   return (
     outcome ?? (overdueSinceOf(sentAt, tradingPartner) <= now.getTime() ? 'overdue' : 'pending')
   )
@@ -215,6 +227,7 @@ function interchangeOf(
   acknowledgement: AcknowledgementOutcome | undefined,
   tradingPartner: Pick<TradingPartner, 'acknowledgementTimeLimitHours'>,
   now: Date,
+  notSentReason?: AcknowledgementNotSentReason,
 ): OrderLifecycleInterchange | null {
   if (run.interchange === null) {
     return null
@@ -227,21 +240,23 @@ function interchangeOf(
     acknowledgement: sent
       ? acknowledgementOf(run.receivedAt, acknowledgement, tradingPartner, now)
       : null,
+    notSentReason: notSentReason ?? null,
   }
 }
 
 type MessageEntry = {
   runId: string
   acknowledgement: AcknowledgementOutcome | undefined
+  notSentReason?: AcknowledgementNotSentReason | undefined
   replacedBy: RunSummary | null
 }
 
-export function seedOrderLifecycles(now = new Date()): OrderLifecycleSeed {
+export function seedOrderLifecycles(now = new Date(), seeds = lifecycleSeeds): OrderLifecycleSeed {
   const runs: RunSummary[] = []
   const reprocessed: Reprocessed[] = []
   const waitingForTradingPartnerSince = new Map<string, string>()
 
-  const seeded = lifecycleSeeds.map(({ businessReference, messages, ...seed }) => {
+  const seeded = seeds.map(({ businessReference, messages, ...seed }) => {
     const tradingPartner = seedTradingPartners.find(({ name }) => name === seed.tradingPartner)!
     const tradingPartnerSummary = { id: tradingPartner.id, name: tradingPartner.name }
 
@@ -286,7 +301,14 @@ export function seedOrderLifecycles(now = new Date()): OrderLifecycleSeed {
       }
 
       if (!message.reprocessed) {
-        return [{ runId: run.id, acknowledgement: message.acknowledgement, replacedBy: null }]
+        return [
+          {
+            runId: run.id,
+            acknowledgement: message.acknowledgement,
+            notSentReason: message.notSentReason,
+            replacedBy: null,
+          },
+        ]
       }
 
       const replacing = toRun(`${index}:reprocessed`, {
@@ -302,6 +324,7 @@ export function seedOrderLifecycles(now = new Date()): OrderLifecycleSeed {
         {
           runId: replacing.id,
           acknowledgement: message.reprocessed.acknowledgement,
+          notSentReason: message.notSentReason,
           replacedBy: null,
         },
       ]
@@ -313,7 +336,7 @@ export function seedOrderLifecycles(now = new Date()): OrderLifecycleSeed {
   const store = createRunStore(runs, reprocessed)
 
   const orderLifecycles = seeded.map(({ businessReference, tradingPartner, entries }) => {
-    const toMessage = ({ runId, acknowledgement, replacedBy }: MessageEntry) => {
+    const toMessage = ({ runId, acknowledgement, notSentReason, replacedBy }: MessageEntry) => {
       const run = store.get(runId)!
 
       return orderLifecycleMessageSchema.parse({
@@ -327,7 +350,7 @@ export function seedOrderLifecycles(now = new Date()): OrderLifecycleSeed {
           replacedBy: replacedBy && { id: replacedBy.id },
           waitingForTradingPartnerSince: waitingForTradingPartnerSince.get(run.id) ?? null,
         },
-        interchange: interchangeOf(run, acknowledgement, tradingPartner, now),
+        interchange: interchangeOf(run, acknowledgement, tradingPartner, now, notSentReason),
       })
     }
 
@@ -438,6 +461,7 @@ export function createLargeVolumeOrderLifecycles({
                     direction === 'outbound'
                       ? acknowledgementOf(receivedAt, step.acknowledgement, tradingPartner, now)
                       : null,
+                  notSentReason: null,
                 }
               : null,
         }

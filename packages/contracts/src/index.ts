@@ -496,6 +496,9 @@ export {
 } from './mapping-paths'
 
 export {
+  type AcknowledgementNotSentReason,
+  acknowledgementNotSentReasons,
+  acknowledgementNotSentReasonSchema,
   type AcknowledgementState,
   acknowledgementStates,
   acknowledgementStateSchema,

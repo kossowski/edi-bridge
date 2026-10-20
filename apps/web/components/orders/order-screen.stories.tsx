@@ -84,7 +84,7 @@ export const WaitingForConfirmation = meta.story({
         name: 'Waiting for Rheinkauf eG to confirm the dispatch advice',
       }),
     ).toBeVisible()
-    await expect(canvas.getAllByText('Waiting for partner')).toHaveLength(2)
+    await expect(canvas.getAllByText('Waiting for partner')).toHaveLength(1)
 
     const timeline = await timelineOf(canvasElement, 'Rheinkauf eG')
     const desadv = within(stepOf(timeline, 'Dispatch advice'))
@@ -112,7 +112,10 @@ export const TwoTradingPartnersWithOverdue = meta.story({
       }),
     ).toBeVisible()
     await expect(
-      canvas.getByRole('heading', { level: 3, name: 'Everything for this order is done' }),
+      canvas.getByRole('heading', {
+        level: 3,
+        name: 'The dispatch advice was sent to Hansemarkt GmbH, with no receipt confirmation yet',
+      }),
     ).toBeVisible()
 
     for (const tradingPartner of ['Alpenfrisch Märkte AG', 'Hansemarkt GmbH']) {

@@ -18,6 +18,7 @@ import {
 } from 'drizzle-orm/pg-core'
 
 import {
+  acknowledgementNotSentReasons,
   acknowledgementStates,
   acknowledgementTimeLimitHours,
   aiDailyTokenLimit,
@@ -605,13 +606,6 @@ export const runs = pgTable(
     ),
   ],
 )
-
-export const acknowledgementNotSentReasons = [
-  'noOutboundChannel',
-  'ambiguousChannel',
-  'workspaceGlnMissing',
-  'unechoableInterchangeHeader',
-] as const
 
 export const acknowledgementNotSentReason = pgEnum(
   'acknowledgement_not_sent_reason',
