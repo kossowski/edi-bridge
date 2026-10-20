@@ -219,7 +219,7 @@ export const ReceiptConfirmationNotSentGerman = meta.story({
     ).toBeVisible()
     await expect(
       canvas.getByText(
-        /weil sich der Kopf der Übertragung von Rheinkauf eG nicht in einer gültigen Empfangsbestätigung wiederholen lässt\. Bitten Sie Rheinkauf eG, den Kopf seiner Übertragungen zu prüfen\./,
+        /weil sich der Kopf der Übertragung von Rheinkauf eG nicht in einer gültigen Empfangsbestätigung wiederholen lässt\. Bitten Sie Rheinkauf eG, den Kopf der Übertragungen zu prüfen\./,
       ),
     ).toBeVisible()
     await expect(canvas.getByRole('link', { name: 'GLN Ihres Unternehmens' })).toBeVisible()
