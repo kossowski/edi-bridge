@@ -10,7 +10,11 @@ export type NewDocument = Pick<RawDocument, 'workspaceId' | 'channelId' | 'fileN
   Partial<
     Pick<
       RawDocument,
-      'interchangeSender' | 'interchangeControlReference' | 'contentHash' | 'receivedAt'
+      | 'interchangeSender'
+      | 'interchangeControlReference'
+      | 'testIndicator'
+      | 'contentHash'
+      | 'receivedAt'
     >
   >
 

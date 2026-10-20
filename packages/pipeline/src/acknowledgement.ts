@@ -18,7 +18,7 @@ import {
   readInterchange,
 } from '@edi-bridge/edifact'
 
-import { enveloped } from './envelope'
+import { carriesTestIndicator, enveloped } from './envelope'
 import { Database, Delivery } from './services'
 
 type NotSentReason = NonNullable<(typeof acknowledgements.$inferSelect)['notSentReason']>
@@ -141,7 +141,13 @@ const answerOf = (workspaceId: string, documentId: string, content: string) =>
       contrl:
         message === null || workspaceGln === null
           ? null
-          : { message, sender: workspaceGln, receiver: sender, testMode },
+          : {
+              message,
+              sender: workspaceGln,
+              receiver: sender,
+              // The CONTRL to a test Interchange is a test too, whatever the partner's Test Mode.
+              testMode: testMode || carriesTestIndicator(header),
+            },
     } satisfies Answer
   })
 

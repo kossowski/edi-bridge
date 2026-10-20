@@ -39,6 +39,9 @@ type Envelope = {
 // 0035 is element 11 of the UNB, so the optional elements 6 to 10 before it stay empty.
 const testIndicator = [[''], [''], [''], [''], [''], ['1']]
 
+export const carriesTestIndicator = (header: Segment | undefined) =>
+  header?.elements[10]?.[0] === '1'
+
 export const enveloped = (
   message: Message,
   { characterSet, sender, receiver, sentAt, reference, testMode }: Envelope,

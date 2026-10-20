@@ -1,0 +1,1 @@
+ALTER TABLE "documents" ADD COLUMN "test_indicator" boolean DEFAULT false NOT NULL;

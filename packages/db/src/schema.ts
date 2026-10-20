@@ -491,6 +491,8 @@ export const documents = pgTable(
     // The UNB keys that make a later copy of the Interchange a Duplicate; null for no Interchange.
     interchangeSender: text(),
     interchangeControlReference: text(),
+    // UNB 0035 = 1: the sender marked the Interchange as a test.
+    testIndicator: boolean().notNull().default(false),
     // With the Channel and file name, the key that makes a later copy of an SFTP file a Duplicate.
     contentHash: text(),
     receivedAt: timestamp({ withTimezone: true, mode: 'date' }).notNull().defaultNow(),

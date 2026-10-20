@@ -70,6 +70,7 @@ describe('the Document storage', () => {
       content: invoice,
       interchangeSender: '4012345000009',
       interchangeControlReference: '1',
+      testIndicator: true,
       contentHash: 'a1b2',
     })
 
@@ -81,6 +82,7 @@ describe('the Document storage', () => {
       content: invoice,
       interchangeSender: '4012345000009',
       interchangeControlReference: '1',
+      testIndicator: true,
       contentHash: 'a1b2',
       receivedAt: stored.receivedAt,
     })
