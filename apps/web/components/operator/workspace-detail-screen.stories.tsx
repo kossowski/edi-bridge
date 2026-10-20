@@ -929,7 +929,7 @@ export const LimitsInvalid = meta.story({
     const retention = await canvas.findByLabelText('Keep documents for (days)')
     await userEvent.clear(retention)
     await userEvent.click(canvas.getByRole('button', { name: 'Save limits' }))
-    await expect(await canvas.findByText('Enter a retention period.')).toBeVisible()
+    await expect(await canvas.findByText('Enter how many days to keep documents.')).toBeVisible()
     await expect(retention).toHaveAttribute('aria-invalid', 'true')
   },
 })

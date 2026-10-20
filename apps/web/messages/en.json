@@ -843,7 +843,7 @@
         "tryAgain": "{action, select, reprocess {Try again. EDI Bridge processes the original file once more with the same mapping version.} other {Try again. The finished document is sent once more, nothing is translated again.}}",
         "tellTradingPartner": "Tell {tradingPartner} and ask for a corrected file. The message includes the technical detail their IT team needs. Their contact details are on the partner page.",
         "markWaiting": "Mark it so your team knows you are waiting for {tradingPartner}.",
-        "documentExpired": "EDI Bridge deleted the original file on <time>{deletedAt}</time>, when the retention period ended, so this document cannot be processed again. {afterFix, select, yes {Fixing the cause helps only the documents that arrive from now on. } other {}}{direction, select, inbound {Ask {tradingPartner} to send it again.} other {Send it again from your ERP.}}"
+        "documentExpired": "EDI Bridge deleted the original file on <time>{deletedAt}</time>, when the time to keep documents ran out, so this document cannot be processed again. {afterFix, select, yes {Fixing the cause helps only the documents that arrive from now on. } other {}}{direction, select, inbound {Ask {tradingPartner} to send it again.} other {Send it again from your ERP.}}"
       },
       "fixLink": {
         "mapping": "Open “{name}” at this field",
@@ -3426,7 +3426,7 @@
     },
     "file": {
       "label": "File",
-      "description": "A sample Document from your own systems, or the JSON Schema they provide. At most 5 MB.",
+      "description": "An example document from your own systems, or the JSON Schema they provide. At most 5 MB.",
       "drop": "Drop the file here or choose it."
     },
     "errors": {
@@ -4049,7 +4049,7 @@
         "standard": {
           "title": "Customers",
           "description": "Real companies exchanging real documents. You invite their members.",
-          "empty": "No customer Workspaces yet."
+          "empty": "No customers yet."
         },
         "showcase": {
           "title": "Demo",
@@ -4250,7 +4250,7 @@
         "label": "Keep documents for (days)",
         "hint": "Between {min} and {max} days.",
         "errors": {
-          "required": "Enter a retention period.",
+          "required": "Enter how many days to keep documents.",
           "notWhole": "Enter a whole number of days.",
           "outOfRange": "Enter between {min} and {max} days."
         }

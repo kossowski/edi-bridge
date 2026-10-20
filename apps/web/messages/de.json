@@ -843,7 +843,7 @@
         "tryAgain": "{action, select, reprocess {Versuchen Sie es erneut. EDI Bridge verarbeitet die Originaldatei noch einmal mit derselben Mapping-Version.} other {Versuchen Sie es erneut. Der fertige Beleg wird noch einmal gesendet, nichts wird neu übersetzt.}}",
         "tellTradingPartner": "Informieren Sie {tradingPartner} und bitten Sie um eine korrigierte Datei. Die Nachricht enthält die technischen Details für das IT-Team. Die Kontaktdaten stehen auf der Partnerseite.",
         "markWaiting": "Markieren Sie den Beleg, damit Ihr Team weiß, dass Sie auf {tradingPartner} warten.",
-        "documentExpired": "EDI Bridge hat die Originaldatei am <time>{deletedAt}</time> gelöscht, als die Aufbewahrungsdauer abgelaufen war. Dieser Beleg lässt sich deshalb nicht erneut verarbeiten. {afterFix, select, yes {Das Beheben der Ursache hilft nur den Belegen, die ab jetzt eingehen. } other {}}{direction, select, inbound {Bitten Sie {tradingPartner}, ihn erneut zu senden.} other {Senden Sie ihn erneut aus Ihrem ERP.}}"
+        "documentExpired": "EDI Bridge hat die Originaldatei am <time>{deletedAt}</time> gelöscht, als die Zeit abgelaufen war, für die Belege aufbewahrt werden. Dieser Beleg lässt sich deshalb nicht erneut verarbeiten. {afterFix, select, yes {Das Beheben der Ursache hilft nur den Belegen, die ab jetzt eingehen. } other {}}{direction, select, inbound {Bitten Sie {tradingPartner}, ihn erneut zu senden.} other {Senden Sie ihn erneut aus Ihrem ERP.}}"
       },
       "fixLink": {
         "mapping": "„{name}“ an diesem Feld öffnen",
@@ -3108,7 +3108,7 @@
     },
     "tooFew": {
       "title": "Noch nichts zu vergleichen",
-      "description": "Ein Vergleich braucht mindestens zwei Versionen. Veröffentlichen Sie den Entwurf im Canvas, um eine weitere zu erstellen.",
+      "description": "Ein Vergleich braucht mindestens zwei Versionen. Veröffentlichen Sie den Entwurf auf der Zeichenfläche, um eine weitere zu erstellen.",
       "viewOnlyDescription": "Ein Vergleich braucht mindestens zwei Versionen. Eine weitere erscheint hier, sobald ein Admin den Entwurf veröffentlicht."
     },
     "unknownVersion": {
@@ -3253,7 +3253,7 @@
     "usedNote": "Veröffentlichte Versionen ändern sich nie, deshalb lehnt EDI Bridge Änderungen an Feldern ab, die sie verwenden. Felder, die nur ein Entwurf verknüpft, lassen sich ändern, solange sie ihren Platz behalten.",
     "name": {
       "label": "Name",
-      "description": "Erscheint in der Mapping-Liste und auf dem Mapping-Canvas."
+      "description": "Erscheint in der Mapping-Liste und auf der Mapping-Zeichenfläche."
     },
     "fields": "Felder",
     "fieldsDescription": "Markieren Sie Felder und Objekte als Pflicht oder optional, als wiederholend oder nicht, und passen Sie den Typ eines Felds an. Die Änderungen gelten, sobald Sie speichern.",
@@ -3519,7 +3519,7 @@
       "unknownPath": "Das Datenformat hat sich inzwischen geändert. Laden Sie die Seite neu und passen Sie es erneut an.",
       "notAdjustable": "Dieser Teil des Datenformats lässt sich so nicht ändern.",
       "csvDocumentRequired": "Für andere CSV-Einstellungen braucht es eine CSV-Datei, die EDI Bridge mit den neuen Einstellungen erneut liest.",
-      "linkedByMapping": "Ein Entwurf eines Mappings verknüpft ein Feld, das diese Änderung entfernen würde. Entfernen Sie zuerst die Verknüpfung auf dem Mapping-Canvas oder machen Sie die Änderung rückgängig.",
+      "linkedByMapping": "Ein Entwurf eines Mappings verknüpft ein Feld, das diese Änderung entfernen würde. Entfernen Sie zuerst die Verknüpfung auf der Mapping-Zeichenfläche oder machen Sie die Änderung rückgängig.",
       "usedByMappingVersion": "Veröffentlichte Versionen von Mappings verwenden diesen Teil, und eine veröffentlichte Version ändert sich nie. Machen Sie die Änderung rückgängig oder erstellen Sie ein neues Datenformat für die neue Form."
     },
     "csvSettingsUsedByMappingVersion": "Veröffentlichte Versionen von Mappings lesen CSV-Dateien mit diesen Einstellungen, und eine veröffentlichte Version ändert sich nie. Behalten Sie die gespeicherten CSV-Einstellungen oder erstellen Sie ein neues Datenformat mit den neuen."
@@ -4049,7 +4049,7 @@
         "standard": {
           "title": "Kunden",
           "description": "Echte Unternehmen, die echte Belege austauschen. Ihre Mitglieder laden Sie ein.",
-          "empty": "Noch keine Arbeitsbereiche von Kunden."
+          "empty": "Noch keine Kunden."
         },
         "showcase": {
           "title": "Demo",
@@ -4250,7 +4250,7 @@
         "label": "Belege aufbewahren (Tage)",
         "hint": "Zwischen {min} und {max} Tagen.",
         "errors": {
-          "required": "Geben Sie eine Aufbewahrungsdauer ein.",
+          "required": "Geben Sie ein, wie viele Tage Belege aufbewahrt werden.",
           "notWhole": "Geben Sie eine ganze Zahl von Tagen ein.",
           "outOfRange": "Geben Sie einen Wert zwischen {min} und {max} Tagen ein."
         }
