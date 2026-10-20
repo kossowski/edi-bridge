@@ -268,6 +268,7 @@ const runDetailFields = {
   mappingVersion: mappingVersionSummarySchema.nullable(),
   replaces: runReferenceSchema.nullable(),
   replacedBy: runReferenceSchema.nullable(),
+  documentDeletedAt: z.iso.datetime().nullable(),
 }
 
 const unfailedFields = {
