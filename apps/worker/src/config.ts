@@ -13,6 +13,12 @@ const envSchema = (production: boolean) =>
     RUN_REQUEUE_INTERVAL_SECONDS: z.coerce.number().int().positive().default(60),
     RUN_STUCK_AFTER_MINUTES: z.coerce.number().int().positive().default(10),
     CHANNEL_SECRET_KEY: secretKeyEnv(production),
+    SENTRY_DSN: z.union([z.literal(''), z.url()]).optional(),
+    SENTRY_ENVIRONMENT: z.string().optional(),
+    SENTRY_TRACES_SAMPLE_RATE: z.preprocess(
+      (value) => (value === '' ? undefined : value),
+      z.coerce.number().min(0).max(1).default(0.1),
+    ),
   })
 
 export function loadConfig(source: NodeJS.ProcessEnv) {
@@ -29,6 +35,13 @@ export function loadConfig(source: NodeJS.ProcessEnv) {
     requeueInterval: Duration.seconds(env.data.RUN_REQUEUE_INTERVAL_SECONDS),
     stuckAfter: Duration.minutes(env.data.RUN_STUCK_AFTER_MINUTES),
     channelSecretKey: env.data.CHANNEL_SECRET_KEY,
+    sentry: env.data.SENTRY_DSN
+      ? {
+          dsn: env.data.SENTRY_DSN,
+          environment: env.data.SENTRY_ENVIRONMENT || undefined,
+          tracesSampleRate: env.data.SENTRY_TRACES_SAMPLE_RATE,
+        }
+      : undefined,
   }
 }
 
