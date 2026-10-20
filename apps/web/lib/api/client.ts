@@ -588,7 +588,7 @@ export function listLookupTableMissingCodes(id: string, language: Language) {
   })
 }
 
-export function hintLookupTableMissingCodes(id: string, language: Language) {
+export function getLookupTableMissingCodeHints(id: string, language: Language) {
   return request(lookupTableMissingCodeHintsEndpoint, {
     path: toPath(lookupTableMissingCodeHintsEndpoint.path, { id }),
     query: { language },

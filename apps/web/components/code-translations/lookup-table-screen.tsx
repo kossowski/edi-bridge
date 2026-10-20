@@ -65,10 +65,13 @@ export function LookupTableScreen({
   const missing = useQuery(lookupTableMissingCodesQuery(id, language))
   const session = useSession()
 
-  const hints = useQuery({
-    ...lookupTableMissingCodeHintsQuery(id, language),
-    enabled: session.canChange && (missing.data?.length ?? 0) > 0,
-  })
+  const hints = useQuery(
+    lookupTableMissingCodeHintsQuery(
+      id,
+      language,
+      session.canChange && (missing.data?.length ?? 0) > 0,
+    ),
+  )
 
   const [importOpen, setImportOpen] = useState(false)
   const [imported, setImported] = useState('')

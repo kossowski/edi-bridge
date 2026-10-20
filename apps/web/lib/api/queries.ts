@@ -52,7 +52,7 @@ import {
   getHome,
   getLookupTable,
   getLookupTableSuggestions,
-  hintLookupTableMissingCodes,
+  getLookupTableMissingCodeHints,
   getMappingDraft,
   getMappingVersion,
   getOperatorWorkspaceSettings,
@@ -555,8 +555,6 @@ export function lookupTableMissingCodesQuery(id: string, language: Language) {
 }
 
 // Each fetch spends AI budget, so an AI read is fetched once and never again on its own.
-// An error leaves the query without data, so it is stale: no retry, mount, focus or reconnect
-// fetches it again.
 const fetchedOnce = {
   staleTime: Infinity,
   gcTime: Infinity,
@@ -575,11 +573,13 @@ export function lookupTableSuggestionsQuery(query: LookupTableSuggestionsQuery) 
 }
 
 // Kept apart from the missing codes, so a save that marks them stale does not ask the AI again.
-export function lookupTableMissingCodeHintsQuery(id: string, language: Language) {
+export function lookupTableMissingCodeHintsQuery(id: string, language: Language, wanted: boolean) {
   return queryOptions({
     queryKey: lookupTableKeys.missingCodeHints(id, language),
-    queryFn: () => hintLookupTableMissingCodes(id, language),
+    queryFn: () => getLookupTableMissingCodeHints(id, language),
     ...fetchedOnce,
+    // Once answered or failed, a screen that wants the hints anew keeps the first result.
+    enabled: ({ state }) => wanted && state.dataUpdateCount + state.errorUpdateCount === 0,
   })
 }
 

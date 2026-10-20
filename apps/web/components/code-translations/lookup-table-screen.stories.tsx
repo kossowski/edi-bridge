@@ -1,4 +1,4 @@
-import { http, HttpResponse } from 'msw'
+import { delay, http, HttpResponse } from 'msw'
 import { expect, screen, userEvent, waitFor, within } from 'storybook/test'
 
 import { LookupTableScreen } from '@/components/code-translations/lookup-table-screen'
@@ -129,17 +129,28 @@ function hintsNoticeHandlers(missingCodeHintsNotice: AiNoticeReason) {
   return lookupTableHandlers(apiUrl, { lookupTables, missingCodeHintsNotice })
 }
 
-const hintRequests = { count: 0 }
+const hintsPath = `${apiUrl}${lookupTableMissingCodeHintsEndpoint.path}`
 
-function failingHintsHandler() {
-  hintRequests.count = 0
+// Each story that counts the hint requests takes its own counter.
+function failingHints() {
+  const requests = { count: 0 }
 
-  return http.post(`${apiUrl}${lookupTableMissingCodeHintsEndpoint.path}`, () => {
-    hintRequests.count += 1
+  const handler = http.post(hintsPath, () => {
+    requests.count += 1
 
     return HttpResponse.json({ message: 'The AI hints failed' }, { status: 500 })
   })
+
+  return { requests, handler }
 }
+
+const viewerHints = failingHints()
+
+const failedHints = failingHints()
+
+const germanFailedHints = failingHints()
+
+const failedHintsAfterUndo = failingHints()
 
 function valueRow(code: string) {
   const values = screen.getByRole('list', { name: /^Values/ })
@@ -627,14 +638,15 @@ export const Viewer = meta.story({
 export const ViewerWithoutHints = meta.story({
   ...viewerStory({
     beforeEach({ msw }) {
-      msw.use(failingHintsHandler())
+      viewerHints.requests.count = 0
+      msw.use(viewerHints.handler)
     },
     async play() {
       const set = await missingRow('SET')
 
       await expect(set.getByText('Set')).toBeVisible()
       await expect((await missingRow('KRT')).queryByText('Carton')).toBeNull()
-      await expect(hintRequests.count).toBe(0)
+      await expect(viewerHints.requests.count).toBe(0)
     },
   }),
 })
@@ -714,10 +726,11 @@ export const HintsUnavailable = meta.story({
 
 export const HintsFailed = meta.story({
   beforeEach({ msw }) {
-    msw.use(failingHintsHandler())
+    failedHints.requests.count = 0
+    msw.use(failedHints.handler)
   },
   async play({ canvas }) {
-    await waitFor(() => expect(hintRequests.count).toBe(1))
+    await waitFor(() => expect(failedHints.requests.count).toBe(1))
 
     const set = await hintedRow('SET', 'SET')
 
@@ -726,6 +739,92 @@ export const HintsFailed = meta.story({
     await expect(
       canvas.queryByText('The values that are not translated yet could not be loaded.'),
     ).toBeNull()
+  },
+})
+
+export const HintsAskedOnceAfterUndo = meta.story({
+  args: { id: countryCodes.id },
+  beforeEach({ msw }) {
+    failedHintsAfterUndo.requests.count = 0
+    msw.use(failedHintsAfterUndo.handler)
+  },
+  async play({ canvas }) {
+    await waitFor(() => expect(failedHintsAfterUndo.requests.count).toBe(1))
+
+    const polen = await missingRow('Polen')
+
+    await userEvent.type(polen.getByRole('textbox', { name: 'What Polen becomes' }), 'PL')
+    await userEvent.click(polen.getByRole('button', { name: 'Accept Polen' }))
+    await waitFor(() =>
+      expect(canvas.queryByRole('region', { name: 'Not translated yet' })).toBeNull(),
+    )
+
+    await userEvent.click(valueRow('Polen').getByRole('button', { name: 'Remove Polen' }))
+    await missingRow('Polen')
+    await userEvent.click(canvas.getByRole('button', { name: 'Undo' }))
+    await expect(await canvas.findByRole('button', { name: 'Edit Polen' })).toBeVisible()
+
+    await expect(failedHintsAfterUndo.requests.count).toBe(1)
+  },
+})
+
+export const HintsLoading = meta.story({
+  beforeEach({ msw }) {
+    msw.use(http.post(hintsPath, () => delay('infinite')))
+  },
+  async play() {
+    await expect((await missingRow('SET')).getByText('Set')).toBeVisible()
+
+    const krt = await missingRow('KRT')
+
+    await expect(krt.getByRole('textbox', { name: 'Send KRT as' })).toHaveValue('')
+    await expect(krt.queryByText('Carton')).toBeNull()
+  },
+})
+
+export const GermanHintsLoading = meta.story({
+  decorators: [german],
+  beforeEach({ msw }) {
+    msw.use(http.post(hintsPath, () => delay('infinite')))
+  },
+  async play() {
+    await expect((await missingRow('SET')).getByText('Satz')).toBeVisible()
+
+    const krt = await missingRow('KRT')
+
+    await expect(krt.getByRole('textbox', { name: 'KRT senden als' })).toHaveValue('')
+    await expect(krt.queryByText('Karton')).toBeNull()
+  },
+})
+
+export const GermanHintsUnavailable = meta.story({
+  decorators: [german],
+  beforeEach({ msw }) {
+    msw.use(...hintsNoticeHandlers('aiUnavailable'))
+  },
+  async play({ canvas }) {
+    const notice = await canvas.findByRole('status', { name: 'Werte ohne KI erklärt' })
+
+    await expect(notice).toHaveTextContent('Die KI konnte die Werte nicht erklären')
+    await expect(
+      (await missingRow('KRT')).queryByRole('button', { name: / verwenden / }),
+    ).toBeNull()
+  },
+})
+
+export const GermanHintsFailed = meta.story({
+  decorators: [german],
+  beforeEach({ msw }) {
+    germanFailedHints.requests.count = 0
+    msw.use(germanFailedHints.handler)
+  },
+  async play({ canvas }) {
+    await waitFor(() => expect(germanFailedHints.requests.count).toBe(1))
+
+    const set = await hintedRow('SET', 'SET', 'SET senden als')
+
+    await expect(set.getByText('Satz')).toBeVisible()
+    await expect(canvas.queryByRole('status', { name: 'Werte ohne KI erklärt' })).toBeNull()
   },
 })
 

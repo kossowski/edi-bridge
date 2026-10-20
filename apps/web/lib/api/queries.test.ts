@@ -9,7 +9,11 @@ import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
-import { lookupTableSuggestionsEndpoint, type Task } from '@edi-bridge/contracts'
+import {
+  lookupTableMissingCodeHintsEndpoint,
+  lookupTableSuggestionsEndpoint,
+  type Task,
+} from '@edi-bridge/contracts'
 import {
   aiDraftHandlers,
   aiProposalFor,
@@ -169,7 +173,7 @@ describe('storeSavedLookupTable', () => {
 
   it('keeps the AI hints of its missing codes, since each fetch spends AI budget', () => {
     const queryClient = new QueryClient()
-    const hints = lookupTableMissingCodeHintsQuery(saved.id, 'en').queryKey
+    const hints = lookupTableMissingCodeHintsQuery(saved.id, 'en', true).queryKey
 
     queryClient.setQueryData(hints, { hints: [], notice: null })
 
@@ -204,7 +208,7 @@ describe('forgetDeletedLookupTable', () => {
 
     queryClient.setQueryData(lookupTablesQuery.queryKey, [deleted!, kept!])
     queryClient.setQueryData(lookupTableQuery(deleted!.id, 'de').queryKey, deleted)
-    queryClient.setQueryData(lookupTableMissingCodeHintsQuery(deleted!.id, 'de').queryKey, {
+    queryClient.setQueryData(lookupTableMissingCodeHintsQuery(deleted!.id, 'de', true).queryKey, {
       hints: [],
       notice: null,
     })
@@ -212,7 +216,7 @@ describe('forgetDeletedLookupTable', () => {
     forgetDeletedLookupTable(queryClient, deleted!.id)
 
     expect(
-      queryClient.getQueryState(lookupTableMissingCodeHintsQuery(deleted!.id, 'de').queryKey),
+      queryClient.getQueryState(lookupTableMissingCodeHintsQuery(deleted!.id, 'de', true).queryKey),
     ).toBeUndefined()
 
     expect(queryClient.getQueryState(lookupTableQuery(deleted!.id, 'de').queryKey)).toBeUndefined()
@@ -297,16 +301,16 @@ describe('lookupTableMissingCodeHintsQuery', () => {
   it('keys the hints by Lookup Table and language', () => {
     const id = seedLookupTables[0]!.id
 
-    expect(lookupTableMissingCodeHintsQuery(id, 'de').queryKey).not.toEqual(
-      lookupTableMissingCodeHintsQuery(id, 'en').queryKey,
+    expect(lookupTableMissingCodeHintsQuery(id, 'de', true).queryKey).not.toEqual(
+      lookupTableMissingCodeHintsQuery(id, 'en', true).queryKey,
     )
-    expect(lookupTableMissingCodeHintsQuery(id, 'en').queryKey).not.toEqual(
+    expect(lookupTableMissingCodeHintsQuery(id, 'en', true).queryKey).not.toEqual(
       lookupTableMissingCodesQuery(id, 'en').queryKey,
     )
   })
 
   it('never asks for the hints again on its own, since each fetch spends AI budget', () => {
-    const hints = lookupTableMissingCodeHintsQuery(seedLookupTables[0]!.id, 'en')
+    const hints = lookupTableMissingCodeHintsQuery(seedLookupTables[0]!.id, 'en', true)
 
     expect(hints).toMatchObject({
       staleTime: Infinity,
@@ -315,6 +319,44 @@ describe('lookupTableMissingCodeHintsQuery', () => {
       retryOnMount: false,
       refetchOnWindowFocus: false,
       refetchOnReconnect: false,
+    })
+  })
+
+  describe('when the hints fail', () => {
+    const server = setupServer()
+
+    beforeAll(() => server.listen({ onUnhandledFrame: 'error' }))
+
+    afterEach(() => {
+      server.resetHandlers()
+      server.events.removeAllListeners()
+    })
+
+    afterAll(() => server.close())
+
+    it('asks once, also when the screen stops and starts wanting them again', async () => {
+      let requests = 0
+      server.use(
+        http.post(`${apiUrl}${lookupTableMissingCodeHintsEndpoint.path}`, () =>
+          HttpResponse.json({ message: 'The AI hints failed' }, { status: 500 }),
+        ),
+      )
+      server.events.on('request:start', () => requests++)
+
+      const queryClient = new QueryClient({ defaultOptions: { queries: { retry: retriesQuery } } })
+      const id = seedLookupTables[0]!.id
+      const observer = new QueryObserver(
+        queryClient,
+        lookupTableMissingCodeHintsQuery(id, 'en', true),
+      )
+      observer.subscribe(() => {})
+      await expect.poll(() => observer.getCurrentResult().status).toBe('error')
+
+      observer.setOptions(lookupTableMissingCodeHintsQuery(id, 'en', false))
+      observer.setOptions(lookupTableMissingCodeHintsQuery(id, 'en', true))
+      await new Promise((resolve) => setTimeout(resolve, 20))
+
+      expect(requests).toBe(1)
     })
   })
 })
