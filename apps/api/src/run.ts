@@ -31,7 +31,7 @@ import {
 } from '@edi-bridge/contracts'
 import { flows, mappingVersions, runs, runSteps, tradingPartners } from '@edi-bridge/db'
 import {
-  isReprocessable,
+  isFixedByReprocess,
   Database as PipelineDatabase,
   reprocessRun as reprocessInPipeline,
   retryRun as retryDelivery,
@@ -334,15 +334,11 @@ export const retryRun = (id: string) =>
 
     const run = yield* loadRun(id)
 
-    // The Reprocess refuses an expired Document with its reason; a Retry at delivery does not read it.
-    const candidate = {
-      ...run,
-      mappingVersionId: run.mappingVersion?.id ?? null,
-      documentDeletedAt: null,
-    }
+    const candidate = { ...run, mappingVersionId: run.mappingVersion?.id ?? null }
 
     // Trying a Defect again outside delivery reprocesses the Run with its own Mapping Version.
-    if (candidate.problem?.reason === 'defect' && isReprocessable(candidate)) {
+    // The Reprocess refuses an expired Document with its reason; a Retry at delivery does not read it.
+    if (candidate.problem?.reason === 'defect' && isFixedByReprocess(candidate)) {
       yield* reprocessWithVersion(id, candidate.mappingVersionId)
 
       return yield* loadRun(id)
