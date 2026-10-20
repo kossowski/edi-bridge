@@ -16,6 +16,13 @@ export type LanguageQuery = z.input<typeof languageQuerySchema>
 
 type Meanings = Readonly<Record<Language, string>>
 
+export const standardListOf: Readonly<Record<LookupTableKind, string>> = {
+  units: 'unit codes of UN/ECE Recommendation 20, such as PCE or KGM',
+  countries: 'country codes of ISO 3166-1 alpha-2, such as DE or NL',
+  addresses: 'address identifiers such as GLNs',
+  other: 'tax category codes of UNCL 5305, such as S or AA',
+}
+
 // Partners send package codes such as CT as units, so they stand among the UN/ECE unit codes.
 const unitMeanings: ReadonlyMap<string, Meanings> = new Map([
   ['PCE', { en: 'Piece', de: 'Stück' }],
