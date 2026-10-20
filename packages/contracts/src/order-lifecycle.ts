@@ -145,7 +145,8 @@ function stepStateOf(messages: ReadonlyArray<StepMessage>): OrderLifecycleStepSt
     current.some(
       ({ run }) => run.status === 'failed' && run.waitingForTradingPartnerSince === null,
     ) ||
-    acknowledgements.some((state) => state === 'rejected' || state === 'overdue')
+    acknowledgements.some((state) => state === 'rejected' || state === 'overdue') ||
+    current.some(({ interchange }) => interchange?.notSentReason != null)
   ) {
     return 'needs-attention'
   }
@@ -154,10 +155,11 @@ function stepStateOf(messages: ReadonlyArray<StepMessage>): OrderLifecycleStepSt
     return 'waiting-for-trading-partner'
   }
 
+  // A sent Interchange without an Acknowledgement was handed over before Acknowledgements were
+  // tracked, so it counts as accepted.
   return current.every(
-    ({ run, direction, interchange }) =>
-      run.status === 'delivered' &&
-      (direction === 'inbound' || interchange?.acknowledgement === 'accepted'),
+    ({ run, interchange }) =>
+      run.status === 'delivered' && (interchange?.acknowledgement ?? 'accepted') === 'accepted',
   )
     ? 'done'
     : 'in-progress'
