@@ -114,6 +114,19 @@ export const PasteHostKey = meta.story({
   },
 })
 
+export const InvalidHostKey = meta.story({
+  async play({ canvas }) {
+    const field = canvas.getByLabelText('Host key fingerprint (optional)')
+    await expect(field).toHaveAttribute('aria-invalid', 'false')
+    await userEvent.type(field, 'SHA256:abc')
+    await userEvent.click(canvas.getByRole('button', { name: 'Create Channel' }))
+    await expect(
+      canvas.getByText('Enter the fingerprint as SHA256: followed by 43 characters.'),
+    ).toBeVisible()
+    await expect(field).toHaveAttribute('aria-invalid', 'true')
+  },
+})
+
 export const EditConfirmedHostKey = meta.story({
   render: () => <EditChannelScreen id={sftpInbox.id} />,
   async play({ canvas }) {
