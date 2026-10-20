@@ -4,8 +4,10 @@ import {
   lookupTableEndpoint,
   lookupTableEntriesSchema,
   lookupTableInputSchema,
+  lookupTableMissingCodeHintsEndpoint,
   lookupTableMissingCodesEndpoint,
   lookupTableSuggestionsEndpoint,
+  missingCodeHintsNotices,
   lookupTablesEndpoint,
   lookupTableUseSchema,
 } from './lookup-table'
@@ -117,6 +119,7 @@ describe('lookupTableEndpoint', () => {
 describe.each([
   ['lookupTableEndpoint', lookupTableEndpoint],
   ['lookupTableMissingCodesEndpoint', lookupTableMissingCodesEndpoint],
+  ['lookupTableMissingCodeHintsEndpoint', lookupTableMissingCodeHintsEndpoint],
 ])('%s query', (_, endpoint) => {
   it('asks for the code meanings in English unless a language is given', () => {
     expect(endpoint.query.parse({})).toEqual({ language: 'en' })
@@ -233,6 +236,53 @@ describe('lookupTableMissingCodesEndpoint', () => {
     ])
 
     expect(result.success).toBe(false)
+  })
+})
+
+describe('lookupTableMissingCodeHintsEndpoint', () => {
+  const krt = {
+    code: 'KRT',
+    meaning: 'Carton',
+    suggestions: [
+      { code: 'CT', meaning: 'Carton' },
+      { code: 'PK', meaning: 'Package' },
+    ],
+  }
+
+  const btl = { code: 'BTL', meaning: null, suggestions: [] }
+
+  it('asks the AI for the meanings of the missing codes with a change', () => {
+    expect(lookupTableMissingCodeHintsEndpoint).toMatchObject({
+      method: 'POST',
+      path: '/lookup-tables/:id/missing-codes/hints',
+    })
+  })
+
+  it('gives a hint per missing code and no notice when the AI explained them', () => {
+    const hints = { hints: [krt, btl], notice: null }
+
+    expect(lookupTableMissingCodeHintsEndpoint.response.parse(hints)).toEqual(hints)
+  })
+
+  it('says why the codes were explained without AI', () => {
+    const hints = { hints: [btl], notice: missingCodeHintsNotices.aiBudgetExhausted }
+
+    expect(lookupTableMissingCodeHintsEndpoint.response.parse(hints).notice).toEqual({
+      reason: 'aiBudgetExhausted',
+      message: 'AI budget used up for today; codes explained without AI',
+    })
+  })
+
+  it('rejects an answer without the notice, with an unknown reason or a code twice', () => {
+    const response = lookupTableMissingCodeHintsEndpoint.response
+
+    expect(response.safeParse({ hints: [krt] }).success).toBe(false)
+    expect(
+      response.safeParse({ hints: [krt], notice: { reason: 'tired', message: 'Later' } }).success,
+    ).toBe(false)
+    expect(
+      response.safeParse({ hints: [krt, { ...btl, code: 'KRT' }], notice: null }).success,
+    ).toBe(false)
   })
 })
 

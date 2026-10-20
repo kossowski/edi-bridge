@@ -1,7 +1,7 @@
 import type {
   ChannelTestResultReason,
   DocumentStructure,
-  FieldNamesNoticeReason,
+  AiNoticeReason,
   Invite,
   Session,
   TradingPartner,
@@ -394,7 +394,7 @@ export function createHandlers(
     documentStructures?: ReadonlyArray<DocumentStructure> | DocumentStructureStore
     documentStructuresState?: DocumentStructuresState
     documentStructureInferenceState?: DocumentStructuresState
-    documentStructureFieldNamesNotice?: FieldNamesNoticeReason
+    documentStructureFieldNamesNotice?: AiNoticeReason
     lookupTables?: ReadonlyArray<LookupTableRecord>
     lookupTableSuggestions?: LookupTableSuggestionsState
     mappingSamples?: ReadonlyArray<MappingSampleRecord>

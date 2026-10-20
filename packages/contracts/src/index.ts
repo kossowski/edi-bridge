@@ -43,6 +43,8 @@ export {
   requestAiDraftEndpoint,
 } from './ai-draft'
 
+export { type AiNotice, type AiNoticeReason, aiNoticeReasons, aiNoticeSchema } from './ai-notice'
+
 export {
   acceptedAiReview,
   aiReviewKeys,
@@ -163,11 +165,7 @@ export {
   documentStructuresEndpoint,
   type EncodedFile,
   encodedFileSchema,
-  type FieldNamesNotice,
-  type FieldNamesNoticeReason,
-  fieldNamesNoticeReasons,
   fieldNamesNotices,
-  fieldNamesNoticeSchema,
   samplePreview,
   samplePreviewLineCount,
   type FieldLabelChoice,
@@ -404,6 +402,7 @@ export {
   type LookupTableKind,
   lookupTableKindSchema,
   lookupTableKinds,
+  lookupTableMissingCodeHintsEndpoint,
   lookupTableMissingCodesEndpoint,
   lookupTableSchema,
   type LookupTableScope,
@@ -428,6 +427,11 @@ export {
   type MissingCode,
   type MissingCodeCounts,
   missingCodeCountsSchema,
+  type MissingCodeHint,
+  type MissingCodeHints,
+  missingCodeHintSchema,
+  missingCodeHintsNotices,
+  missingCodeHintsSchema,
   missingCodeSchema,
   missingCodesSchema,
   type SuggestedEntry,

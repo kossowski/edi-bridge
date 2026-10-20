@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import { type AiNotice, type AiNoticeReason, aiNoticeSchema } from './ai-notice'
 import { type LanguageQuery, languageQuerySchema } from './code-meaning'
 import { directionOf, directionSchema, messageTypeSchema } from './message-type'
 import { tradingPartnerSummarySchema } from './trading-partner'
@@ -245,6 +246,41 @@ export const lookupTableMissingCodesEndpoint: Endpoint<
   path: '/lookup-tables/:id/missing-codes',
   query: languageQuerySchema,
   response: missingCodesSchema,
+}
+
+export const missingCodeHintSchema = z.object(missingCodeFields)
+
+export type MissingCodeHint = z.infer<typeof missingCodeHintSchema>
+
+export const missingCodeHintsSchema = z.object({
+  hints: z
+    .array(missingCodeHintSchema)
+    .refine((hints) => new Set(hints.map(({ code }) => code)).size === hints.length, {
+      message: 'A missing code is hinted once',
+    }),
+  notice: aiNoticeSchema.nullable(),
+})
+
+export type MissingCodeHints = z.infer<typeof missingCodeHintsSchema>
+
+export const missingCodeHintsNotices = {
+  aiBudgetExhausted: {
+    reason: 'aiBudgetExhausted',
+    message: 'AI budget used up for today; codes explained without AI',
+  },
+  aiUnavailable: { reason: 'aiUnavailable', message: 'AI unavailable; codes explained without AI' },
+} as const satisfies Record<AiNoticeReason, AiNotice>
+
+export const lookupTableMissingCodeHintsEndpoint: Endpoint<
+  MissingCodeHints,
+  LanguageQuery,
+  undefined,
+  '/lookup-tables/:id/missing-codes/hints'
+> = {
+  method: 'POST',
+  path: '/lookup-tables/:id/missing-codes/hints',
+  query: languageQuerySchema,
+  response: missingCodeHintsSchema,
 }
 
 export const lookupTableSuggestionsQuerySchema = z

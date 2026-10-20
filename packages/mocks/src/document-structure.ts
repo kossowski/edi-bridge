@@ -23,7 +23,7 @@ import {
   documentStructuresEndpoint,
   type DocumentStructureSummary,
   documentStructureSummarySchema,
-  type FieldNamesNoticeReason,
+  type AiNoticeReason,
   fieldNamesNotices,
   samplePreview,
   inferDocumentStructure,
@@ -618,7 +618,7 @@ export function documentStructureHandlers(
     documentStructures?: ReadonlyArray<DocumentStructure> | DocumentStructureStore
     state?: DocumentStructuresState | undefined
     inferenceState?: DocumentStructuresState | undefined
-    fieldNamesNotice?: FieldNamesNoticeReason | undefined
+    fieldNamesNotice?: AiNoticeReason | undefined
     session?: Session | null | SessionStore
   } & MappingUse = {},
 ) {

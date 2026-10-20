@@ -27,7 +27,7 @@ import { leafCount } from '@/components/document-structures/structure-tree'
 import { TextField } from '@/components/form-field'
 import {
   type DocumentStructureInference,
-  type FieldNamesNotice,
+  type AiNotice,
   maxDocumentStructureNameLength,
 } from '@edi-bridge/contracts'
 import { Alert, AlertDescription, AlertTitle } from '@edi-bridge/ui/components/alert'
@@ -47,7 +47,7 @@ function SaveLabel({ block, saving }: { block: SaveBlock | null; saving: boolean
   return saving ? t('saving') : t('submit')
 }
 
-function FieldNamesNoticeAlert({ notice }: { notice: FieldNamesNotice }) {
+function FieldNamesNoticeAlert({ notice }: { notice: AiNotice }) {
   const t = useTranslations('DocumentStructureForm.review.fieldNamesNotice')
   const titleId = useId()
 
