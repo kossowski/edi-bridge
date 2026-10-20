@@ -13,7 +13,7 @@ const codeOfRun = sql<string>`${runs.problem} -> 'fixTarget' ->> 'code'`
 
 const replacing = alias(runs, 'replacing')
 
-export type BlockingCodeRuns = Omit<BlockingMissingCode, 'meaning' | 'suggestions'>
+export type BlockingCodeWithoutMeaning = Omit<BlockingMissingCode, 'meaning' | 'suggestions'>
 
 export const selectBlockingCodes = async (
   db: Database | Transaction,
@@ -65,7 +65,7 @@ export const selectBlockingCodes = async (
 
   const byLookupTable = Map.groupBy(rows, (row) => row.lookupTableId)
 
-  return (id: string): BlockingCodeRuns[] =>
+  return (id: string): BlockingCodeWithoutMeaning[] =>
     [...Map.groupBy(byLookupTable.get(id) ?? [], ({ code }) => code)].map(([code, failed]) => ({
       urgency: 'blocking',
       code,

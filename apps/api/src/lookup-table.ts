@@ -32,7 +32,7 @@ import {
 import { Db, type Database, type Transaction } from './db.js'
 import { Conflict, NotFound } from './errors.js'
 import { lookupTableUnused, selectLookupTableUses, selectUsesOfLookupTable } from './mapping-use.js'
-import { type BlockingCodeRuns, selectBlockingCodes } from './missing-code.js'
+import { type BlockingCodeWithoutMeaning, selectBlockingCodes } from './missing-code.js'
 import {
   byName,
   foundOrNotFound,
@@ -70,7 +70,7 @@ const scopeOf = ({ tradingPartnerId, tradingPartnerName }: Row): LookupTableScop
 const toSummary = (
   row: Row,
   uses: LookupTableUse[],
-  blocking: BlockingCodeRuns[],
+  blocking: BlockingCodeWithoutMeaning[],
 ): LookupTableSummary => ({
   id: row.id,
   name: row.name,
@@ -181,7 +181,7 @@ export const loadLookupTable = (id: string, language: Language = defaultLanguage
     )
   })
 
-const rejectingUnknownLookupTable = (id: string) =>
+const kindOfLookupTable = (id: string) =>
   Effect.gen(function* () {
     yield* rejectingInvalidId(id)
 
@@ -202,10 +202,12 @@ const rejectingUnknownLookupTable = (id: string) =>
     return found.kind
   })
 
+const rejectingUnknownLookupTable = (id: string) => Effect.asVoid(kindOfLookupTable(id))
+
 // A partner code that is itself a known code likely means that code.
 const withMeaning =
   (kind: LookupTableKind, language: Language) =>
-  (missing: BlockingCodeRuns): BlockingMissingCode => {
+  (missing: BlockingCodeWithoutMeaning): BlockingMissingCode => {
     const meaning = codeMeaningOf(kind, missing.code, language)
 
     return {
@@ -217,7 +219,7 @@ const withMeaning =
 
 export const listLookupTableMissingCodes = (id: string, language: Language) =>
   Effect.gen(function* () {
-    const kind = yield* rejectingUnknownLookupTable(id)
+    const kind = yield* kindOfLookupTable(id)
 
     const db = yield* Db
     const workspace = yield* CurrentWorkspace
