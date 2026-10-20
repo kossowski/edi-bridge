@@ -1,7 +1,7 @@
 import { and, eq, sql } from 'drizzle-orm'
 import { Cause, Duration, Effect, Exit, Fiber, Logger } from 'effect'
 import { TestClock } from 'effect/testing'
-import { createHash, randomBytes, randomUUID } from 'node:crypto'
+import { randomBytes, randomUUID } from 'node:crypto'
 import { afterAll, assert, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 
@@ -51,6 +51,7 @@ import {
   sweepRunsEvery,
   sweepStuckRuns,
 } from './index'
+import { contentHashOf } from './receive'
 import { type Database, type Delivery, Documents, type RunQueue } from './services'
 import {
   addContrlFlow,
@@ -2183,7 +2184,7 @@ describe('the processing of an inbound Run', () => {
     expect(erp.received).toHaveLength(0)
   })
 
-  describe('a re-sent Interchange', () => {
+  describe('an Interchange received again', () => {
     const fromSender = (sender: string, messages: string[][]) =>
       interchangeOf(messages).replace('4071615111110', sender)
 
@@ -2276,6 +2277,19 @@ describe('the processing of an inbound Run', () => {
       expect(elsewhere.runs).toMatchObject([{ status: 'delivered', duplicateOfRunId: null }])
     })
 
+    it('is a Duplicate by its Interchange key when its body does not parse', async () => {
+      const into = await seedInvoiceWorkspace(connection.db, 'Unreadable Body Foods')
+      const content = `${fromHanseRetail}\nUNH+1+ORDERS:D:96A:UN:EAN008\nUNZ+1+00000001'`
+
+      const original = await receiveAgain(into, content)
+      const again = await receiveAgain(into, content)
+
+      expect(original.runs).toMatchObject([{ messageIndex: null, duplicateOfRunId: null }])
+      expect(again.runs).toMatchObject([
+        { status: 'duplicate', messageIndex: null, duplicateOfRunId: original.runs[0]?.id },
+      ])
+    })
+
     it('yields one original when copies arrive at once', async () => {
       const into = await ordersWorkspace('Concurrent Foods')
       const content = interchangeOf([ordersMessage])
@@ -2288,7 +2302,7 @@ describe('the processing of an inbound Run', () => {
     })
   })
 
-  describe('a re-sent SFTP file', () => {
+  describe('an SFTP file received again', () => {
     const onSftp = async (into: InvoiceWorkspace, flowId: string) =>
       receiveOverSftp(connection.db, into, sftpLogin(), { flowId })
 
@@ -2317,7 +2331,7 @@ describe('the processing of an inbound Run', () => {
     }
 
     it('is recorded as a Duplicate of the original Run and never queued', async () => {
-      const into = await seedInvoiceWorkspace(connection.db, 'File Resend Foods')
+      const into = await seedInvoiceWorkspace(connection.db, 'File Again Foods')
       const sftpChannelId = await onSftp(into, into.flowId)
 
       const original = await receiveFile(into, sftpChannelId)
@@ -2328,7 +2342,7 @@ describe('the processing of an inbound Run', () => {
       expect(again.document).toMatchObject({
         channelId: sftpChannelId,
         fileName: 'invoice.json',
-        contentHash: createHash('sha256').update(goldenInvoice).digest('hex'),
+        contentHash: contentHashOf(goldenInvoice),
       })
       expect(again.runs).toMatchObject([
         {
@@ -2436,7 +2450,6 @@ describe('the processing of an inbound Run', () => {
       const asOrders = { fileName: 'orders.edi', content }
 
       const original = await receiveFile(into, sftpChannelId, asOrders)
-      // The Interchange key alone: another file name.
       const renamed = await receiveFile(into, sftpChannelId, { ...asOrders, fileName: 'copy.edi' })
 
       // The file key matches only the Duplicate above, so the Interchange key finds the original.
@@ -2458,7 +2471,7 @@ describe('the processing of an inbound Run', () => {
   describe('a delivered resend', () => {
     let sent = 0
 
-    // A resend is a new Interchange, so each copy gets a control reference of its own.
+    // A Trading Partner sends a corrected copy as a new Interchange, so each copy gets a control reference of its own.
     const sentAnew = (content: string) => {
       sent += 1
 
