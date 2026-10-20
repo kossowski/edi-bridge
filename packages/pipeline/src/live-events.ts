@@ -11,7 +11,7 @@ export type LiveEventsService = {
   publish: (published: PublishedLiveEvent) => Effect.Effect<void>
 }
 
-// Without a publisher, as in the api until it serves live events, changes go unannounced.
+// Where no publisher is provided, Run changes go unannounced.
 export const LiveEvents = Context.Reference<LiveEventsService>('@edi-bridge/pipeline/LiveEvents', {
   defaultValue: () => ({ publish: () => Effect.void }),
 })
