@@ -204,6 +204,13 @@
       "when": 1792466521891,
       "tag": "0028_trading_partner_test_rejection",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1792479801247,
+      "tag": "0029_workspace_kind",
+      "breakpoints": true
     }
   ]
 }

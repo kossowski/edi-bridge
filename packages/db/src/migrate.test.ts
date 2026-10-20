@@ -1,11 +1,12 @@
 import { eq } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { documentRetentionDays } from '@edi-bridge/contracts'
+import { documentRetentionDays, workspaceKinds } from '@edi-bridge/contracts'
 
 import { connect, type Connection } from './client.js'
 import { migrate } from './migrate.js'
 import {
+  channels,
   documents,
   documentStructures,
   lookupTableEntries,
@@ -78,6 +79,20 @@ describe('schema', () => {
 })
 
 describe('a Workspace', () => {
+  it('is a standard Workspace without seed data or a reset', async () => {
+    const workspace = await insertWorkspace(connection.db)
+
+    expect(workspace).toMatchObject({ kind: 'standard', seeded: false, lastResetAt: null })
+  })
+
+  it.each(workspaceKinds)('stores the kind %s', async (kind) => {
+    const stored = await only(
+      connection.db.insert(workspaces).values({ name: 'Demo GmbH', kind }).returning(),
+    )
+
+    expect(stored.kind).toBe(kind)
+  })
+
   it('has the default retention period', async () => {
     const workspace = await insertWorkspace(connection.db)
 
@@ -518,5 +533,28 @@ describe('a Run', () => {
         connection.db.select().from(documents).where(eq(documents.id, documentId)),
       ).resolves.toEqual([])
     })
+  })
+})
+
+describe('a Channel', () => {
+  it('is not seeded unless marked', async () => {
+    const workspace = await insertWorkspace(connection.db)
+
+    const stored = await only(
+      connection.db
+        .insert(channels)
+        .values({
+          workspaceId: workspace.id,
+          type: 'webhook',
+          direction: 'inbound',
+          name: 'ERP webhook',
+          rateLimitPerMinute: 60,
+          encryptedWebhookToken: 'encrypted',
+          webhookTokenLastFour: 'abcd',
+        })
+        .returning(),
+    )
+
+    expect(stored.seeded).toBe(false)
   })
 })

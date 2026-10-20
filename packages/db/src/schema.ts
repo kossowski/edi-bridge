@@ -42,8 +42,11 @@ import {
   runStepStages,
   runStepStatuses,
   sftpAuthentications,
+  workspaceKinds,
   workspaceRoles,
 } from '@edi-bridge/contracts'
+
+export const workspaceKind = pgEnum('workspace_kind', workspaceKinds)
 
 export const workspaces = pgTable(
   'workspaces',
@@ -51,6 +54,9 @@ export const workspaces = pgTable(
     id: uuid().primaryKey().defaultRandom(),
     name: text().notNull(),
     gln: text(),
+    kind: workspaceKind().notNull().default('standard'),
+    seeded: boolean().notNull().default(false),
+    lastResetAt: timestamp({ withTimezone: true, mode: 'date' }),
     aiDailyTokenLimit: integer().notNull().default(aiDailyTokenLimit.default),
     documentRetentionDays: integer().notNull().default(documentRetentionDays.default),
     createdAt: timestamp({ withTimezone: true, mode: 'date' }).notNull().defaultNow(),
@@ -399,6 +405,7 @@ export const channels = pgTable(
     webhookTokenLastFour: text(),
     url: text(),
     encryptedAuthorization: text(),
+    seeded: boolean().notNull().default(false),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

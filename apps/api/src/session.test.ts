@@ -6,6 +6,7 @@ import {
   signedInSchema,
   signOutEndpoint,
 } from '@edi-bridge/contracts'
+import { workspaces } from '@edi-bridge/db'
 
 import { buildApp } from './app.js'
 import { loadConfig } from './config.js'
@@ -168,6 +169,31 @@ describe('GET /session', () => {
       id: otherWorkspace.id,
       name: otherWorkspace.name,
       kind: 'standard',
+    })
+  })
+
+  it('names the kind of the Workspace', async () => {
+    const [sandbox] = await api.connection.db
+      .insert(workspaces)
+      .values({ name: 'Sandbox', kind: 'sandbox' })
+      .returning()
+
+    const sandboxViewer: NewMember = {
+      name: 'Sandbox Viewer',
+      email: 'viewer@sandbox.example',
+      password: 'sandbox-password',
+      workspaceId: sandbox!.id,
+      role: 'viewer',
+    }
+
+    await addMember(api.connection.db, sandboxViewer)
+
+    const response = await getSession(await signIn(api.app, sandboxViewer))
+
+    expect(sessionSchema.parse(response.json()).workspace).toEqual({
+      id: sandbox!.id,
+      name: 'Sandbox',
+      kind: 'sandbox',
     })
   })
 
