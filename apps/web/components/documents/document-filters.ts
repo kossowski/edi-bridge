@@ -51,7 +51,7 @@ export function parseDocumentFilters(params: SearchParamsReader): DocumentFilter
   const status = statusGroups.find((group) => group === params.get('status'))
   const tradingPartnerId = params.get('partner') ?? ''
   const messageType = messageTypeSchema.safeParse(params.get('type'))
-  // The transmissions of an Interchange can't be narrowed to one Mapping.
+  // Interchanges have no Mapping; only Runs do.
   const mappingId = view === 'transmissions' ? '' : (params.get('mapping') ?? '')
 
   return {
