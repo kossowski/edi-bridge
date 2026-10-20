@@ -149,6 +149,8 @@ export function withHints(
   return codes.map((code) => {
     const hint = hintOf.get(code.code)
 
-    return hint ? { ...code, meaning: hint.meaning, suggestions: hint.suggestions } : code
+    return hint
+      ? { ...code, meaning: hint.meaning ?? code.meaning, suggestions: hint.suggestions }
+      : code
   })
 }

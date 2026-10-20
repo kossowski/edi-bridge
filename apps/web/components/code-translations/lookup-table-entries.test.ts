@@ -207,6 +207,12 @@ describe('withHints', () => {
     ])
   })
 
+  it('keeps the static meaning when the hint has none', () => {
+    const hint = { code: 'SET', meaning: null, suggestions: [] }
+
+    expect(withHints([set], [hint])).toEqual([{ ...set, suggestions: [] }])
+  })
+
   it('keeps the static codes without hints', () => {
     expect(withHints([krt, set], undefined)).toEqual([krt, set])
   })
