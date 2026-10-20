@@ -441,6 +441,7 @@ export { applyLookupTableImport, classifyLookupTableImport } from './lookup-tabl
 export {
   codeMeaningOf,
   codeMeaningsOf,
+  defaultLanguage,
   type Language,
   type LanguageQuery,
   languageQuerySchema,

@@ -1,17 +1,10 @@
 import {
-  type CodeMeaning,
   codeMeaningOf,
+  codeMeaningsOf,
   type Language,
   type LookupTableKind,
   type SuggestedEntry,
 } from '@edi-bridge/contracts'
-
-// The shared dictionary knows no list for this kind; the seed tables use UNCL 5305 tax categories.
-const otherMeanings: ReadonlyMap<string, Readonly<Record<Language, string>>> = new Map([
-  ['S', { en: 'Standard rate', de: 'Normalsatz' }],
-  ['AA', { en: 'Lower rate', de: 'Ermäßigter Satz' }],
-  ['Z', { en: 'Zero rated goods', de: 'Nullsatz' }],
-])
 
 // An own code means what its partner code means, so its meaning follows the language.
 type OwnCodeHint = { meansCode: string | null; suggestions: ReadonlyArray<string> }
@@ -44,30 +37,12 @@ const firstValues: Readonly<Record<LookupTableKind, ReadonlyArray<readonly [stri
   other: [],
 }
 
-export function meaningOf(kind: LookupTableKind, code: string, language: Language) {
-  return kind === 'other'
-    ? (otherMeanings.get(code)?.[language] ?? null)
-    : codeMeaningOf(kind, code, language)
-}
-
-export function codeMeaningsOf(
-  kind: LookupTableKind,
-  codes: Iterable<string>,
-  language: Language,
-): CodeMeaning[] {
-  return [...new Set(codes)].flatMap((code) => {
-    const meaning = meaningOf(kind, code, language)
-
-    return meaning === null ? [] : [{ code, meaning }]
-  })
-}
-
 export function hintFor(kind: LookupTableKind, code: string, language: Language) {
   const hint = ownCodeHints[kind].get(code)
   const meansCode = hint?.meansCode ?? null
 
   return {
-    meaning: meansCode === null ? null : meaningOf(kind, meansCode, language),
+    meaning: meansCode === null ? null : codeMeaningOf(kind, meansCode, language),
     suggestions: codeMeaningsOf(kind, hint?.suggestions ?? [], language),
   }
 }
@@ -76,6 +51,6 @@ export function firstValuesOf(kind: LookupTableKind, language: Language): Sugges
   return firstValues[kind].map(([sourceCode, targetCode]) => ({
     sourceCode,
     targetCode,
-    targetMeaning: meaningOf(kind, targetCode, language),
+    targetMeaning: codeMeaningOf(kind, targetCode, language),
   }))
 }

@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { type LanguageQuery, languageQuerySchema, languageSchema } from './code-meaning'
+import { type LanguageQuery, languageQuerySchema } from './code-meaning'
 import { directionOf, directionSchema, messageTypeSchema } from './message-type'
 import { tradingPartnerSummarySchema } from './trading-partner'
 
@@ -247,11 +247,9 @@ export const lookupTableMissingCodesEndpoint: Endpoint<
   response: missingCodesSchema,
 }
 
-export const lookupTableSuggestionsQuerySchema = z.object({
-  kind: lookupTableKindSchema,
-  tradingPartnerId: z.uuid().optional(),
-  language: languageSchema.default('en'),
-})
+export const lookupTableSuggestionsQuerySchema = z
+  .object({ kind: lookupTableKindSchema, tradingPartnerId: z.uuid().optional() })
+  .extend(languageQuerySchema.shape)
 
 export type LookupTableSuggestionsQuery = z.input<typeof lookupTableSuggestionsQuerySchema>
 

@@ -21,7 +21,14 @@ describe('codeMeaningOf', () => {
     expect(codeMeaningOf('countries', code, 'en')).toBeNull()
   })
 
-  it('knows no meaning for an unknown unit or a kind without a code list', () => {
+  it.each([
+    ['en', 'Standard rate'],
+    ['de', 'Normalsatz'],
+  ] as const)('names a UNCL 5305 tax category in %s', (language, meaning) => {
+    expect(codeMeaningOf('other', 'S', language)).toBe(meaning)
+  })
+
+  it('knows no meaning for an unknown code or a kind without a code list', () => {
     expect(codeMeaningOf('units', 'KRT', 'en')).toBeNull()
     expect(codeMeaningOf('addresses', 'DE', 'en')).toBeNull()
     expect(codeMeaningOf('other', 'PCE', 'en')).toBeNull()

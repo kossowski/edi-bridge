@@ -8,13 +8,15 @@ export const languageSchema = z.enum(languages)
 
 export type Language = z.infer<typeof languageSchema>
 
-export const languageQuerySchema = z.object({ language: languageSchema.default('en') })
+export const defaultLanguage: Language = 'en'
+
+export const languageQuerySchema = z.object({ language: languageSchema.default(defaultLanguage) })
 
 export type LanguageQuery = z.input<typeof languageQuerySchema>
 
 type Meanings = Readonly<Record<Language, string>>
 
-// Common codes of UN/ECE Recommendation 20, with the package codes partners send as units.
+// Partners send package codes such as CT as units, so they stand among the UN/ECE unit codes.
 const unitMeanings: ReadonlyMap<string, Meanings> = new Map([
   ['PCE', { en: 'Piece', de: 'Stück' }],
   ['H87', { en: 'Piece', de: 'Stück' }],
@@ -44,6 +46,13 @@ const unitMeanings: ReadonlyMap<string, Meanings> = new Map([
   ['PF', { en: 'Pallet', de: 'Palette' }],
 ])
 
+// The kind other has no list of its own; tax categories (UNCL 5305) are its common codes.
+const otherMeanings: ReadonlyMap<string, Meanings> = new Map([
+  ['S', { en: 'Standard rate', de: 'Normalsatz' }],
+  ['AA', { en: 'Lower rate', de: 'Ermäßigter Satz' }],
+  ['Z', { en: 'Zero rated goods', de: 'Nullsatz' }],
+])
+
 // ISO 3166-1 alpha-2; Intl.DisplayNames also names regions such as EU that are no country.
 const countryCodes = new Set(
   (
@@ -69,8 +78,9 @@ export function codeMeaningOf(kind: LookupTableKind, code: string, language: Lan
       return unitMeanings.get(code)?.[language] ?? null
     case 'countries':
       return countryCodes.has(code) ? (countryNames[language].of(code) ?? null) : null
-    case 'addresses':
     case 'other':
+      return otherMeanings.get(code)?.[language] ?? null
+    case 'addresses':
       return null
   }
 }

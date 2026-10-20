@@ -3,7 +3,9 @@ import { delay, http, HttpResponse } from 'msw'
 import {
   applyLookupTableImport,
   classifyLookupTableImport,
+  codeMeaningsOf,
   createLookupTableEndpoint,
+  defaultLanguage,
   deleteLookupTableEndpoint,
   directionOf,
   type FailedRunReference,
@@ -41,7 +43,7 @@ import { aiBudgetOf } from './ai-budget'
 import { type ChannelRecord, type ChannelStore, seedChannels, toChannelStore } from './channel'
 import { type FlowRecord, type FlowStore, seedFlows, toFlowStore } from './flow'
 import { lookupTableFailureOf } from './interchange'
-import { codeMeaningsOf, firstValuesOf, hintFor } from './lookup-table-codes'
+import { firstValuesOf, hintFor } from './lookup-table-codes'
 import {
   type LookupTableRecord,
   type LookupTableStore,
@@ -154,7 +156,7 @@ export function toLookupTable(
   record: LookupTableRecord,
   tradingPartners: TradingPartnerNames,
   usage: LookupTableUsage = unused,
-  language: Language = 'en',
+  language: Language = defaultLanguage,
 ): LookupTable {
   return {
     ...toLookupTableSummary(record, tradingPartners, usage),
@@ -340,13 +342,13 @@ export function createLookupTableUsage(
     return [...blocking, ...upcoming]
   }
 
-  return (table: LookupTableRecord, language: Language = 'en'): LookupTableUsage => ({
+  return (table: LookupTableRecord, language: Language): LookupTableUsage => ({
     uses: usesOf(table),
     missingCodes: missingCodesOf(table, language),
   })
 }
 
-type Usage = (table: LookupTableRecord, language?: Language) => LookupTableUsage
+type Usage = (table: LookupTableRecord, language: Language) => LookupTableUsage
 
 export function lookupTableListHandler(
   apiUrl: string,
@@ -362,7 +364,9 @@ export function lookupTableListHandler(
     HttpResponse.json(
       store
         .all()
-        .map((table) => toLookupTableSummary(table, tradingPartnerStore, usageOf(table)))
+        .map((table) =>
+          toLookupTableSummary(table, tradingPartnerStore, usageOf(table, defaultLanguage)),
+        )
         .sort(byName),
     ),
   )
@@ -482,7 +486,7 @@ export function lookupTableHandlers(
       : { response: badRequest(body.error.message) }
   }
 
-  function serve(table: LookupTableRecord, init?: ResponseInit, language: Language = 'en') {
+  function serve(table: LookupTableRecord, language: Language, init?: ResponseInit) {
     return HttpResponse.json(
       toLookupTable(table, tradingPartnerStore, usageOf(table, language), language),
       init,
@@ -526,7 +530,7 @@ export function lookupTableHandlers(
 
       const table = store.get(params.id)
 
-      return table ? serve(table, undefined, query.data.language) : notFound()
+      return table ? serve(table, query.data.language) : notFound()
     }),
     http.get<{ id: string }>(
       `${apiUrl}${lookupTableMissingCodesEndpoint.path}`,
@@ -561,7 +565,7 @@ export function lookupTableHandlers(
 
         store.set(created)
 
-        return serve(created, { status: 201 })
+        return serve(created, defaultLanguage, { status: 201 })
       }),
     ),
     http.put<{ id: string }>(
@@ -587,7 +591,7 @@ export function lookupTableHandlers(
 
         store.set(updated)
 
-        return serve(updated)
+        return serve(updated, defaultLanguage)
       }),
     ),
     http.delete<{ id: string }>(
@@ -599,7 +603,7 @@ export function lookupTableHandlers(
           return notFound()
         }
 
-        if (usageOf(existing).uses.length > 0) {
+        if (usageOf(existing, defaultLanguage).uses.length > 0) {
           return conflict(lookupTableInUseMessage)
         }
 
@@ -633,7 +637,7 @@ export function lookupTableHandlers(
 
         store.set(imported)
 
-        return serve(imported)
+        return serve(imported, defaultLanguage)
       }),
     ),
   ]
