@@ -1,6 +1,7 @@
 import type {
   ChannelTestResultReason,
   DocumentStructure,
+  FieldNamesNoticeReason,
   Invite,
   Session,
   TradingPartner,
@@ -371,6 +372,7 @@ export function createHandlers(
     documentStructureInferenceState,
     lookupTables = seedLookupTables,
     mappingSamples = seedMappingSamples,
+    documentStructureFieldNamesNotice,
     mappingVersions,
     liveEvents = { mode: 'quiet' },
     aiDraft = {},
@@ -392,6 +394,7 @@ export function createHandlers(
     lookupTables?: ReadonlyArray<LookupTableRecord>
     mappingSamples?: ReadonlyArray<MappingSampleRecord>
     mappingVersions?: ReadonlyArray<MappingVersionRecord> | MappingVersionStore
+    documentStructureFieldNamesNotice?: FieldNamesNoticeReason
     liveEvents?: Omit<LiveEventsOptions, 'runs' | 'bus'>
     aiDraft?: Pick<AiDraftOptions, 'state' | 'stepDelayMs' | 'signal'>
   } = {},
@@ -561,6 +564,7 @@ export function createHandlers(
     }),
     messageTypeStructureHandler(apiUrl),
     ...lookupTableHandlers(apiUrl, {
+      fieldNamesNotice: documentStructureFieldNamesNotice,
       lookupTables: lookupTableStore,
       tradingPartners: tradingPartnerStore,
       mappings: mappingDraftStore,

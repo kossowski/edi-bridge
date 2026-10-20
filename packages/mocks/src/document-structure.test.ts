@@ -349,6 +349,37 @@ describe('POST /document-structures/inference', () => {
     expect(inferred.sample?.fileName).toBe('Rechnungsexport_2026-10-08.csv')
   })
 
+  it('names the fields as if the AI had named them', async () => {
+    useHandlers()
+
+    const response = await post(
+      inferDocumentStructureEndpoint.path,
+      documentStructureOrigins.jsonDocument,
+    )
+
+    expect(
+      inferDocumentStructureEndpoint.response.parse(await response.json()).fieldNamesNotice,
+    ).toBeNull()
+  })
+
+  it('names the fields without AI once the AI budget is used up', async () => {
+    server.use(...documentStructureHandlers(apiUrl, { fieldNamesNotice: 'aiBudgetExhausted' }))
+
+    const response = await post(
+      inferDocumentStructureEndpoint.path,
+      documentStructureOrigins.jsonDocument,
+    )
+
+    const inferred = inferDocumentStructureEndpoint.response.parse(await response.json())
+
+    expect(response.status).toBe(200)
+    expect(inferred.fieldNamesNotice).toEqual({
+      reason: 'aiBudgetExhausted',
+      message: 'AI budget used up for today; fields named without AI',
+    })
+    expect(inferred.children.length).toBeGreaterThan(0)
+  })
+
   it('answers 400 for a body outside the contract', async () => {
     useHandlers()
 

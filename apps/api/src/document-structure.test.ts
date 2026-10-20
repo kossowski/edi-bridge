@@ -14,7 +14,6 @@ import {
   documentStructureOrigins,
   findNode,
   inferDocumentStructureEndpoint,
-  inferredDocumentStructureSchema,
   toEncodedFile,
   type UpdateDocumentStructureBody,
   updateDocumentStructureEndpoint,
@@ -53,10 +52,19 @@ const inferred = async (body: DocumentStructureOrigin) => {
 
   expect(response.statusCode).toBe(200)
 
-  return inferredDocumentStructureSchema.parse(response.json())
+  return inferDocumentStructureEndpoint.response.parse(response.json())
 }
 
 describe('POST /document-structures/inference', () => {
+  it('names the fields without AI and says so', async () => {
+    const structure = await inferred(documentStructureOrigins.jsonDocument)
+
+    expect(structure.fieldNamesNotice).toEqual({
+      reason: 'aiUnavailable',
+      message: 'AI unavailable; fields named without AI',
+    })
+  })
+
   it('infers nesting and repetitions from a JSON sample Document', async () => {
     const structure = await inferred(documentStructureOrigins.jsonDocument)
 

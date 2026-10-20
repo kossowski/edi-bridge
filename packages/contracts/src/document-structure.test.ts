@@ -6,6 +6,8 @@ import {
   documentStructureProblemSchema,
   documentStructureSchema,
   documentStructureSummarySchema,
+  fieldNamesNotices,
+  inferDocumentStructureEndpoint,
   samplePreview,
   inferredDocumentStructureSchema,
   updateDocumentStructureBodySchema,
@@ -346,6 +348,43 @@ describe('inferredDocumentStructureSchema', () => {
         facts: { columnCount: 2, rowCount: 3 },
       }).success,
     ).toBe(false)
+  })
+})
+
+describe('inferDocumentStructureEndpoint', () => {
+  const inferred = {
+    ...purchaseOrder,
+    id: undefined,
+    name: undefined,
+    facts: { fieldCount: 2 },
+  }
+
+  it('says whether the AI named the fields', () => {
+    const named = { ...inferred, fieldNamesNotice: null }
+    const unnamed = { ...inferred, fieldNamesNotice: fieldNamesNotices.aiBudgetExhausted }
+
+    expect(inferDocumentStructureEndpoint.response.parse(named).fieldNamesNotice).toBeNull()
+    expect(inferDocumentStructureEndpoint.response.parse(unnamed).fieldNamesNotice).toEqual({
+      reason: 'aiBudgetExhausted',
+      message: 'AI budget used up for today; fields named without AI',
+    })
+  })
+
+  it('rejects an answer without the notice or with an unknown reason', () => {
+    const unknown = { ...inferred, fieldNamesNotice: { reason: 'tired', message: 'Later' } }
+
+    expect(inferDocumentStructureEndpoint.response.safeParse(inferred).success).toBe(false)
+    expect(inferDocumentStructureEndpoint.response.safeParse(unknown).success).toBe(false)
+  })
+
+  it('still checks the inferred structure', () => {
+    const wrongFacts = {
+      ...inferred,
+      facts: { columnCount: 2, rowCount: 3 },
+      fieldNamesNotice: null,
+    }
+
+    expect(inferDocumentStructureEndpoint.response.safeParse(wrongFacts).success).toBe(false)
   })
 })
 
