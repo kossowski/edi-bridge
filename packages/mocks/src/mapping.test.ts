@@ -797,6 +797,32 @@ describe('PUT /mappings/:id/draft', () => {
     })
   })
 
+  it.each([
+    ['rejects', [links[0]!]],
+    ['edits', [links[0]!, { ...links[1]!, sourcePath: 'BGM/1004' }]],
+  ])('closes the AI review once a save %s the last proposed part', async (_, saved) => {
+    const reviewing: MappingDraftRecord = {
+      ...hansemarktOrders,
+      links,
+      transforms: [],
+      transformLinks: [],
+      aiReview: {
+        sampleId: '00000008-0000-4000-8000-000000000001',
+        proposedLinks: ['buyer.gln'],
+        proposedTransforms: [],
+        proposedTransformLinks: [],
+      },
+    }
+
+    server.use(...mappingHandlers(apiUrl, { mappings: createMappingDraftStore([reviewing]) }))
+
+    const response = await saveDraft(reviewing.id, { links: saved })
+
+    expect(response.status).toBe(200)
+    expect(saveMappingDraftEndpoint.response.parse(await response.json()).aiReview).toBeNull()
+    expect((await getDraft(reviewing.id)).aiReview).toBeNull()
+  })
+
   it('saves a Draft without an AI review as one without', async () => {
     server.use(...mappingHandlers(apiUrl, { mappings: createMappingDraftStore() }))
 

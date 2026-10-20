@@ -80,6 +80,30 @@ async function getDraft(id: string) {
   return mappingDraftEndpoint.response.parse(await response.json())
 }
 
+function saveDraft(draft: MappingDraftRecord, links: MappingDraftRecord['links']) {
+  return fetch(`${apiUrl}${toPath(saveMappingDraftEndpoint.path, { id: draft.id })}`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      links,
+      transforms: draft.transforms,
+      transformLinks: draft.transformLinks,
+    }),
+  })
+}
+
+function inAiReview(draft: MappingDraftRecord): MappingDraftRecord {
+  return {
+    ...draft,
+    aiReview: {
+      sampleId: '00000008-0000-4000-8000-000000000001',
+      proposedLinks: [draft.links[0]!.targetPath],
+      proposedTransforms: [],
+      proposedTransformLinks: [],
+    },
+  }
+}
+
 const hasEarlierConfig = ({ transforms }: MappingDraftRecord) =>
   transforms.some(({ kind }) => kind === 'substring')
 
@@ -338,17 +362,7 @@ describe('POST /mappings/:mappingId/versions', () => {
   })
 
   it('answers 423 while the AI review of the Draft is open', async () => {
-    const draft = publishable.find(({ links }) => links.length > 0)!
-
-    const reviewing: MappingDraftRecord = {
-      ...draft,
-      aiReview: {
-        sampleId: '00000008-0000-4000-8000-000000000001',
-        proposedLinks: [draft.links[0]!.targetPath],
-        proposedTransforms: [],
-        proposedTransformLinks: [],
-      },
-    }
+    const reviewing = inAiReview(publishable.find(({ links }) => links.length > 0)!)
 
     server.use(
       ...mappingVersionHandlers(apiUrl, { mappings: createMappingDraftStore([reviewing]) }),
@@ -356,6 +370,19 @@ describe('POST /mappings/:mappingId/versions', () => {
 
     expect((await publish(reviewing.id)).status).toBe(aiReviewOpenStatus)
     expect(aiReviewOpenStatus).toBe(423)
+  })
+
+  it('publishes once a save rejects the last proposed part of the AI review', async () => {
+    const reviewing = inAiReview(publishable.find(({ links }) => links.length > 0)!)
+    const mappings = createMappingDraftStore([reviewing])
+
+    server.use(
+      ...mappingHandlers(apiUrl, { mappings }),
+      ...mappingVersionHandlers(apiUrl, { mappings }),
+    )
+
+    expect((await saveDraft(reviewing, reviewing.links.slice(1))).status).toBe(200)
+    expect((await publish(reviewing.id)).status).toBe(201)
   })
 
   it('answers 404 for an unknown Mapping', async () => {
@@ -520,20 +547,33 @@ describe('POST /mappings/:mappingId/versions/:versionId/restore', () => {
   })
 
   it('answers 423 while the AI review of the Draft is open', async () => {
-    const reviewing: MappingDraftRecord = {
-      ...published,
-      aiReview: {
-        sampleId: '00000008-0000-4000-8000-000000000001',
-        proposedLinks: [published.links[0]!.targetPath],
-        proposedTransforms: [],
-        proposedTransformLinks: [],
-      },
-    }
+    const reviewing = inAiReview(published)
 
     handlers(createMappingDraftStore([reviewing]))
     const [, older] = await listVersions(reviewing.id)
 
     expect((await restore(reviewing.id, older!.id)).status).toBe(aiReviewOpenStatus)
+  })
+
+  it('restores once a save edits the last proposed part of the AI review', async () => {
+    const reviewing = inAiReview(published)
+    const [proposed, other] = reviewing.links
+
+    handlers(createMappingDraftStore([reviewing]))
+    const [, older] = await listVersions(reviewing.id)
+
+    const edited = [{ ...proposed!, sourcePath: other!.sourcePath }, ...reviewing.links.slice(1)]
+
+    expect((await saveDraft(reviewing, edited)).status).toBe(200)
+    expect((await restore(reviewing.id, older!.id)).status).toBe(200)
+  })
+
+  it('answers 404 for an unknown version while the AI review of the Draft is open', async () => {
+    const reviewing = inAiReview(published)
+
+    handlers(createMappingDraftStore([reviewing]))
+
+    expect((await restore(reviewing.id, crypto.randomUUID())).status).toBe(404)
   })
 })
 
