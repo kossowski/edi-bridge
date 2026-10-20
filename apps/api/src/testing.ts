@@ -285,8 +285,10 @@ export const signInRequest = ({ email, password }: Credentials): InjectOptions =
 })
 
 export async function signIn(app: Client, credentials: Credentials): Promise<Client> {
-  const response = await app.inject(signInRequest(credentials))
+  return signedInClient(app, await app.inject(signInRequest(credentials)))
+}
 
+export function signedInClient(app: Client, response: LightMyRequestResponse): Client {
   if (response.statusCode !== 200) {
     throw new Error(`Sign-in failed with status ${response.statusCode}: ${response.body}`)
   }

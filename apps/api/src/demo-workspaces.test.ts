@@ -1,18 +1,28 @@
-import { count, eq } from 'drizzle-orm'
+import { and, count, eq } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import { secretBox } from '@edi-bridge/channels'
-import { sessionEndpoint, sessionSchema } from '@edi-bridge/contracts'
-import { runs, workspaces } from '@edi-bridge/db'
+import {
+  createTradingPartnerEndpoint,
+  operatorWorkspacesEndpoint,
+  sessionEndpoint,
+  sessionSchema,
+  showcaseSignInEndpoint,
+  signedInSchema,
+} from '@edi-bridge/contracts'
+import { members, runs, users, workspaces } from '@edi-bridge/db'
 
 import { ensureDemoWorkspaces, showcaseAdmin, showcaseViewer } from './demo-workspaces.js'
 import {
   type Client,
+  ownWorkspace,
   signIn,
   signInRequest,
+  signedInClient,
   startTestApi,
   type TestApi,
   testChannels,
+  webOrigin,
 } from './testing.js'
 
 let api: TestApi
@@ -25,8 +35,24 @@ const ensure = (password = vi.fn(() => adminPassword)) =>
     adminPassword: password,
   })
 
+const showcaseSignIn = (headers: Record<string, string> = { origin: webOrigin }) =>
+  api.app.inject({ method: 'POST', url: showcaseSignInEndpoint.path, headers })
+
 const sessionOf = async (client: Client) =>
   sessionSchema.parse((await client.inject({ method: 'GET', url: sessionEndpoint.path })).json())
+
+const viewerId = async () => {
+  const [viewer] = await api.connection.db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.email, showcaseViewer.email))
+
+  if (viewer === undefined) {
+    throw new Error('The showcase Viewer is missing')
+  }
+
+  return viewer.id
+}
 
 const runCount = async (kind: 'showcase' | 'sandbox') => {
   const [row] = await api.connection.db
@@ -44,6 +70,15 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await api.stop()
+})
+
+describe('POST /auth/sign-in/showcase before the demo Workspaces exist', () => {
+  it('answers 404 and creates no session', async () => {
+    const response = await showcaseSignIn()
+
+    expect(response.statusCode).toBe(404)
+    expect(response.cookies).toEqual([])
+  })
 })
 
 describe('api start', () => {
@@ -119,5 +154,100 @@ describe('ensureDemoWorkspaces', () => {
       (await api.app.inject(signInRequest({ email: showcaseAdmin.email, password: adminPassword })))
         .statusCode,
     ).toBe(200)
+  })
+})
+
+describe('POST /auth/sign-in/showcase', () => {
+  it('signs in the read-only Viewer of the Showcase', async () => {
+    const response = await showcaseSignIn()
+
+    expect(signedInSchema.parse(response.json()).user.email).toBe(showcaseViewer.email)
+    expect(await sessionOf(signedInClient(api.app, response))).toMatchObject({
+      user: { name: showcaseViewer.name, email: showcaseViewer.email },
+      operator: false,
+      workspace: { name: 'Lindenhof Feinkost GmbH', kind: 'showcase' },
+      role: 'viewer',
+    })
+  })
+
+  it('lets the Viewer change nothing', async () => {
+    const viewer = signedInClient(api.app, await showcaseSignIn())
+
+    const response = await viewer.inject({
+      method: 'POST',
+      url: createTradingPartnerEndpoint.path,
+      body: {
+        name: 'Demo Besucher GmbH',
+        gln: null,
+        characterSet: 'UNOC',
+        acknowledgementTimeLimitHours: 24,
+      },
+    })
+
+    expect(response.statusCode).toBe(403)
+  })
+
+  it('keeps the Operator routes closed to the Viewer', async () => {
+    const viewer = signedInClient(api.app, await showcaseSignIn())
+
+    expect(
+      (await viewer.inject({ method: 'GET', url: operatorWorkspacesEndpoint.path })).statusCode,
+    ).toBe(403)
+  })
+
+  it('refuses a request from a foreign origin', async () => {
+    const response = await showcaseSignIn({ origin: 'https://attacker.example' })
+
+    expect(response.statusCode).toBe(403)
+    expect(response.cookies).toEqual([])
+  })
+
+  it('refuses once the Viewer is also Member of another Workspace', async () => {
+    const userId = await viewerId()
+
+    await api.connection.db
+      .insert(members)
+      .values({ userId, workspaceId: ownWorkspace.id, role: 'viewer' })
+
+    try {
+      const response = await showcaseSignIn()
+
+      expect(response.statusCode).toBe(403)
+      expect(response.cookies).toEqual([])
+    } finally {
+      await api.connection.db
+        .delete(members)
+        .where(and(eq(members.userId, userId), eq(members.workspaceId, ownWorkspace.id)))
+    }
+  })
+
+  it('refuses once the Viewer holds a role above Viewer', async () => {
+    const userId = await viewerId()
+
+    await api.connection.db.update(members).set({ role: 'admin' }).where(eq(members.userId, userId))
+
+    try {
+      expect((await showcaseSignIn()).statusCode).toBe(403)
+    } finally {
+      await api.connection.db
+        .update(members)
+        .set({ role: 'viewer' })
+        .where(eq(members.userId, userId))
+    }
+  })
+
+  it('refuses once the Viewer is an Operator', async () => {
+    const userId = await viewerId()
+
+    await api.connection.db.update(users).set({ operator: true }).where(eq(users.id, userId))
+
+    try {
+      const response = await showcaseSignIn()
+
+      expect(response.statusCode).toBe(403)
+      expect(response.cookies).toEqual([])
+    } finally {
+      await api.connection.db.update(users).set({ operator: false }).where(eq(users.id, userId))
+    }
   })
 })

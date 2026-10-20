@@ -6,6 +6,8 @@ import type { FastifyInstance, FastifyRequest } from 'fastify'
 
 import { accounts, sessions, users, verifications } from '@edi-bridge/db'
 
+import { showcaseSignIn } from './showcase-sign-in.js'
+
 import type { Database } from './db.js'
 
 export interface AuthSettings {
@@ -29,6 +31,7 @@ function createAuth(database: Database, { secret, baseUrl, trustedOrigins }: Aut
     }),
     emailAndPassword: { enabled: true, disableSignUp: true },
     disabledPaths: ['/sign-up/email'],
+    plugins: [showcaseSignIn(database)],
     // better-auth skips the origin check under NODE_ENV=test; tests must meet the real check.
     advanced: { database: { generateId: 'uuid' }, disableOriginCheck: false },
     telemetry: { enabled: false },
