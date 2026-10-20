@@ -40,6 +40,43 @@ The command creates the Workspace if no Workspace has that name, and makes the u
 
 Running the command again is safe. An existing user keeps their password and roles; the command grants only a missing Operator or Admin role. To replace the password of an existing user, add `--reset-password`.
 
+## Create the Showcase and Sandbox
+
+**Open the demo** on the login screen signs visitors in to the Showcase Workspace. The API never creates it on start. Until the Operator runs the command below, **Open the demo** fails and `POST /api/auth/sign-in/showcase` answers 404.
+
+1. Open a terminal in the running API container, as in [Create the Operator](#create-the-operator).
+2. Run the command:
+
+   ```sh
+   node dist/create-demo-workspaces.js
+   ```
+
+3. Confirm that the output reports the Showcase Workspace, the Sandbox Workspace, the Viewer of the Showcase and the Admin of the Sandbox.
+4. If the output shows a password, store it in the secret manager now. The command shows it only once.
+
+The command creates two seeded Workspaces with fictional companies and their traffic:
+
+- The **Showcase Workspace** that visitors browse read-only. Its only Member is a fixed Viewer without a password. **Open the demo** signs the visitor in as this Viewer, and as nobody else.
+- The **Sandbox Workspace** where visitors may change anything. Its Admin is `showcase-admin@edi-bridge.example`, who is not an Operator.
+
+The command uses `DATABASE_URL` and `CHANNEL_SECRET_KEY` from the application's **Environment** settings. It also reads one optional variable:
+
+| Variable                  | Default                     | Description                                                                          |
+| ------------------------- | --------------------------- | ------------------------------------------------------------------------------------ |
+| `SHOWCASE_ADMIN_PASSWORD` | A generated random password | The password of the Sandbox Admin, at least 8 characters. Read only by this command. |
+
+To choose the password, set `SHOWCASE_ADMIN_PASSWORD` for this one command only. Do not add it to the application's **Environment** settings. Without it, the command generates a strong password and prints it once to its own output. The API never logs it.
+
+```sh
+SHOWCASE_ADMIN_PASSWORD='<password>' node dist/create-demo-workspaces.js
+```
+
+Running the command again is safe. It does not seed an existing Workspace again, and it never changes an existing role or password. It adds what is missing: a Workspace, a user, or the membership of the Viewer in the Showcase or of the Admin in the Sandbox. If the Viewer or the Sandbox Admin is an Operator or has any other membership, the command grants nothing and fails with a message that names the user. Remove those rights and run the command again.
+
+The seeded Channels of both Workspaces point at reserved hosts and never send. **Test connection** on one of them answers that it never sends.
+
+The Showcase sign-in refuses to sign anyone in once the Viewer gains any right beyond a Viewer of the Showcase, such as another Workspace, a higher role or the Operator role. Do not invite or promote the Viewer.
+
 ## Deploy a change
 
 Deploy changes through the GitHub integration:

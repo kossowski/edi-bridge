@@ -1,5 +1,5 @@
 import type {
-  ChannelTestFailureReason,
+  ChannelTestResultReason,
   DocumentStructure,
   Invite,
   Session,
@@ -383,7 +383,7 @@ export function createHandlers(
     invites?: ReadonlyArray<Invite>
     tradingPartners?: ReadonlyArray<TradingPartner>
     channels?: ReadonlyArray<ChannelRecord>
-    connectionFailures?: ReadonlyMap<string, ChannelTestFailureReason>
+    connectionFailures?: ReadonlyMap<string, ChannelTestResultReason>
     testInterchange?: TestInterchangeOptions
     mappingDrafts?: ReadonlyArray<MappingDraftRecord> | MappingDraftStore
     documentStructures?: ReadonlyArray<DocumentStructure> | DocumentStructureStore

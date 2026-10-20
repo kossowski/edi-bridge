@@ -392,12 +392,15 @@ export const testChannel = (id: string) =>
     const { secrets, apiPublicUrl } = yield* ChannelEnvironment
     const channel = toChannel(row, apiPublicUrl)
 
-    const reason = yield* handlingOf(channel.type)
-      .reach(channel, secretOf(secrets, row))
-      .pipe(
-        Effect.as(null),
-        Effect.catchTag('ChannelUnreachable', (error) => Effect.succeed(error.reason)),
-      )
+    // A seeded Channel points at a reserved host and never connects, not even for a test.
+    const reason = row.seeded
+      ? ('seededChannel' as const)
+      : yield* handlingOf(channel.type)
+          .reach(channel, secretOf(secrets, row))
+          .pipe(
+            Effect.as(null),
+            Effect.catchTag('ChannelUnreachable', (error) => Effect.succeed(error.reason)),
+          )
 
     const testedAt = new Date().toISOString()
 

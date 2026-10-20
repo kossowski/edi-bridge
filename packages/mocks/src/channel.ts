@@ -7,7 +7,7 @@ import {
   type ChannelInput,
   channelInputSchema,
   type ChannelKind,
-  type ChannelTestFailureReason,
+  type ChannelTestResultReason,
   type ChannelTestResult,
   channelKinds,
   channelSchema,
@@ -359,7 +359,7 @@ const rejectedLogin = seedChannels.find(
     type === 'sftp' && direction === 'outbound' && tradingPartnerId === awaitingContrl?.id,
 )
 
-export const seedConnectionFailures: ReadonlyMap<string, ChannelTestFailureReason> = new Map(
+export const seedConnectionFailures: ReadonlyMap<string, ChannelTestResultReason> = new Map(
   rejectedLogin ? [[rejectedLogin.id, 'loginRejected']] : [],
 )
 
@@ -379,7 +379,7 @@ export function channelHandlers(
   }: {
     channels?: ReadonlyArray<ChannelRecord> | ChannelStore
     flows?: Listing<FlowRecord>
-    connectionFailures?: ReadonlyMap<string, ChannelTestFailureReason>
+    connectionFailures?: ReadonlyMap<string, ChannelTestResultReason>
   } = {},
 ) {
   const store = toChannelStore(channels)

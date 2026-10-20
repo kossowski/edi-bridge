@@ -11,6 +11,8 @@ import { type Auth, headersOf } from './auth.js'
 import { type Database, Db } from './db.js'
 import { Forbidden } from './errors.js'
 import { exactlyOne } from './rows.js'
+import { showcaseViewer } from './showcase-and-sandbox.js'
+import { showcaseViewerRule } from './showcase-sign-in.js'
 
 export interface Member {
   readonly user: SessionUser
@@ -27,12 +29,25 @@ export interface SignedInUser {
 
 export class CurrentUser extends Context.Service<CurrentUser, SignedInUser>()('CurrentUser') {}
 
+// The shared Viewer's session lasts only while it gives no more than a read-only view of the Showcase.
+async function signedInSession(auth: Auth, database: Database, request: FastifyRequest) {
+  const signedIn = await auth.api.getSession({ headers: headersOf(request) })
+
+  if (signedIn?.user.email !== showcaseViewer.email) {
+    return signedIn
+  }
+
+  const rule = await showcaseViewerRule(database)
+
+  return rule.holds && rule.userId === signedIn.user.id ? signedIn : null
+}
+
 export async function resolveUser(
   auth: Auth,
   database: Database,
   request: FastifyRequest,
 ): Promise<SignedInUser | undefined> {
-  const signedIn = await auth.api.getSession({ headers: headersOf(request) })
+  const signedIn = await signedInSession(auth, database, request)
 
   if (!signedIn) {
     return undefined
@@ -67,7 +82,7 @@ export async function resolveMember(
   database: Database,
   request: FastifyRequest,
 ): Promise<Member | undefined> {
-  const signedIn = await auth.api.getSession({ headers: headersOf(request) })
+  const signedIn = await signedInSession(auth, database, request)
 
   if (!signedIn) {
     return undefined
