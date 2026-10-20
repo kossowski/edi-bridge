@@ -291,7 +291,7 @@ function ManualSubmissionFailure({ error, onRetry }: { error: Error; onRetry: ()
             ? t('undecodable.interchange')
             : t('undecodable.encoding', { encoding: encodingLabels[undecodable.encoding] })
         }>
-        <p className="break-words">{t('undecodable.details', { message: undecodable.message })}</p>
+        <p className="break-words">{t('undecodable.details', { reason: undecodable.reason })}</p>
       </FailureAlert>
     )
   }

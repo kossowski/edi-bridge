@@ -3831,7 +3831,7 @@
       "undecodable": {
         "encoding": "Die Datei ist kein gültiges {encoding}. Wählen Sie eine andere Kodierung, etwa Windows-1252 für eine typische deutsche CSV-Datei, und laden Sie sie erneut hoch.",
         "interchange": "Die Übertragung ist in dem Zeichensatz, den ihr Kopf nennt, nicht gültig. Bitten Sie den Partner, sie erneut zu senden.",
-        "details": "Details: {message}"
+        "details": "Details: {reason}"
       },
       "failed": "Die Datei konnte nicht hochgeladen werden. Versuchen Sie es erneut."
     },

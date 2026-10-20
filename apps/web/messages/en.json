@@ -3831,7 +3831,7 @@
       "undecodable": {
         "encoding": "The file is not valid {encoding}. Choose another encoding, such as Windows-1252 for a typical German CSV file, and upload it again.",
         "interchange": "The transmission is not valid in the character set its header names. Ask the partner to send it again.",
-        "details": "Details: {message}"
+        "details": "Details: {reason}"
       },
       "failed": "The file could not be uploaded. Try again."
     },

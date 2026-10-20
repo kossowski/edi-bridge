@@ -115,6 +115,13 @@ async function chooseEncoding(content: Awaited<ReturnType<typeof sheet>>, encodi
   await waitFor(() => expect(screen.queryByRole('listbox')).toBeNull())
 }
 
+// Upload stays disabled until the Channels load and the chosen file is read.
+async function clickUpload(content: Awaited<ReturnType<typeof sheet>>, name = 'Upload') {
+  const button = content.getByRole('button', { name })
+  await waitFor(() => expect(button).toBeEnabled())
+  await userEvent.click(button)
+}
+
 async function submitFile(file: File, channel?: string, encoding?: string) {
   const content = await sheet()
 
@@ -131,7 +138,7 @@ async function submitFile(file: File, channel?: string, encoding?: string) {
     await chooseEncoding(content, encoding)
   }
 
-  await userEvent.click(content.getByRole('button', { name: 'Upload' }))
+  await clickUpload(content)
 
   return content
 }
@@ -396,12 +403,12 @@ export const WrongEncoding = meta.story({
     await expect(alert).toHaveTextContent(
       'The file is not valid UTF-8. Choose another encoding, such as Windows-1252 for a typical German CSV file, and upload it again.',
     )
-    await expect(alert).toHaveTextContent(/Details: Byte \d+ \(0xE4\) is not valid utf-8/)
+    await expect(alert).toHaveTextContent(/Details: Byte \d+ \(0xE4\) is not valid utf-8$/)
     await expect(content.queryByRole('link', { name: 'Set up a document route' })).toBeNull()
 
     await chooseEncoding(content, 'Windows-1252')
     await expect(content.queryByRole('alert')).toBeNull()
-    await userEvent.click(content.getByRole('button', { name: 'Upload' }))
+    await clickUpload(content)
     await expect(await content.findByRole('heading', { name: '1 document created' })).toBeVisible()
   },
 })
@@ -415,7 +422,7 @@ export const UndecodableInterchange = meta.story({
     await expect(alert).toHaveTextContent(
       'The transmission is not valid in the character set its header names. Ask the partner to send it again.',
     )
-    await expect(alert).toHaveTextContent(/Details: .+/)
+    await expect(alert).toHaveTextContent(/Details: Byte \d+ \(0xE4\) is not valid in UNOA/)
     await expect(content.queryByRole('combobox', { name: encodingLabel })).toBeNull()
   },
 })
@@ -433,10 +440,35 @@ export const GermanWrongEncoding = meta.story({
     await expect(
       await content.findByRole('combobox', { name: 'Zeichenkodierung' }),
     ).toHaveTextContent('UTF-8')
-    await userEvent.click(content.getByRole('button', { name: 'Hochladen' }))
-    await expect(await content.findByRole('alert')).toHaveTextContent(
+    await clickUpload(content, 'Hochladen')
+
+    const alert = await content.findByRole('alert')
+
+    await expect(alert).toHaveTextContent(
       'Die Datei ist kein gültiges UTF-8. Wählen Sie eine andere Kodierung, etwa Windows-1252 für eine typische deutsche CSV-Datei, und laden Sie sie erneut hoch.',
     )
+    await expect(alert).toHaveTextContent(/Details: Byte \d+ \(0xE4\) is not valid utf-8$/)
+    await expect(alert).not.toHaveTextContent('Choose another encoding')
+  },
+})
+
+export const GermanUndecodableInterchange = meta.story({
+  args: { defaultChannelId: inbox.id },
+  decorators: [german],
+  async play() {
+    const content = await sheet('Beleg hochladen')
+
+    await loaded(content, 'Woher kommt der Beleg?')
+    await userEvent.upload(content.getByLabelText('Datei'), unoaInterchange)
+    await clickUpload(content, 'Hochladen')
+
+    const alert = await content.findByRole('alert')
+
+    await expect(alert).toHaveTextContent(
+      'Die Übertragung ist in dem Zeichensatz, den ihr Kopf nennt, nicht gültig. Bitten Sie den Partner, sie erneut zu senden.',
+    )
+    await expect(alert).toHaveTextContent(/Details: Byte \d+ \(0xE4\) is not valid in UNOA/)
+    await expect(content.queryByRole('combobox', { name: 'Zeichenkodierung' })).toBeNull()
   },
 })
 
@@ -517,7 +549,7 @@ export const German = meta.story({
     const content = await sheet('Beleg hochladen')
 
     await userEvent.upload(content.getByLabelText('Datei'), mixed)
-    await userEvent.click(content.getByRole('button', { name: 'Hochladen' }))
+    await clickUpload(content, 'Hochladen')
     await expect(await content.findByRole('heading', { name: '1 Beleg angelegt' })).toBeVisible()
     await expect(content.getByText('2 Teile der Datei wurden nicht verarbeitet')).toBeVisible()
     await userEvent.click(content.getByRole('button', { name: 'Fertig' }))
