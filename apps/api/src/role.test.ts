@@ -29,6 +29,7 @@ import {
   inferDocumentStructureEndpoint,
   lookupTableEndpoint,
   lookupTableImportPreviewEndpoint,
+  lookupTableMissingCodeHintsEndpoint,
   lookupTableMissingCodesEndpoint,
   lookupTableSuggestionsEndpoint,
   lookupTablesEndpoint,
@@ -368,6 +369,13 @@ const changes: Change[] = [
   [
     'suggest the first values of a Lookup Table',
     () => ({ method: 'GET', url: `${lookupTableSuggestionsEndpoint.path}?kind=units` }),
+  ],
+  [
+    'hint the missing codes of a Lookup Table',
+    () => ({
+      method: 'POST',
+      url: withId(lookupTableMissingCodeHintsEndpoint.path, ids.lookupTable),
+    }),
   ],
   [
     'create a Lookup Table',

@@ -5,11 +5,13 @@ import { z } from 'zod'
 
 import {
   lookupTableEndpoint,
+  lookupTableMissingCodeHintsEndpoint,
   lookupTableMissingCodesEndpoint,
   lookupTableSchema,
   lookupTablesEndpoint,
   lookupTableSummarySchema,
   manualSubmissionSchema,
+  missingCodeHintsNotices,
   reprocessRunEndpoint,
   runDetailSchema,
   submitDocumentEndpoint,
@@ -274,6 +276,36 @@ describe('the meanings of the missing codes', () => {
     expect(codes.find(({ code }) => code === 'KAR')).toMatchObject({
       meaning: null,
       suggestions: [],
+    })
+  })
+})
+
+describe('the hints for the missing codes without a model', () => {
+  it('gives what GET missing-codes gives and the notice that the AI is unavailable', async () => {
+    const id = workspace.lookupTableId
+    const query = { language: 'de' }
+
+    const response = await admin.inject({
+      method: lookupTableMissingCodeHintsEndpoint.method,
+      url: toPath(lookupTableMissingCodeHintsEndpoint.path, { id }),
+      query,
+    })
+
+    const listed = lookupTableMissingCodesEndpoint.response.parse(
+      (
+        await admin.inject({
+          method: 'GET',
+          url: toPath(lookupTableMissingCodesEndpoint.path, { id }),
+          query,
+        })
+      ).json(),
+    )
+
+    expect(response.statusCode, response.body).toBe(200)
+    expect(listed).not.toEqual([])
+    expect(lookupTableMissingCodeHintsEndpoint.response.parse(response.json())).toEqual({
+      hints: listed.map(({ code, meaning, suggestions }) => ({ code, meaning, suggestions })),
+      notice: missingCodeHintsNotices.aiUnavailable,
     })
   })
 })

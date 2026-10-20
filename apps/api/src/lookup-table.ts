@@ -121,6 +121,22 @@ export const loadLookupTableEntries = (ids: ReadonlyArray<string>) =>
     )
   })
 
+export const loadFirstLookupTableEntries = (id: string, limit: number) =>
+  Effect.gen(function* () {
+    const db = yield* Db
+    const workspace = yield* CurrentWorkspace
+
+    return yield* Effect.promise(() =>
+      db
+        .select(entryColumns)
+        .from(lookupTableEntries)
+        .innerJoin(lookupTables, eq(lookupTables.id, lookupTableEntries.lookupTableId))
+        .where(inWorkspace(lookupTables, workspace.id, eq(lookupTables.id, id)))
+        .orderBy(asc(lookupTableEntries.position))
+        .limit(limit),
+    )
+  })
+
 export const listLookupTables = Effect.gen(function* () {
   const db = yield* Db
   const workspace = yield* CurrentWorkspace
@@ -217,7 +233,7 @@ const withMeaning =
     }
   }
 
-export const listLookupTableMissingCodes = (id: string, language: Language) =>
+export const loadLookupTableMissingCodes = (id: string, language: Language) =>
   Effect.gen(function* () {
     const kind = yield* kindOfLookupTable(id)
 
@@ -225,8 +241,11 @@ export const listLookupTableMissingCodes = (id: string, language: Language) =>
     const workspace = yield* CurrentWorkspace
     const blockingOf = yield* Effect.promise(() => selectBlockingCodes(db, workspace.id, id))
 
-    return blockingOf(id).map(withMeaning(kind, language))
+    return { kind, missingCodes: blockingOf(id).map(withMeaning(kind, language)) }
   })
+
+export const listLookupTableMissingCodes = (id: string, language: Language) =>
+  Effect.map(loadLookupTableMissingCodes(id, language), ({ missingCodes }) => missingCodes)
 
 const tradingPartnerIdOf = (scope: LookupTableScopeInput) =>
   scope.kind === 'tradingPartner' ? scope.tradingPartnerId : null
