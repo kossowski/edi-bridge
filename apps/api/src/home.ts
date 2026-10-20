@@ -36,7 +36,7 @@ const windowOf = ({ window }: HomeQuery, now: number) => {
 
 type Window = ReturnType<typeof windowOf>
 
-const finished = (status: 'delivered' | 'failed') =>
+const countWithStatus = (status: 'delivered' | 'failed') =>
   sql<number>`count(*) filter (where ${runs.status} = ${status})`.mapWith(Number)
 
 const countFinishedRunsByBucket = (
@@ -51,7 +51,11 @@ const countFinishedRunsByBucket = (
 
   return (
     db
-      .select({ bucket, delivered: finished('delivered'), failed: finished('failed') })
+      .select({
+        bucket,
+        delivered: countWithStatus('delivered'),
+        failed: countWithStatus('failed'),
+      })
       .from(runs)
       .where(
         inWorkspace(
