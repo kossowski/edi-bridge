@@ -56,6 +56,8 @@ const seeded = {
   failedDesadv: '',
   reprocessedDesadv: '',
   waitingOrders: '',
+  notSentOrders: '',
+  notSentOrdersDocument: '',
   alpenfrischId: '',
 }
 
@@ -130,13 +132,6 @@ async function seedLifecycles(target: InvoiceWorkspace, db = api.connection.db) 
 
   const ordersDocument = await document('ORD1')
 
-  await db.insert(acknowledgements).values({
-    workspaceId: target.id,
-    documentId: ordersDocument.id,
-    tradingPartnerId: target.tradingPartnerId,
-    notSentReason: 'noOutboundChannel',
-  })
-
   const hanseOrders = await run({
     flowId: orders.id,
     documentId: ordersDocument.id,
@@ -153,13 +148,14 @@ async function seedLifecycles(target: InvoiceWorkspace, db = api.connection.db) 
     acknowledgementState: 'accepted',
   })
 
+  // Handed over before Acknowledgements were tracked, so it has no Acknowledgement.
   await run({
     flowId: target.flowId,
     businessReference: '4711',
     receivedAt: hoursAgo(80),
     handedOverAt: hoursAgo(80),
     controlReference: 8,
-    acknowledgementState: 'accepted',
+    acknowledgementState: null,
   })
 
   // A Duplicate is never mapped, so it has no Business Reference of its own.
@@ -199,6 +195,22 @@ async function seedLifecycles(target: InvoiceWorkspace, db = api.connection.db) 
     waitingForTradingPartnerSince: waitingSince,
   })
 
+  const notSentDocument = await document('ORD2')
+
+  await db.insert(acknowledgements).values({
+    workspaceId: target.id,
+    documentId: notSentDocument.id,
+    tradingPartnerId: target.tradingPartnerId,
+    notSentReason: 'noOutboundChannel',
+  })
+
+  const notSentOrders = await run({
+    flowId: orders.id,
+    documentId: notSentDocument.id,
+    businessReference: '4714',
+    receivedAt: hoursAgo(20),
+  })
+
   // A Message outside the Order Lifecycle keeps out of it.
   await run({
     flowId: (await flowOf('CONTRL')).id,
@@ -214,6 +226,8 @@ async function seedLifecycles(target: InvoiceWorkspace, db = api.connection.db) 
     failedDesadv: failedDesadv.id,
     reprocessedDesadv: reprocessedDesadv.id,
     waitingOrders: waitingOrders.id,
+    notSentOrders: notSentOrders.id,
+    notSentOrdersDocument: notSentDocument.id,
     alpenfrischId: alpenfrisch.id,
   }
 }
@@ -261,7 +275,7 @@ const lifecycleKeys = (list: Awaited<ReturnType<typeof listed>>) =>
 
 const allStatuses = {
   'on-track': 1,
-  'needs-attention': 1,
+  'needs-attention': 2,
   'waiting-for-trading-partner': 1,
   done: 1,
 }
@@ -271,19 +285,22 @@ describe('GET /order-lifecycles', () => {
     const list = await listed()
 
     expect(lifecycleKeys(list)).toEqual([
+      '4714 Hanse Retail',
       '4713 Hanse Retail',
       '4712 Hanse Retail',
       '4711 Alpenfrisch Märkte AG',
       '4711 Hanse Retail',
     ])
-    expect(list).toMatchObject({ statusCounts: allStatuses, total: 4, page: 1, pageSize: 50 })
+    expect(list).toMatchObject({ statusCounts: allStatuses, total: 5, page: 1, pageSize: 50 })
     expect(list.orderLifecycles.map(({ status }) => status)).toEqual([
+      'needs-attention',
       'waiting-for-trading-partner',
       'needs-attention',
       'on-track',
       'done',
     ])
-    expect(list.orderLifecycles[3]).toEqual({
+    // Its INVOIC was handed over before Acknowledgements were tracked and counts as accepted.
+    expect(list.orderLifecycles[4]).toEqual({
       businessReference: '4711',
       tradingPartner: { id: workspace.tradingPartnerId, name: 'Hanse Retail' },
       status: 'done',
@@ -304,11 +321,32 @@ describe('GET /order-lifecycles', () => {
     expect(list).toMatchObject({ statusCounts: allStatuses, total: 2 })
   })
 
+  it('lists an Order Lifecycle whose CONTRL to a received Interchange was not sent as needing attention', async () => {
+    const list = await listed('status=needs-attention')
+
+    expect(lifecycleKeys(list)).toEqual(['4714 Hanse Retail', '4712 Hanse Retail'])
+    expect(list).toMatchObject({ statusCounts: allStatuses, total: 2 })
+    expect(list.orderLifecycles[0]).toMatchObject({
+      status: 'needs-attention',
+      steps: [
+        { messageType: 'ORDERS', state: 'needs-attention' },
+        { messageType: 'DESADV', state: 'open' },
+        { messageType: 'INVOIC', state: 'open' },
+      ],
+    })
+  })
+
   it.each([
     [
       'an order number',
       '471',
-      ['4713 Hanse Retail', '4712 Hanse Retail', '4711 Alpenfrisch Märkte AG', '4711 Hanse Retail'],
+      [
+        '4714 Hanse Retail',
+        '4713 Hanse Retail',
+        '4712 Hanse Retail',
+        '4711 Alpenfrisch Märkte AG',
+        '4711 Hanse Retail',
+      ],
     ],
     ['part of a Trading Partner name', 'ALPEN', ['4711 Alpenfrisch Märkte AG']],
   ])('searches by %s and counts the matches', async (_, q, expected) => {
@@ -332,8 +370,8 @@ describe('GET /order-lifecycles', () => {
   it('answers one page of the Order Lifecycles', async () => {
     const list = await listed('page=2&pageSize=3')
 
-    expect(lifecycleKeys(list)).toEqual(['4711 Hanse Retail'])
-    expect(list).toMatchObject({ total: 4, page: 2, pageSize: 3 })
+    expect(lifecycleKeys(list)).toEqual(['4711 Alpenfrisch Märkte AG', '4711 Hanse Retail'])
+    expect(list).toMatchObject({ total: 5, page: 2, pageSize: 3 })
   })
 
   it('lists nothing of another Workspace', async () => {
@@ -408,7 +446,16 @@ describe('GET /order-lifecycles/:businessReference', () => {
     })
   })
 
-  it('shows why the CONTRL to a received Interchange was not sent', async () => {
+  it('shows a sent Interchange without an Acknowledgement', async () => {
+    const [, hanse] = await loaded('4711')
+
+    expect(hanse?.messages[2]?.interchange).toMatchObject({
+      controlReference: '8',
+      acknowledgement: null,
+    })
+  })
+
+  it('shows a received Interchange without a not-sent reason', async () => {
     const [, hanse] = await loaded('4711')
 
     expect(hanse?.messages[0]).toMatchObject({
@@ -417,6 +464,21 @@ describe('GET /order-lifecycles/:businessReference', () => {
       interchange: {
         id: seeded.hanseOrdersDocument,
         controlReference: 'ORD1',
+        acknowledgement: null,
+        notSentReason: null,
+      },
+    })
+  })
+
+  it('shows why the CONTRL to a received Interchange was not sent', async () => {
+    const [lifecycle] = await loaded('4714')
+
+    expect(lifecycle?.messages[0]).toMatchObject({
+      direction: 'inbound',
+      run: { id: seeded.notSentOrders },
+      interchange: {
+        id: seeded.notSentOrdersDocument,
+        controlReference: 'ORD2',
         acknowledgement: null,
         notSentReason: 'noOutboundChannel',
       },
