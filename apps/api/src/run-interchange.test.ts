@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm'
 import { Effect } from 'effect'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { z } from 'zod'
 
 import { DeliveryFailed } from '@edi-bridge/channels'
 import {
@@ -18,7 +19,7 @@ import {
   webhookTokenHeader,
 } from '@edi-bridge/contracts'
 import { runs } from '@edi-bridge/db'
-import { type DeliveryService, processRun } from '@edi-bridge/pipeline'
+import { type DeliveryService, deliveryInputSchema, processRun } from '@edi-bridge/pipeline'
 import {
   addOrdersFlow,
   golden,
@@ -218,13 +219,13 @@ describe('an outbound Run', () => {
   const unreachable: DeliveryService = () =>
     Effect.fail(new DeliveryFailed({ reason: 'hostUnreachable' }))
 
-  const submitted = async (delivery: DeliveryService) => {
+  const submitted = async (delivery: DeliveryService, content = goldenInvoice) => {
     const response = await admin.inject({
       method: submitDocumentEndpoint.method,
       url: submitDocumentEndpoint.path,
       body: {
         channelId: workspace.inboundChannelId,
-        document: submittedDocument('invoice.json', goldenInvoice),
+        document: submittedDocument('invoice.json', content),
       },
     })
 
@@ -249,5 +250,89 @@ describe('an outbound Run', () => {
       interchange: { id: runId, raw: unbSegment },
     })
     expect(run.message).toMatchObject({ messageType: 'INVOIC' })
+  })
+  const invoiceNumber = 'INV-'.repeat(10)
+
+  const invalidInvoice = JSON.stringify({
+    ...z.looseObject({}).parse(JSON.parse(goldenInvoice)),
+    invoiceNumber,
+  })
+
+  const deliveryInputOf = async (runId: string) => {
+    const [run] = await api.connection.db
+      .select({ deliveryInput: runs.deliveryInput })
+      .from(runs)
+      .where(eq(runs.id, runId))
+
+    return deliveryInputSchema.parse(run?.deliveryInput)
+  }
+
+  // The Message the pipeline builds for the invalid invoice: the golden one with its long BGM number.
+  const builtInvalidMessage = async () => {
+    const message = await deliveryInputOf(await submitted(unreachable))
+
+    return {
+      ...message,
+      segments: message.segments.map((segment) =>
+        segment.tag === 'BGM'
+          ? { ...segment, elements: segment.elements.with(1, [invoiceNumber]) }
+          : segment,
+      ),
+    }
+  }
+
+  it('shows the Message it built at the failing position when validation failed', async () => {
+    const message = await builtInvalidMessage()
+    const runId = await submitted(unreachable, invalidInvoice)
+
+    await api.connection.db.update(runs).set({ deliveryInput: message }).where(eq(runs.id, runId))
+
+    const run = await detail(runId)
+    const position = run.error?.position
+
+    expect(run).toMatchObject({
+      status: 'failed',
+      failureStage: 'validation',
+      interchange: null,
+      error: { code: 'too-long-element', position: { segment: 2, tag: 'BGM', element: 2 } },
+    })
+    expect(run.message).toMatchObject({ reference: message.header.elements[0]?.[0] })
+    expect(run.message?.segments[0]).toMatchObject({ tag: 'UNH', name: 'Message header' })
+    expect(run.message?.segments[(position?.segment ?? 0) - 1]).toEqual({
+      tag: 'BGM',
+      name: 'Beginning of message',
+      elements: [['380'], [invoiceNumber], ['9']],
+    })
+    expect(run.message?.segments).toHaveLength(message.segments.length + 2)
+  })
+
+  it('shows the Message it built when delivery failed before the Interchange was built', async () => {
+    const runId = await submitted(unreachable)
+    const message = await deliveryInputOf(runId)
+
+    // A delivery that fails before the envelope, for a missing GLN, stores no Interchange.
+    await api.connection.db.update(runs).set({ output: null }).where(eq(runs.id, runId))
+
+    const run = await detail(runId)
+
+    expect(run).toMatchObject({ status: 'failed', failureStage: 'delivery', interchange: null })
+    expect(run.message).toMatchObject({ messageType: 'INVOIC' })
+    expect(run.message?.segments.map(({ tag }) => tag)).toEqual([
+      message.header.tag,
+      ...message.segments.map(({ tag }) => tag),
+      message.trailer.tag,
+    ])
+  })
+
+  it('has no Message when mapping failed, and its error says why', async () => {
+    const runId = await submitted(unreachable, 'not json')
+
+    await expect(detail(runId)).resolves.toMatchObject({
+      status: 'failed',
+      failureStage: 'mapping',
+      interchange: null,
+      message: null,
+      error: { message: expect.any(String) },
+    })
   })
 })

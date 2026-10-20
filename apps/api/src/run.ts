@@ -33,12 +33,13 @@ import {
   whoFixes,
 } from '@edi-bridge/contracts'
 import { documents, flows, mappingVersions, runs, runSteps, tradingPartners } from '@edi-bridge/db'
-import { isBrokenMessage, readInterchange } from '@edi-bridge/edifact'
+import { isBrokenMessage, type Message, readInterchange } from '@edi-bridge/edifact'
 import {
   interchangeFields,
   interchangeOf,
   isFixedByReprocess,
   Database as PipelineDatabase,
+  deliveryInputSchema,
   publishRunChanges,
   reprocessRun as reprocessInPipeline,
   retryRun as retryDelivery,
@@ -261,6 +262,7 @@ export const loadRun = (id: string) =>
         documentDeletedAt: runs.documentDeletedAt,
         messageIndex: runs.messageIndex,
         output: runs.output,
+        deliveryInput: runs.deliveryInput,
         content: documents.content,
         bytes: documents.bytes,
         testIndicator: documents.testIndicator,
@@ -281,17 +283,23 @@ export const loadRun = (id: string) =>
       ]),
     )
 
-    return toDetail(row, {
-      steps: steps.map((step) => ({
-        stage: step.stage,
-        status: step.status,
-        startedAt: step.startedAt?.toISOString() ?? null,
-        finishedAt: step.finishedAt?.toISOString() ?? null,
-      })),
-      mappingVersion: version ? toHeader(version) : null,
-      replaces: row.replacesRunId === null ? null : { id: row.replacesRunId },
-      replacedBy: replacedBy ?? null,
-    })
+    // The pipeline stored the delivery input itself, so one that breaks its schema is a defect.
+    const deliveryInput = deliveryInputSchema.nullable().parse(row.deliveryInput)
+
+    return toDetail(
+      { ...row, deliveryInput },
+      {
+        steps: steps.map((step) => ({
+          stage: step.stage,
+          status: step.status,
+          startedAt: step.startedAt?.toISOString() ?? null,
+          finishedAt: step.finishedAt?.toISOString() ?? null,
+        })),
+        mappingVersion: version ? toHeader(version) : null,
+        replaces: row.replacesRunId === null ? null : { id: row.replacesRunId },
+        replacedBy: replacedBy ?? null,
+      },
+    )
   })
 
 type DetailRow = SummaryRow & {
@@ -301,6 +309,7 @@ type DetailRow = SummaryRow & {
   documentDeletedAt: Date | null
   messageIndex: number | null
   output: string | null
+  deliveryInput: Message | null
   content: string | null
   bytes: Buffer | null
   testIndicator: boolean | null
@@ -313,6 +322,20 @@ const rawOfDetail = (row: DetailRow) =>
       ? null
       : readableTextOf({ ...row, id: row.documentId })
 
+const toParsedMessage = (
+  { header, segments, trailer }: Message,
+  reference: string,
+  messageType: MessageType,
+): ParsedMessage => ({
+  reference,
+  messageType,
+  segments: [header, ...segments, trailer].map(({ tag, elements }) => ({
+    tag,
+    name: segmentDefinition(tag)?.name.en ?? null,
+    elements,
+  })),
+})
+
 const parsedMessageOf = (
   raw: string,
   messageType: MessageType,
@@ -320,21 +343,26 @@ const parsedMessageOf = (
 ): ParsedMessage | null => {
   const found = messageAt(readInterchange(raw).messages, messageIndex)
 
-  if (found === null || isBrokenMessage(found.message)) {
-    return null
+  return found === null || isBrokenMessage(found.message)
+    ? null
+    : toParsedMessage(found.message, found.reference, messageType)
+}
+
+// An outbound Run that failed before its Interchange was built keeps only the Message it built.
+const builtMessageOf = (built: Message, messageType: MessageType): ParsedMessage | null => {
+  const reference = built.header.elements[0]?.[0]
+
+  return reference ? toParsedMessage(built, reference, messageType) : null
+}
+
+const messageOfDetail = (row: DetailRow, raw: string | null, messageType: MessageType) => {
+  if (raw) {
+    return parsedMessageOf(raw, messageType, row.messageIndex)
   }
 
-  const { message: read, reference } = found
-
-  return {
-    reference,
-    messageType,
-    segments: [read.header, ...read.segments, read.trailer].map(({ tag, elements }) => ({
-      tag,
-      name: segmentDefinition(tag)?.name.en ?? null,
-      elements,
-    })),
-  }
+  return directionOf(row) === 'outbound' && row.deliveryInput !== null
+    ? builtMessageOf(row.deliveryInput, messageType)
+    : null
 }
 
 const parsedStageOf = { inbound: 'parse', outbound: 'mapping' } as const
@@ -354,7 +382,7 @@ const toDetail = (
     ...summary,
     ...loaded,
     interchange: summary.interchange && raw ? { ...summary.interchange, raw } : null,
-    message: raw && parsed ? parsedMessageOf(raw, summary.messageType, row.messageIndex) : null,
+    message: parsed ? messageOfDetail(row, raw, summary.messageType) : null,
     documentDeletedAt: row.documentDeletedAt?.toISOString() ?? null,
     testIndicator: row.documentDeletedAt === null ? row.testIndicator : null,
   }

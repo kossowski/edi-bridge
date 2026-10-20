@@ -284,7 +284,6 @@ describe('GET /runs/:id', () => {
       waitingForTradingPartnerSince: null,
       // Validation stopped the Run before it had an Interchange to hand over.
       interchange: null,
-      message: null,
     })
     expect(run.steps.map(({ status }) => status)).toEqual([
       'succeeded',

@@ -13,7 +13,6 @@ import {
 } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import { Data, DateTime, Effect, Match, Predicate, Ref, Result } from 'effect'
-import { z } from 'zod'
 
 import {
   type AcknowledgementState,
@@ -82,6 +81,7 @@ import type { ParseError } from '@edi-bridge/edifact'
 
 import { referencesOf } from './business-reference'
 import { decodeDocument, type DocumentUndecodable } from './decode-document'
+import { deliveryInputSchema } from './delivery-input'
 import { enveloped, framed } from './envelope'
 import { publishRunChanges } from './live-events'
 import { parse } from './parse'
@@ -674,14 +674,6 @@ const handOver = (
     )
   })
 
-const segmentSchema = z.object({ tag: z.string(), elements: z.array(z.array(z.string())) })
-
-const messageSchema = z.object({
-  header: segmentSchema,
-  segments: z.array(segmentSchema),
-  trailer: segmentSchema,
-})
-
 // The Interchange is built once, at its first successful envelope; a Retry delivers it again.
 const buildInterchange = (
   queued: QueuedRun,
@@ -693,7 +685,7 @@ const buildInterchange = (
     const db = yield* Database
     const { characterSet, testMode } = tradingPartner
     // The pipeline stored the delivery input itself, so one that breaks its schema is a defect.
-    const message = yield* Effect.orDie(parse(messageSchema, run.deliveryInput))
+    const message = yield* Effect.orDie(parse(deliveryInputSchema, run.deliveryInput))
 
     if (workspace.gln === null) {
       return yield* new GlnMissing({ party: 'workspace' })

@@ -8,6 +8,8 @@ export { type DecodedDocument, decodeDocument, DocumentUndecodable } from './dec
 
 export { deleteExpiredDocuments } from './delete-expired-documents'
 
+export { deliveryInputSchema } from './delivery-input'
+
 export { enveloped } from './envelope'
 
 export { stagesOf } from './stages'
