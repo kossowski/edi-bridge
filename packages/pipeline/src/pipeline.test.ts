@@ -3975,6 +3975,15 @@ describe('the CONTRL answering a received Interchange', () => {
     }
   }
 
+  // The bytes of the text read as ISO 8859-1 are not valid in the UTF-8 the UNB names.
+  const undecodableInterchange = (text: string) => {
+    const decoded = decodeDocument(Buffer.from(text.replace('UNOC:3', 'UNOW:3'), 'latin1'))
+
+    assert('undecodable' in decoded, 'The Interchange decoded in UTF-8')
+
+    return decoded
+  }
+
   const acknowledgementOf = async (documentId: string) => {
     const [row] = await connection.db
       .select()
@@ -4354,14 +4363,12 @@ describe('the CONTRL answering a received Interchange', () => {
       })
     })
 
-    it('names the header of an Interchange not valid in its character set', async () => {
+    it('names the header of an Interchange whose recipient is not valid in its character set', async () => {
       const into = await answeringWorkspace('Mis-encoded Orders')
 
-      const decoded = decodeDocument(
-        Buffer.from(interchangeOf([ordersMessage]).replace('UNOC:3', 'UNOW:3'), 'latin1'),
+      const decoded = undecodableInterchange(
+        interchangeOf([ordersMessage]).replace('4389876511114:14', '438987651111\u00e4:14'),
       )
-
-      assert('undecodable' in decoded, 'The Interchange decoded in UTF-8')
 
       const { acknowledgement, logs } = await recordedFor(into, decoded)
 
@@ -4390,6 +4397,43 @@ describe('the CONTRL answering a received Interchange', () => {
         },
       })
     })
+  })
+
+  it('rejects an Interchange not valid in its character set in a CONTRL sent', async () => {
+    const into = await answeringWorkspace('Mis-encoded Order Lines')
+    const delivery = recordingDelivery()
+    const misEncoded = ordersMessage.map((line) => line.replace('+128576+', '+1285\u00e476+'))
+
+    const { exit } = await receivingContent(
+      into,
+      undecodableInterchange(interchangeOf([misEncoded])),
+    )
+    await sendWith(delivery.service)
+
+    expect(delivery.to(into.outboundChannelId).map(({ content }) => content)).toEqual([
+      "UNB+UNOC:3+4389876511114:14+4071615111111:14+YYMMDD:HHMM+1'" +
+        "UNH+1+CONTRL:D:3:UN:EAN002'" +
+        "UCI+00000001+4071615111111:14+4389876511114:14+4+21'" +
+        "UNT+3+1'" +
+        "UNZ+1+1'",
+    ])
+    await expect(acknowledgementOf(documentIdOf(exit))).resolves.toMatchObject({
+      notSentReason: null,
+    })
+  })
+
+  it('answers no Interchange not valid in its character set whose UNB cannot be read', async () => {
+    const into = await answeringWorkspace('Mis-encoded Headless Orders')
+    const misEncoded = ordersMessage.map((line) => line.replace('+128576+', '+1285\u00e476+'))
+
+    const { exit } = await receivingContent(
+      into,
+      undecodableInterchange(
+        interchangeOf([misEncoded]).replace("+00000001'", "'").replace("UNZ+1+00000001'", "UNZ+1'"),
+      ),
+    )
+
+    await expect(acknowledgementOf(documentIdOf(exit))).resolves.toBeUndefined()
   })
 
   it('rejects an Interchange whose envelope is broken in a CONTRL sent', async () => {

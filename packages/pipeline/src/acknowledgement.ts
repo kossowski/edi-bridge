@@ -17,6 +17,7 @@ import {
   buildContrl,
   BuildContrlError,
   type BuildContrlErrorCode,
+  type CharacterSetError,
   type Message,
   readInterchange,
 } from '@edi-bridge/edifact'
@@ -46,9 +47,9 @@ const notSentMessages: Record<NotSentReason, string> = {
   seededChannel: 'a seeded Channel never sends',
 }
 
-const builtContrl = (content: string) =>
+const builtContrl = (content: string, invalidCharacter: CharacterSetError | undefined) =>
   Effect.try({
-    try: () => buildContrl(content, '1'),
+    try: () => buildContrl(content, '1', { invalidCharacter }),
     catch: (cause) => {
       if (cause instanceof BuildContrlError) {
         return new ContrlNotBuilt({ code: cause.code })
@@ -116,7 +117,7 @@ const answerOf = (
   undecodable: DocumentUndecodable | undefined,
 ) =>
   Effect.gen(function* () {
-    const built = yield* Effect.result(builtContrl(content))
+    const built = yield* Effect.result(builtContrl(content, undecodable?.characterSetError))
 
     if (Result.isFailure(built) && built.failure.code === 'unreadable-interchange-header') {
       return undefined
@@ -154,8 +155,7 @@ const answerOf = (
 
     const { tradingPartnerId, testMode, workspaceGln } = found
     const { channelId, notSentReason } = yield* channelOf(workspaceId, tradingPartnerId, documentId)
-    // An Acknowledgement echoing U+FFFD in place of the invalid bytes could accept what the sender broke.
-    const message = Result.isSuccess(built) && undecodable === undefined ? built.success : null
+    const message = Result.isSuccess(built) ? built.success : null
 
     return {
       tradingPartnerId,
@@ -220,6 +220,15 @@ const recordAnswer = (
     )
   })
 
+// The UNB of an Interchange not valid in its character set fails to echo at the invalid byte.
+const notSentMessageOf = (
+  notSentReason: NotSentReason,
+  undecodable: DocumentUndecodable | undefined,
+) =>
+  notSentReason === 'unechoableInterchangeHeader' && undecodable !== undefined
+    ? undecodable.message
+    : notSentMessages[notSentReason]
+
 const warnNotSent = (
   documentId: string,
   { notSentReason }: Answer,
@@ -228,7 +237,7 @@ const warnNotSent = (
   notSentReason === null
     ? Effect.void
     : Effect.logWarning(
-        `The CONTRL for Document ${documentId} is not sent: ${undecodable?.message ?? notSentMessages[notSentReason]}`,
+        `The CONTRL for Document ${documentId} is not sent: ${notSentMessageOf(notSentReason, undecodable)}`,
       )
 
 // The receipt does not depend on the CONTRL, so a defect in it leaves the Document unanswered.
