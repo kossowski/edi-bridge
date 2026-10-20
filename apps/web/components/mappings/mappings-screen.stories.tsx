@@ -7,7 +7,12 @@ import { viewerStory } from '@/components/session/session-story-helpers'
 import { darkMode, german, mobile } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import { createMappingEndpoint } from '@edi-bridge/contracts'
-import { createHandlers, createMappingsWithTraffic, mappingHandlers } from '@edi-bridge/mocks'
+import {
+  createHandlers,
+  createMappingsWithTraffic,
+  mappingHandlers,
+  seedMappings,
+} from '@edi-bridge/mocks'
 
 import preview from '../../.storybook/preview'
 
@@ -48,6 +53,11 @@ const choices = ['Purchase orders you receive', 'Dispatch advices you send', 'In
 
 const createUrl = `${apiUrl}${createMappingEndpoint.path}`
 
+// SAFETY: the seed holds one Mapping under this name, the one shared by two partners.
+const sharedMappingId = seedMappings.find(
+  ({ versions }) => versions[0]?.mappingName === 'ERP JSON to DESADV',
+)!.mappingId
+
 const stateOrder = ['Documents failed', 'Draft not published', 'Never published', 'Running fine']
 
 export const Default = meta.story({
@@ -70,7 +80,13 @@ export const Default = meta.story({
 
     await expect(dataFormat).toBeVisible()
     await expect(dataFormat).toHaveTextContent('Your data format: ERP dispatch advice')
-    await expect(shared.getByRole('link', { name: 'See what failed' })).toBeVisible()
+    const seeWhatFailed = shared.getByRole('link', { name: 'See what failed' })
+
+    await expect(seeWhatFailed).toBeVisible()
+    await expect(seeWhatFailed).toHaveAttribute(
+      'href',
+      `/documents?status=attention&mapping=${sharedMappingId}`,
+    )
 
     const neverPublished = card(goingOut.getByRole('link', { name: 'Invoices' }))
 

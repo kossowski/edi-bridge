@@ -13,6 +13,8 @@ import {
 
 const partnerId = '0b9f8f5e-3c1a-4d4e-9a57-1f2e3d4c5b6a'
 
+const mappingId = '7c2d1e0f-9a8b-4c7d-8e6f-5a4b3c2d1e0f'
+
 describe('parseDocumentFilters', () => {
   it('starts at the documents that need attention', () => {
     expect(parseDocumentFilters(new URLSearchParams())).toEqual(emptyDocumentFilters)
@@ -36,8 +38,19 @@ describe('parseDocumentFilters', () => {
       q: 'PO1',
       tradingPartnerId: partnerId,
       messageType: 'INVOIC',
+      mappingId: '',
       page: 3,
     })
+  })
+
+  it('reads the Mapping in the documents view only', () => {
+    expect(parseDocumentFilters(new URLSearchParams({ mapping: mappingId })).mappingId).toBe(
+      mappingId,
+    )
+    expect(
+      parseDocumentFilters(new URLSearchParams({ view: 'transmissions', mapping: mappingId }))
+        .mappingId,
+    ).toBe('')
   })
 
   it('ignores values the list cannot show', () => {
@@ -48,6 +61,7 @@ describe('parseDocumentFilters', () => {
           status: 'failed',
           partner: 'acme',
           type: 'ORDRSP',
+          mapping: 'orders',
           page: '0',
         }),
       ),
@@ -72,6 +86,15 @@ describe('documentFiltersSearch', () => {
     ).toBe('view=transmissions&status=done')
   })
 
+  it('writes the Mapping in the documents view only', () => {
+    expect(documentFiltersSearch({ ...emptyDocumentFilters, mappingId })).toBe(
+      `status=attention&mapping=${mappingId}`,
+    )
+    expect(
+      documentFiltersSearch({ ...emptyDocumentFilters, view: 'transmissions', mappingId }),
+    ).toBe('view=transmissions')
+  })
+
   it('round-trips through parseDocumentFilters', () => {
     const filters = {
       view: 'transmissions',
@@ -79,6 +102,7 @@ describe('documentFiltersSearch', () => {
       q: 'Hanse',
       tradingPartnerId: partnerId,
       messageType: 'ORDERS',
+      mappingId: '',
       page: 4,
     } as const
 
@@ -94,13 +118,20 @@ describe('documentsHref', () => {
       `/documents?status=all&partner=${partnerId}`,
     )
   })
+
+  it('links to the documents of one Mapping that need attention', () => {
+    expect(documentsHref({ status: 'attention', mappingId })).toBe(
+      `/documents?status=attention&mapping=${mappingId}`,
+    )
+  })
 })
 
 describe('hasSearchFilters', () => {
-  it('counts search, partner and document type but not the status group', () => {
+  it('counts search, partner, document type and Mapping but not the status group', () => {
     expect(hasSearchFilters({ ...emptyDocumentFilters, status: 'done' })).toBe(false)
     expect(hasSearchFilters({ ...emptyDocumentFilters, q: 'PO' })).toBe(true)
     expect(hasSearchFilters({ ...emptyDocumentFilters, messageType: 'DESADV' })).toBe(true)
+    expect(hasSearchFilters({ ...emptyDocumentFilters, mappingId })).toBe(true)
   })
 })
 
@@ -121,12 +152,14 @@ describe('toRunListQuery', () => {
         q: ' PO1 ',
         tradingPartnerId: partnerId,
         messageType: 'INVOIC',
+        mappingId,
         page: 2,
       }),
     ).toEqual({
       status: ['delivered', 'duplicate'],
       tradingPartnerId: [partnerId],
       messageType: ['INVOIC'],
+      mappingId: [mappingId],
       q: 'PO1',
       page: 2,
       pageSize: 50,
@@ -143,6 +176,7 @@ describe('toInterchangeListQuery', () => {
         status: 'done',
         q: ' 00123 ',
         messageType: 'ORDERS',
+        mappingId,
       }),
     ).toEqual({
       tradingPartnerId: undefined,
