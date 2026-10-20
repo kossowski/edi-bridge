@@ -1,10 +1,11 @@
 import { en, Faker } from '@faker-js/faker'
 import { http, HttpResponse } from 'msw'
 
-import { liveEventsEndpoint, type RunSummary } from '@edi-bridge/contracts'
+import { liveEventsEndpoint, type RunSummary, type TradingPartner } from '@edi-bridge/contracts'
 
 import { eventFrame, eventStreamHeaders, eventStreamOpened } from './event-stream'
-import { generateRun, pickFailureStage, seedRuns, toRunSummary } from './run'
+import { type LiveEventBus } from './live-event-bus'
+import { createRun, generateRun, pickFailureStage, seedRuns, toRunSummary } from './run'
 import { type RunStore, toRunStore } from './run-store'
 
 export type LiveEventsMode = 'live' | 'quiet' | 'unavailable' | 'dropping' | 'stalling'
@@ -16,6 +17,7 @@ export type LiveEventsOptions = {
   dropAfter?: number
   seed?: number
   signal?: AbortSignal
+  bus?: LiveEventBus
 }
 
 function receive(faker: Faker): RunSummary {
@@ -34,6 +36,20 @@ function finish(faker: Faker, run: RunSummary): RunSummary {
   )
 }
 
+// The worker publishes the test Run at its hand-over, then the CONTRL Run that answers it.
+export function testInterchangeRunOf({ id, name, onboarding }: TradingPartner): RunSummary {
+  const answered = onboarding.contrlReceivedAt !== null || onboarding.testRejectedAt !== null
+
+  return createRun({
+    tradingPartner: { id, name },
+    messageType: answered ? 'CONTRL' : 'DESADV',
+    status: 'delivered',
+    failureStage: null,
+    receivedAt: new Date().toISOString(),
+    manualSubmission: false,
+  })
+}
+
 export function liveEventsHandler(
   apiUrl: string,
   {
@@ -43,6 +59,7 @@ export function liveEventsHandler(
     dropAfter = 3,
     seed = 73,
     signal,
+    bus,
   }: LiveEventsOptions = {},
 ) {
   const path = `${apiUrl}${liveEventsEndpoint.path}`
@@ -82,8 +99,11 @@ export function liveEventsHandler(
     let timer: ReturnType<typeof setInterval> | undefined
     let close = () => {}
 
+    let unsubscribe = () => {}
+
     const stop = () => {
       clearInterval(timer)
+      unsubscribe()
       signal?.removeEventListener('abort', close)
     }
 
@@ -102,6 +122,15 @@ export function liveEventsHandler(
 
         signal?.addEventListener('abort', close, { once: true })
         controller.enqueue(eventStreamOpened)
+
+        unsubscribe =
+          bus?.subscribe((event) => {
+            try {
+              controller.enqueue(eventFrame(liveEventsEndpoint, event))
+            } catch {
+              stop()
+            }
+          }) ?? unsubscribe
 
         if (mode === 'quiet') {
           return

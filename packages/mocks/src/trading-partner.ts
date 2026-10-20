@@ -265,11 +265,13 @@ export function tradingPartnerHandlers(
     workspace = seedWorkspace,
     testInterchange: { handoverDelayMs = 1000, contrlDelayMs = 5000, rejectingRunId, refusal } = {},
     session = seedSession,
+    onTestInterchangeChange,
   }: {
     tradingPartners?: ReadonlyArray<TradingPartner> | TradingPartnerStore
     workspace?: Workspace | WorkspaceStore
     testInterchange?: TestInterchangeOptions
     session?: Session | null | SessionStore
+    onTestInterchangeChange?: (tradingPartner: TradingPartner) => void
   } = {},
 ) {
   const store = toTradingPartnerStore(tradingPartners)
@@ -332,6 +334,36 @@ export function tradingPartnerHandlers(
   function advance() {
     receiveDueContrls()
     handOverDueInterchanges()
+  }
+
+  // Like the worker, which publishes the test Run once it is handed over and once its CONTRL arrives.
+  function announceWhenDue(id: string, dueAt: number) {
+    if (!onTestInterchangeChange) {
+      return
+    }
+
+    // Taken now, so a check that advanced the onboarding meanwhile still gets announced.
+    const before = store.get(id)?.onboarding
+
+    setTimeout(
+      () => {
+        advance()
+        const tradingPartner = store.get(id)
+
+        if (!tradingPartner || tradingPartner.onboarding === before) {
+          return
+        }
+
+        onTestInterchangeChange(tradingPartner)
+
+        const contrlAt = contrlDueAt.get(id)
+
+        if (contrlAt !== undefined) {
+          announceWhenDue(id, contrlAt)
+        }
+      },
+      Math.max(0, dueAt - Date.now()),
+    )
   }
 
   function glnTaken(gln: string | null, ownId?: string) {
@@ -473,6 +505,7 @@ export function tradingPartnerHandlers(
         store.set(updated)
         contrlDueAt.delete(existing.id)
         handoverDueAt.set(existing.id, Date.now() + handoverDelayMs)
+        announceWhenDue(existing.id, Date.now() + handoverDelayMs)
 
         return HttpResponse.json(updated)
       }),

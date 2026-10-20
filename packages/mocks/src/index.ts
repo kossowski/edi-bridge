@@ -28,7 +28,8 @@ import { firstStepsHandler } from './first-steps'
 import { createFlowStore, flowHandlers } from './flow'
 import { homeHandler } from './home'
 import { interchangesHandler } from './interchange-list'
-import { liveEventsHandler, type LiveEventsOptions } from './live-event'
+import { liveEventsHandler, type LiveEventsOptions, testInterchangeRunOf } from './live-event'
+import { createLiveEventBus } from './live-event-bus'
 import {
   createLookupTableStore,
   lookupTableHandlers,
@@ -391,7 +392,7 @@ export function createHandlers(
     lookupTables?: ReadonlyArray<LookupTableRecord>
     mappingSamples?: ReadonlyArray<MappingSampleRecord>
     mappingVersions?: ReadonlyArray<MappingVersionRecord> | MappingVersionStore
-    liveEvents?: Omit<LiveEventsOptions, 'runs'>
+    liveEvents?: Omit<LiveEventsOptions, 'runs' | 'bus'>
     aiDraft?: Pick<AiDraftOptions, 'state' | 'stepDelayMs' | 'signal'>
   } = {},
 ) {
@@ -426,6 +427,7 @@ export function createHandlers(
   })
 
   const tradingPartnerStore = createTradingPartnerStore(tradingPartners)
+  const liveEventBus = createLiveEventBus()
   const workspaceSettingsStore = createWorkspaceSettingsStore(workspaceSettings)
   const channelStore = createChannelStore(channels)
   const flows = createFlowStore()
@@ -467,6 +469,11 @@ export function createHandlers(
       workspace: workspaceStore,
       testInterchange,
       session: sessionStore,
+      onTestInterchangeChange: (tradingPartner) => {
+        for (const run of runs.set(testInterchangeRunOf(tradingPartner))) {
+          liveEventBus.publish({ type: 'run.changed', run })
+        }
+      },
     }),
     ...tradingPartnerActivityHandlers(apiUrl, {
       tradingPartners: tradingPartnerStore,
@@ -483,7 +490,7 @@ export function createHandlers(
     publishedMappingVersionsHandler(apiUrl, mappingVersionStore),
     runsHandler(apiUrl, runs, { flows, mappings: mappingVersionStore }),
     interchangesHandler(apiUrl, runs),
-    liveEventsHandler(apiUrl, { ...liveEvents, runs }),
+    liveEventsHandler(apiUrl, { ...liveEvents, runs, bus: liveEventBus }),
     homeHandler(apiUrl, seedWorkspaceActivity(runs, orderLifecycles.waitingForTradingPartnerSince)),
     tasksHandler(
       apiUrl,

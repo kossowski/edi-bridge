@@ -10,7 +10,10 @@ import {
   runEndpoint,
   runListSchema,
   runsEndpoint,
+  sendTestInterchangeEndpoint,
   toPath,
+  tradingPartnerEndpoint,
+  tradingPartnerSchema,
   toSearchParams,
 } from '@edi-bridge/contracts'
 
@@ -20,7 +23,7 @@ import { liveEventsHandler, type LiveEventsOptions } from './live-event'
 import { createRuns, runsHandler } from './run'
 import { createRunStore } from './run-store'
 import { seedRunsBeforeAll } from './test-helpers'
-import { seedTradingPartners } from './trading-partner'
+import { createTradingPartner, seedTradingPartners } from './trading-partner'
 
 const apiUrl = 'http://api.test'
 
@@ -261,5 +264,51 @@ describe('createHandlers live events', () => {
         status: run.status,
       })
     }
+  })
+
+  it('announces the hand-over of a test send and its CONTRL as changes of the Trading Partner', async () => {
+    const readyForTest = createTradingPartner({
+      id: '10000000-0000-4000-8000-0000000000f1',
+      gln: '0200000000042',
+      testMode: true,
+      onboarding: {
+        testInterchangeSentAt: null,
+        contrlReceivedAt: null,
+        testRejectedAt: null,
+        testRejectedRunId: null,
+      },
+    })
+
+    server.use(
+      ...createHandlers(apiUrl, {
+        tradingPartners: [readyForTest],
+        testInterchange: { handoverDelayMs: 0, contrlDelayMs: 0 },
+        liveEvents: { signal: streams.signal },
+      }),
+    )
+
+    const stream = await openStream()
+    await fetch(`${apiUrl}${toPath(sendTestInterchangeEndpoint.path, readyForTest)}`, {
+      method: 'POST',
+    })
+    const events = eventsOf((await readFrames(stream, 2)).frames)
+
+    expect(events.map(({ run }) => run.tradingPartner.id)).toEqual([
+      readyForTest.id,
+      readyForTest.id,
+    ])
+
+    const response = await fetch(`${apiUrl}${toPath(tradingPartnerEndpoint.path, readyForTest)}`)
+
+    expect(tradingPartnerSchema.parse(await response.json()).onboarding).toEqual(
+      expect.objectContaining({
+        testInterchangeSentAt: expect.any(String),
+        contrlReceivedAt: expect.any(String),
+      }),
+    )
+
+    const { runs } = await listRuns()
+
+    expect(runs.map(({ id }) => id)).toContain(events[0]?.run.id)
   })
 })
