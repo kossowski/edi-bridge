@@ -490,7 +490,10 @@ function registerRoutes(
       return unauthorized(reply)
     }
 
-    return liveEventStreamsOfApp.stream(reply, member.workspaceId)
+    const stillMember = async () =>
+      (await resolveMember(auth, database, request))?.workspaceId === member.workspaceId
+
+    return liveEventStreamsOfApp.stream(reply, member.workspaceId, stillMember)
   })
 
   app.get(currentWorkspaceEndpoint.path, (request, reply) =>

@@ -1,14 +1,23 @@
+import { and, eq } from 'drizzle-orm'
 import { Effect } from 'effect'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import type { LightMyRequestResponse } from 'fastify'
 
-import { type LiveEvent, liveEventsEndpoint, parseLiveEvent } from '@edi-bridge/contracts'
+import {
+  type LiveEvent,
+  liveEventsEndpoint,
+  parseLiveEvent,
+  signOutEndpoint,
+} from '@edi-bridge/contracts'
+import { members } from '@edi-bridge/db'
 
 import { buildApp } from './app.js'
 import {
+  addMember,
   type Client,
   memoryLiveEvents,
+  type NewMember,
   otherWorkspace,
   ownAdmin,
   ownWorkspace,
@@ -164,6 +173,34 @@ describe('GET /events', () => {
     await vi.waitFor(() => {
       expect(api.liveEvents.listening()).toBe(listening)
     })
+  })
+
+  it('ends the stream once its Member signs out', async () => {
+    const client = await signIn(api.app, ownAdmin)
+    const response = await openStream(client)
+
+    await client.inject({ method: 'POST', url: signOutEndpoint.path })
+
+    await expect(framesOf(response)(isEvent)).rejects.toThrow('The stream ended')
+  })
+
+  it('ends the stream once its Member leaves the Workspace', async () => {
+    const leaving: NewMember = {
+      name: 'Nordwind Leaver',
+      email: 'leaver@nordwind.example',
+      password: 'nordwind-leaver-password',
+      workspaceId: ownWorkspace.id,
+      role: 'viewer',
+    }
+
+    const userId = await addMember(api.connection.db, leaving)
+    const response = await openStream(await signIn(api.app, leaving))
+
+    await api.connection.db
+      .delete(members)
+      .where(and(eq(members.userId, userId), eq(members.workspaceId, ownWorkspace.id)))
+
+    await expect(framesOf(response)(isEvent)).rejects.toThrow('The stream ended')
   })
 
   it('ends its open streams when the api closes', async () => {

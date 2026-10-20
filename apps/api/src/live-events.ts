@@ -33,15 +33,33 @@ export function liveEventStreams(hub: LiveEventHub, heartbeatMs: number) {
   const open = new Set<() => void>()
 
   return {
-    stream: (reply: FastifyReply, workspaceId: string) => {
+    stream: (reply: FastifyReply, workspaceId: string, stillMember: () => Promise<boolean>) => {
       const stream = new PassThrough()
 
       const unsubscribe = hub.subscribe(workspaceId, (event) => {
         stream.write(frame(event))
       })
 
+      let checking = false
+
+      // A session can end or a Member leave while the stream stays open.
       const heartbeat = setInterval(() => {
         stream.write(':heartbeat\n\n')
+
+        if (checking) {
+          return
+        }
+
+        checking = true
+        void stillMember()
+          .catch(() => false)
+          .then((member) => {
+            checking = false
+
+            if (!member) {
+              end()
+            }
+          })
       }, heartbeatMs)
 
       const end = () => {
