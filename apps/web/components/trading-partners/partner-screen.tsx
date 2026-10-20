@@ -1,6 +1,6 @@
 'use client'
 
-import { useMutationState, useQuery } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import { Suspense, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
@@ -12,13 +12,12 @@ import { PartnerConnections } from '@/components/trading-partners/partner-connec
 import { PartnerDocuments } from '@/components/trading-partners/partner-documents-panel'
 import { PartnerGln } from '@/components/trading-partners/partner-gln'
 import { PartnerLoading, PartnerOverview } from '@/components/trading-partners/partner-overview'
-import { onboardingPollInterval } from '@/components/trading-partners/partner-page-helpers'
 import { PartnerSettings } from '@/components/trading-partners/partner-settings'
 import { SetupNotice } from '@/components/trading-partners/partner-setup-notice'
 import { TestModeBadge } from '@/components/trading-partners/test-mode-badge'
 import { useUrlTab } from '@/hooks/use-url-tab'
 import { ApiError } from '@/lib/api/client'
-import { tradingPartnerKeys, tradingPartnerQuery, useTakenSetupSummary } from '@/lib/api/queries'
+import { tradingPartnerQuery, useTakenSetupSummary } from '@/lib/api/queries'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@edi-bridge/ui/components/tabs'
 
 import type { TradingPartner } from '@edi-bridge/contracts'
@@ -111,15 +110,7 @@ export function PartnerScreen({ id }: { id: string }) {
     titleRef.current?.focus()
   }
 
-  const testSent =
-    useMutationState({
-      filters: { mutationKey: tradingPartnerKeys.testInterchange(id), status: 'success' },
-    }).length > 0
-
-  const { data, error, isPending, refetch } = useQuery({
-    ...tradingPartnerQuery(id),
-    refetchInterval: ({ state }) => onboardingPollInterval(state.data, testSent),
-  })
+  const { data, error, isPending, refetch } = useQuery(tradingPartnerQuery(id))
 
   return (
     <AppPage

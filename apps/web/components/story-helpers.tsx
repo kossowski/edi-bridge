@@ -8,6 +8,7 @@ import {
 import { type ReactNode, useLayoutEffect, useMemo, useState } from 'react'
 import { expect } from 'storybook/test'
 
+import { LiveEventsProvider } from '@/components/live-events-provider'
 import messagesDe from '@/messages/de.json'
 import { type Invite, inviteValidityDays } from '@edi-bridge/contracts'
 import { dayMs, seedWorkspaceSummaries, type WorkspaceSummaryRecord } from '@edi-bridge/mocks'
@@ -51,6 +52,12 @@ export const german = (Story: () => ReactNode) => (
   <NextIntlClientProvider locale="de" messages={messagesDe} timeZone="Europe/Berlin">
     <Story />
   </NextIntlClientProvider>
+)
+
+export const withLiveEvents = (Story: () => ReactNode) => (
+  <LiveEventsProvider>
+    <Story />
+  </LiveEventsProvider>
 )
 
 // At 768px the app's sidebar takes 16rem of the width.

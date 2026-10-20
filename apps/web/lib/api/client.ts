@@ -209,7 +209,7 @@ async function request<
 export async function openLiveEvents() {
   await mockingReady()
 
-  return new EventSource(`${apiUrl}${liveEventsEndpoint.path}`)
+  return new EventSource(`${apiUrl}${liveEventsEndpoint.path}`, { withCredentials: true })
 }
 
 export function getSession() {

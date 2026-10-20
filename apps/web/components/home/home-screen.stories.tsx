@@ -4,7 +4,13 @@ import { expect, userEvent, waitFor, within } from 'storybook/test'
 
 import { HomeScreen } from '@/components/home/home-screen'
 import { viewerStory } from '@/components/session/session-story-helpers'
-import { darkMode, expectNoPageScroll, german, mobile } from '@/components/story-helpers'
+import {
+  darkMode,
+  expectNoPageScroll,
+  german,
+  mobile,
+  withLiveEvents,
+} from '@/components/story-helpers'
 import { everyKind, hansemarkt } from '@/components/tasks/task-story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import {
@@ -23,6 +29,7 @@ const meta = preview.meta({
   title: 'Home/HomeScreen',
   component: HomeScreen,
   parameters: { layout: 'fullscreen' },
+  decorators: [withLiveEvents],
 })
 
 function keyNumbers(canvasElement: HTMLElement) {

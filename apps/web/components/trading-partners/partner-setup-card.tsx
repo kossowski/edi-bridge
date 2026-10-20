@@ -110,7 +110,14 @@ function SendTestDocument({
   const send = useMutation({
     mutationKey: tradingPartnerKeys.testInterchange(tradingPartner.id),
     mutationFn: () => sendTestInterchange(tradingPartner.id),
-    onSuccess: (updated) => storeSavedTradingPartner(queryClient, updated),
+    onSuccess: (updated) => {
+      storeSavedTradingPartner(queryClient, updated)
+      // The hand-over's live event can arrive before this answer, which predates the hand-over.
+      void queryClient.invalidateQueries({
+        queryKey: tradingPartnerKeys.detail(updated.id),
+        exact: true,
+      })
+    },
   })
 
   const refusal = testInterchangeRefusalOf(send.error)

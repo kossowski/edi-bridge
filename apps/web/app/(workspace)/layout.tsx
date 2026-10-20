@@ -2,6 +2,7 @@ import { cookies } from 'next/headers'
 
 import { AppHeader } from '@/components/app-header'
 import { AppSidebar } from '@/components/app-sidebar'
+import { LiveEventsProvider } from '@/components/live-events-provider'
 import { MainContentFocus } from '@/components/main-content-focus'
 import { SessionGate } from '@/components/session/session-gate'
 import {
@@ -20,16 +21,18 @@ export default async function WorkspaceLayout({
 
   return (
     <SessionGate>
-      <SidebarProvider defaultOpen={sidebarOpen}>
-        <AppSidebar />
-        <SidebarInset>
-          <AppHeader />
-          <div id="main-content" tabIndex={-1} className="flex flex-1 flex-col outline-none">
-            {children}
-            <MainContentFocus />
-          </div>
-        </SidebarInset>
-      </SidebarProvider>
+      <LiveEventsProvider>
+        <SidebarProvider defaultOpen={sidebarOpen}>
+          <AppSidebar />
+          <SidebarInset>
+            <AppHeader />
+            <div id="main-content" tabIndex={-1} className="flex flex-1 flex-col outline-none">
+              {children}
+              <MainContentFocus />
+            </div>
+          </SidebarInset>
+        </SidebarProvider>
+      </LiveEventsProvider>
     </SessionGate>
   )
 }

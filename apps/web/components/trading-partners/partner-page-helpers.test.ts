@@ -4,7 +4,6 @@ import {
   awaitsReceiptConfirmation,
   awaitsTestHandover,
   dayTotals,
-  onboardingPollInterval,
   testRejected,
 } from './partner-page-helpers'
 
@@ -116,50 +115,6 @@ describe('awaitsTestHandover', () => {
 
   it('does not wait for a live partner', () => {
     expect(awaitsTestHandover({ testMode: false, onboarding: notSent }, true)).toBe(false)
-  })
-})
-
-describe('onboardingPollInterval', () => {
-  const sent = {
-    testInterchangeSentAt: '2026-10-10T08:00:00.000Z',
-    contrlReceivedAt: null,
-    testRejectedAt: null,
-    testRejectedRunId: null,
-  }
-
-  it('checks every 10 seconds while the receipt confirmation is awaited', () => {
-    expect(onboardingPollInterval({ testMode: true, onboarding: sent }, false)).toBe(10_000)
-  })
-
-  it('checks every 10 seconds until an accepted test send is handed over', () => {
-    expect(
-      onboardingPollInterval(
-        { testMode: true, onboarding: { ...sent, testInterchangeSentAt: null } },
-        true,
-      ),
-    ).toBe(10_000)
-  })
-
-  it('does not check before a test send', () => {
-    expect(
-      onboardingPollInterval(
-        { testMode: true, onboarding: { ...sent, testInterchangeSentAt: null } },
-        false,
-      ),
-    ).toBe(false)
-  })
-
-  it('stops checking once the receipt confirmation arrived', () => {
-    expect(
-      onboardingPollInterval(
-        { testMode: true, onboarding: { ...sent, contrlReceivedAt: '2026-10-10T08:05:00.000Z' } },
-        true,
-      ),
-    ).toBe(false)
-  })
-
-  it('does not check before the Trading Partner is loaded', () => {
-    expect(onboardingPollInterval(undefined, true)).toBe(false)
   })
 })
 

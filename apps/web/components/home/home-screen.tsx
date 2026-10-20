@@ -14,9 +14,9 @@ import { HomeDraftPromo } from '@/components/home/home-draft-promo'
 import { HomeKeyNumbers } from '@/components/home/home-key-numbers'
 import { HomeSetupLink } from '@/components/home/home-setup-link'
 import { HomeTradingPartners } from '@/components/home/home-trading-partners'
+import { useLiveStatus } from '@/components/live-events-provider'
 import { LiveIndicator } from '@/components/live-indicator'
 import { LoadError } from '@/components/load-error'
-import { useLiveEvents } from '@/hooks/use-live-events'
 import { firstStepsQuery, homeKeys, homeQuery } from '@/lib/api/queries'
 import { navigationItems } from '@/lib/navigation'
 import { firstStepsProgress, type HomeWindow, homeWindows } from '@edi-bridge/contracts'
@@ -99,7 +99,7 @@ export function HomeScreen({ defaultWindow = '24h' }: { defaultWindow?: HomeWind
   const [timeWindow, setTimeWindow] = useState<HomeWindow>(defaultWindow)
   const queryClient = useQueryClient()
   const router = useRouter()
-  const liveStatus = useLiveEvents()
+  const liveStatus = useLiveStatus()
 
   const { data, isError, isPending, isPlaceholderData, refetch } = useQuery(homeQuery(timeWindow))
   const firstSteps = useQuery(firstStepsQuery)
