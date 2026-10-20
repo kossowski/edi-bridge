@@ -166,10 +166,6 @@ const restoreInTransaction = async (
     .where(eq(mappings.id, mappingId))
     .for('update')
 
-  if (locked?.aiReview) {
-    return new AiReviewOpen()
-  }
-
   const [restored] = await tx
     .select({ graph: mappingVersions.graph })
     .from(mappingVersions)
@@ -177,6 +173,10 @@ const restoreInTransaction = async (
 
   if (!restored) {
     return new NotFound()
+  }
+
+  if (locked?.aiReview) {
+    return new AiReviewOpen()
   }
 
   const [latest] = await tx

@@ -153,6 +153,8 @@ const lastLink = {
   proposedTransformLinks: [],
 }
 
+const unknownVersionId = '9c8b7a6d-5e4f-4d3c-8b2a-1f0e9d8c7b6a'
+
 const restore = (mappingId: string, versionId: string) =>
   admin.inject({
     method: 'POST',
@@ -282,6 +284,15 @@ describe('POST /mappings/:mappingId/versions/:versionId/restore', () => {
 
     expect(response.statusCode).toBe(200)
     expect(mappingDraftSchema.parse(response.json())).toMatchObject({ ...proposed, aiReview: null })
+  })
+
+  it('answers 404 for an unknown version while the AI review is open', async () => {
+    const id = await draftedByAi()
+
+    const response = await restore(id, unknownVersionId)
+
+    expect(response.statusCode).toBe(404)
+    expect(await draftOf(id)).toMatchObject({ ...proposed, aiReview: review })
   })
 })
 
