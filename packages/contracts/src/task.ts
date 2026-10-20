@@ -133,3 +133,15 @@ export function taskCountsOf(tasks: ReadonlyArray<Pick<Task, 'whoActs'>>): TaskC
 
   return counts
 }
+
+// Picked from the Trading Partner's open failed Runs; without one clear actor, you own the follow-up.
+export function whoActsOnFailingTradingPartner(
+  openFailedRunTasks: ReadonlyArray<Pick<Task, 'whoActs'>>,
+): TaskActor {
+  const counts = taskCountsOf(openFailedRunTasks)
+  const [first, second] = taskActors.toSorted((a, b) => counts[b] - counts[a])
+
+  return first !== undefined && second !== undefined && counts[first] > counts[second]
+    ? first
+    : 'you'
+}

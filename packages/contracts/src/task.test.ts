@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { taskCountsOf, taskSchema, whoActsOnFailedRun } from './task'
+import {
+  taskCountsOf,
+  taskSchema,
+  whoActsOnFailedRun,
+  whoActsOnFailingTradingPartner,
+} from './task'
 
 const runId = '20000000-0000-4000-8000-000000000001'
 
@@ -86,5 +91,16 @@ describe('taskCountsOf', () => {
       retry: 0,
       tradingPartner: 1,
     })
+  })
+})
+
+describe('whoActsOnFailingTradingPartner', () => {
+  it.each([
+    [['tradingPartner', 'tradingPartner', 'retry'], 'tradingPartner'],
+    [['retry', 'retry', 'you'], 'retry'],
+    [['retry', 'tradingPartner'], 'you'],
+    [[], 'you'],
+  ] as const)('gives open failed Runs acted on by %j to %s', (actors, expected) => {
+    expect(whoActsOnFailingTradingPartner(actors.map((whoActs) => ({ whoActs })))).toBe(expected)
   })
 })

@@ -647,6 +647,7 @@ export {
   tasksSchema,
   type TaskTarget,
   whoActsOnFailedRun,
+  whoActsOnFailingTradingPartner,
 } from './task'
 
 export {

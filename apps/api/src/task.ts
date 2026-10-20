@@ -4,14 +4,13 @@ import { Clock, Effect } from 'effect'
 
 import {
   healthStatusOf,
-  taskActors,
   type MessageType,
   overdueAcknowledgementMessageTypes,
   type Task,
-  type TaskActor,
   taskCountsOf,
   type Tasks,
   whoActsOnFailedRun,
+  whoActsOnFailingTradingPartner,
 } from '@edi-bridge/contracts'
 import { flows, runs, tradingPartners } from '@edi-bridge/db'
 
@@ -153,16 +152,6 @@ const countRecentRunsByTradingPartner = (db: Database, workspaceId: string, from
 
 type RecentRunCountsRow = Awaited<ReturnType<typeof countRecentRunsByTradingPartner>>[number]
 
-// Without one clear actor, you own the Trading Partner's follow-up.
-const dominantWhoActs = (failedRunTasks: readonly Task[]): TaskActor => {
-  const counts = taskCountsOf(failedRunTasks)
-  const [first, second] = taskActors.toSorted((a, b) => counts[b] - counts[a])
-
-  return first !== undefined && second !== undefined && counts[first] > counts[second]
-    ? first
-    : 'you'
-}
-
 const toFailingTradingPartnerTask =
   (failedRunTasks: readonly Task[], overdueTasks: readonly Task[], now: Date) =>
   (row: RecentRunCountsRow): Task[] => {
@@ -177,7 +166,7 @@ const toFailingTradingPartnerTask =
       {
         id: `tradingPartner:${row.tradingPartnerId}`,
         kind: 'failingTradingPartner',
-        whoActs: dominantWhoActs(failedRunTasks.filter(ofTradingPartner)),
+        whoActs: whoActsOnFailingTradingPartner(failedRunTasks.filter(ofTradingPartner)),
         tradingPartner: { id: row.tradingPartnerId, name: row.tradingPartnerName },
         at: (row.lastRunAt ?? now).toISOString(),
         delivered: row.delivered,

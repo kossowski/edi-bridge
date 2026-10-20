@@ -8,14 +8,13 @@ import {
   type OverdueAcknowledgement,
   type RunSummary,
   type Task,
-  type TaskActor,
-  taskActors,
   taskCountsOf,
   type Tasks,
   tasksEndpoint,
   tasksSchema,
   type TradingPartner,
   whoActsOnFailedRun,
+  whoActsOnFailingTradingPartner,
 } from '@edi-bridge/contracts'
 
 import { hour } from './overdue'
@@ -132,28 +131,15 @@ function overdueAcknowledgementTasks(
   }))
 }
 
-function dominantWhoActs(
-  failedRuns: readonly FailedRun[],
-  waiting: WaitingForTradingPartner,
-): TaskActor {
-  const counts = taskCountsOf(failedRuns.map((run) => ({ whoActs: whoActsOn(run, waiting) })))
-  const [first, second] = taskActors.toSorted((a, b) => counts[b] - counts[a])
-
-  return counts[first!] > counts[second!] ? first! : 'you'
-}
-
 function failingTradingPartnerTasks(
   tradingPartners: ReadonlyArray<TradingPartner>,
   runs: readonly RunSummary[],
   overdueAcknowledgements: ReadonlyArray<OverdueAcknowledgement>,
-  waiting: WaitingForTradingPartner,
+  openFailedRunTasks: readonly Task[],
   from: number,
   now: Date,
 ) {
-  const failedRuns = Map.groupBy(
-    runs.filter(isFailed).filter((run) => Date.parse(run.receivedAt) >= from),
-    (run) => run.tradingPartner.id,
-  )
+  const failedRunTasksOf = Map.groupBy(openFailedRunTasks, (task) => task.tradingPartner.id)
 
   return tradingPartnerHealthOf(tradingPartners, runs, overdueAcknowledgements, from).flatMap(
     (health): Task[] =>
@@ -162,7 +148,9 @@ function failingTradingPartnerTasks(
             {
               id: `tradingPartner:${health.tradingPartner.id}`,
               kind: 'failingTradingPartner',
-              whoActs: dominantWhoActs(failedRuns.get(health.tradingPartner.id) ?? [], waiting),
+              whoActs: whoActsOnFailingTradingPartner(
+                failedRunTasksOf.get(health.tradingPartner.id) ?? [],
+              ),
               tradingPartner: health.tradingPartner,
               at: health.lastRunAt ?? now.toISOString(),
               delivered: health.delivered,
@@ -187,14 +175,16 @@ export function toTasks(
   const store = toRunStore(runs)
   const all = store.all()
 
+  const openFailedRunTasks = failedRunTasks(store, waitingForTradingPartnerSince, from)
+
   const tasks = [
-    ...failedRunTasks(store, waitingForTradingPartnerSince, from),
+    ...openFailedRunTasks,
     ...overdueAcknowledgementTasks(overdueAcknowledgements),
     ...failingTradingPartnerTasks(
       tradingPartners,
       all,
       overdueAcknowledgements,
-      waitingForTradingPartnerSince,
+      openFailedRunTasks,
       from,
       now,
     ),

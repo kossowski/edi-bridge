@@ -275,6 +275,40 @@ describe('GET /tasks', () => {
     },
   )
 
+  it('picks who acts on a failing Trading Partner from its open failed Runs only', async () => {
+    const failedRun = (failureStage: 'parse' | 'delivery', hour: number) =>
+      createRun({
+        tradingPartner: summaryOf(hansemarkt),
+        messageType: 'ORDERS',
+        status: 'failed',
+        failureStage,
+        receivedAt: `2026-10-10T0${hour}:00:00.000Z`,
+      })
+
+    const replaced = [1, 2, 3].map((hour) => failedRun('parse', hour))
+    const open = [4, 5].map((hour) => failedRun('delivery', hour))
+    const replacing = replaced.map(() => delivered('2026-10-10T08:00:00.000Z', hansemarkt))
+
+    server.use(
+      tasksHandler(
+        apiUrl,
+        data({
+          runs: createRunStore(
+            [...replaced, ...open, ...replacing],
+            replaced.map((run, index) => ({ replaced: run.id, replacing: replacing[index]!.id })),
+          ),
+          tradingPartners: [hansemarkt],
+        }),
+      ),
+    )
+
+    const { tasks } = await getTasks()
+
+    expect(tasks.find(({ kind }) => kind === 'failingTradingPartner')).toEqual(
+      expect.objectContaining({ whoActs: 'retry' }),
+    )
+  })
+
   it('has nothing to do when all is good', async () => {
     server.use(tasksHandler(apiUrl, 'empty'))
 
