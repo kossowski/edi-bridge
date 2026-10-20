@@ -26,8 +26,8 @@ async function findShowcaseViewer(database: Database) {
 
   const [viewer] = rows
 
-  if (viewer === undefined) {
-    throw new APIError('NOT_FOUND', { message: 'No Showcase Workspace exists' })
+  if (viewer === undefined || !rows.some(({ kind }) => kind === 'showcase')) {
+    return null
   }
 
   // Only a read-only Viewer of the Showcase may sign in here; any more rights and it stays shut.
@@ -54,9 +54,10 @@ export const showcaseSignIn = (database: Database) =>
         // The same origin check as the email sign-in, so no foreign page signs a visitor in.
         { method: 'POST', use: [formCsrfMiddleware] },
         async (ctx) => {
-          const user = await ctx.context.internalAdapter.findUserById(
-            await findShowcaseViewer(database),
-          )
+          const viewerId = await findShowcaseViewer(database)
+
+          const user =
+            viewerId === null ? null : await ctx.context.internalAdapter.findUserById(viewerId)
 
           if (user === null) {
             throw new APIError('NOT_FOUND', { message: 'No Showcase Workspace exists' })

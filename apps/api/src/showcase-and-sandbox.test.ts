@@ -364,3 +364,15 @@ describe('ensureShowcaseAndSandbox run again after a change', () => {
     }
   })
 })
+
+describe('POST /auth/sign-in/showcase once the Showcase is gone', () => {
+  it('answers 404 and creates no session, though the Viewer still exists', async () => {
+    await api.connection.db.delete(workspaces).where(eq(workspaces.kind, 'showcase'))
+
+    const response = await showcaseSignIn()
+
+    expect(await userIdOf(showcaseViewer.email)).toEqual(expect.any(String))
+    expect(response.statusCode).toBe(404)
+    expect(response.cookies).toEqual([])
+  })
+})
