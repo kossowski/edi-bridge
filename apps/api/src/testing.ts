@@ -136,7 +136,7 @@ export const failedRun = (failureStage: 'parse' | 'validation' | 'mapping' | 'de
 
 type RunValues = Partial<typeof runs.$inferInsert> & { receivedAt: Date }
 
-const one = async <Row>(rows: Promise<Row[]>) => {
+export const one = async <Row>(rows: Promise<Row[]>) => {
   const [row] = await rows
 
   if (row === undefined) {
