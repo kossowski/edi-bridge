@@ -202,3 +202,7 @@ _On screen_: Try again (DE: Erneut versuchen)
 Starting a new Run from the original, unmodified Document of a failed Run, using a chosen Mapping version; the new Run links to the one it replaces.
 _Avoid_: Rerun, replay, fix
 _On screen_: Process again (DE: Erneut verarbeiten)
+
+**Live event**:
+A notice to the Members of a Workspace that one of its Runs was created or changed, so the screens they have open show the change without a reload.
+_Avoid_: Notification, push, update
