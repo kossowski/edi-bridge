@@ -81,6 +81,7 @@ import type { ParseError } from '@edi-bridge/edifact'
 
 import { referencesOf } from './business-reference'
 import { decodeDocument, type DocumentUndecodable } from './decode-document'
+import { reportDefect } from './defect-report'
 import { deliveryInputSchema } from './delivery-input'
 import { enveloped, framed } from './envelope'
 import { publishRunChanges } from './live-events'
@@ -1685,7 +1686,16 @@ const processClaimed = (
         return yield* new RunNotOwned({ runId: run.id })
       }
 
-      return yield* Effect.logError(`The Document of Run ${run.id} expired before it was processed`)
+      const expired = new Error(`The Document of Run ${run.id} expired before it was processed`)
+
+      yield* Effect.logError(expired.message)
+
+      return yield* reportDefect({
+        workspaceId: queued.workspaceId,
+        runId: run.id,
+        tradingPartnerId: tradingPartner.id,
+        defect: expired,
+      })
     }
 
     const documents = yield* Documents
@@ -1742,6 +1752,13 @@ export const processRun = (queued: QueuedRun) =>
           if (!held) {
             return yield* new RunNotOwned({ runId: holding.runId, cause: defect })
           }
+
+          yield* reportDefect({
+            workspaceId: queued.workspaceId,
+            runId: holding.runId,
+            tradingPartnerId: claimed.tradingPartner.id,
+            defect,
+          })
 
           return yield* Effect.die(defect)
         }),

@@ -65,6 +65,8 @@ import { type Database, type Delivery, Documents, type RunQueue } from './servic
 import {
   addContrlFlow,
   addOrdersFlow,
+  defectReportsIn,
+  defectReportsOf,
   deliverOverSftp,
   markSeeded,
   golden,
@@ -1979,6 +1981,179 @@ describe('the processing of a Run', () => {
   })
 })
 
+describe('the defect report of a Run', () => {
+  it('reports a Delivery that dies once, tagged with its Workspace, Run and Trading Partner', async () => {
+    const broken = new Error('The Channel row is broken')
+    const { queue, runId } = await receiveInvoice()
+
+    await Effect.runPromiseExit(
+      processRun(queue.queued[0] ?? { workspaceId: workspace.id, runId }).pipe(
+        pipelineServices(connection.db, queue, () => Effect.die(broken)),
+      ),
+    )
+
+    expect(defectReportsOf(runId)).toEqual([
+      {
+        workspaceId: workspace.id,
+        runId,
+        tradingPartnerId: workspace.tradingPartnerId,
+        defect: broken,
+      },
+    ])
+  })
+
+  it('reports a processing defect once, tagged with its Workspace, Run and Trading Partner', async () => {
+    const defective = await seedInvoiceWorkspace(connection.db, 'Reported Foods')
+
+    // An outbound Flow pinned to an inbound Mapping is a defect of the stored setup.
+    await connection.db
+      .update(mappings)
+      .set({ messageType: 'ORDERS' })
+      .where(eq(mappings.id, defective.mappingId))
+    await deliverOverSftp(connection.db, defective, sftpLogin())
+
+    const { queue, runId } = await receiveInvoice(goldenInvoice, inMemoryRunQueue(), defective)
+
+    const exit = await Effect.runPromiseExit(
+      processRun({ workspaceId: defective.id, runId }).pipe(
+        pipelineServices(connection.db, queue, sftpDelivery),
+      ),
+    )
+
+    expect(defectReportsOf(runId)).toEqual([
+      {
+        workspaceId: defective.id,
+        runId,
+        tradingPartnerId: defective.tradingPartnerId,
+        defect: Cause.squash(Exit.isFailure(exit) ? exit.cause : Cause.empty),
+      },
+    ])
+  })
+
+  it('reports a delivery defect once', async () => {
+    const exhausted = await seedInvoiceWorkspace(connection.db, 'Overflowing Foods')
+
+    // The next control reference overflows its integer column when it is claimed.
+    await connection.db
+      .update(tradingPartners)
+      .set({ nextControlReference: 2_147_483_647 })
+      .where(eq(tradingPartners.id, exhausted.tradingPartnerId))
+    await deliverOverSftp(connection.db, exhausted, sftpLogin())
+
+    const { queue, runId } = await receiveInvoice(goldenInvoice, inMemoryRunQueue(), exhausted)
+
+    await Effect.runPromiseExit(
+      processRun({ workspaceId: exhausted.id, runId }).pipe(
+        pipelineServices(connection.db, queue, sftpDelivery),
+      ),
+    )
+
+    expect(defectReportsOf(runId)).toMatchObject([
+      { workspaceId: exhausted.id, runId, tradingPartnerId: exhausted.tradingPartnerId },
+    ])
+  })
+
+  it('reports a Run whose Document expired before it was processed', async () => {
+    const { queue, runId } = await receiveInvoice()
+
+    await connection.db
+      .update(runs)
+      .set({ documentId: null, documentDeletedAt: new Date() })
+      .where(eq(runs.id, runId))
+    await processQueued(queue)
+
+    await expect(readRun(connection.db, runId)).resolves.toMatchObject({
+      status: 'failed',
+      problem: { reason: 'defect' },
+    })
+    expect(defectReportsOf(runId)).toMatchObject([
+      { workspaceId: workspace.id, runId, tradingPartnerId: workspace.tradingPartnerId },
+    ])
+  })
+
+  it('reports a stuck Run the sweep fails as a defect once', async () => {
+    const { runId } = await receiveInvoice()
+
+    await connection.db.execute(
+      sql`update run_steps set status = 'running', started_at = now() where run_id = ${runId} and stage = 'mapping'`,
+    )
+    await leaveStuck(runId)
+    await sweepStuck()
+    await sweepStuck()
+
+    expect(defectReportsOf(runId)).toMatchObject([
+      { workspaceId: workspace.id, runId, tradingPartnerId: workspace.tradingPartnerId },
+    ])
+  })
+
+  it('reports nothing for a Run whose SFTP Channel is unreachable', async () => {
+    const unreachable = await seedInvoiceWorkspace(connection.db, 'Silent Unreachable Foods')
+
+    await deliverOverSftp(connection.db, unreachable, {
+      ...sftpLogin(),
+      host: '127.0.0.1',
+      port: 1,
+    })
+
+    const { queue, runId } = await receiveInvoice(goldenInvoice, inMemoryRunQueue(), unreachable)
+
+    await processQueued(queue)
+
+    await expect(readRun(connection.db, runId)).resolves.toMatchObject({
+      problem: { reason: 'unreachable' },
+    })
+    expect(defectReportsIn(unreachable.id)).toEqual([])
+  })
+
+  it('reports nothing for a Run whose SFTP server shows another host key', async () => {
+    const impostor = await seedInvoiceWorkspace(connection.db, 'Silent Impostor Foods')
+
+    await deliverOverSftp(connection.db, impostor, {
+      ...sftpLogin(),
+      hostKeyFingerprint: mismatchingHostKeyFingerprint,
+    })
+
+    const { queue, runId } = await receiveInvoice(goldenInvoice, inMemoryRunQueue(), impostor)
+
+    await processQueued(queue)
+
+    await expect(readRun(connection.db, runId)).resolves.toMatchObject({
+      problem: { reason: 'hostKeyMismatch' },
+    })
+    expect(defectReportsIn(impostor.id)).toEqual([])
+  })
+
+  it('reports nothing for a Run that fails on an incomplete setup', async () => {
+    const withoutGln = await seedInvoiceWorkspace(connection.db, 'Silent Unnamed Foods')
+
+    await connection.db
+      .update(workspaces)
+      .set({ gln: null })
+      .where(eq(workspaces.id, withoutGln.id))
+    await deliverOverSftp(connection.db, withoutGln, sftpLogin())
+
+    const { queue, runId } = await receiveInvoice(goldenInvoice, inMemoryRunQueue(), withoutGln)
+
+    await processQueued(queue)
+
+    await expect(readRun(connection.db, runId)).resolves.toMatchObject({
+      problem: { reason: 'incompleteSetup' },
+    })
+    expect(defectReportsIn(withoutGln.id)).toEqual([])
+  })
+
+  it('reports nothing for a Run that fails at mapping or validation', async () => {
+    const { queue: unreadable, runId: unreadableId } = await receiveInvoice('not json')
+    const { queue: invalid, runId: invalidId } = await receiveInvoice(tooLongInvoiceNumber)
+
+    await processQueued(unreadable)
+    await processQueued(invalid)
+
+    expect(defectReportsOf(unreadableId)).toEqual([])
+    expect(defectReportsOf(invalidId)).toEqual([])
+  })
+})
+
 describe('the processing of an inbound Run', () => {
   const ordersInterchange = golden('orders-reference.edi', 'latin1')
 
@@ -2183,6 +2358,17 @@ describe('the processing of an inbound Run', () => {
         { stage: 'delivery', status: 'skipped' },
       ],
     })
+  })
+
+  it('reports nothing for a broken Interchange of the Trading Partner', async () => {
+    const into = await ordersWorkspace('Silent Broken Foods')
+    const withoutBgm = ordersMessage.filter((line) => !line.startsWith('BGM'))
+    const unknownFunction = replaced("BGM+220:::+128576+9'", "BGM+220:::+128576+99'")
+
+    const runs = await receiveInterchange(into, interchangeOf([withoutBgm, unknownFunction]))
+
+    expect(runs.map((run) => run?.failureStage)).toEqual(['parse', 'validation'])
+    expect(defectReportsIn(into.id)).toEqual([])
   })
 
   it('fails an invalid Message at validation with its position in the Interchange', async () => {

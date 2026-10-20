@@ -3,6 +3,7 @@ import { DateTime, type Duration, Effect } from 'effect'
 
 import { runs, runSteps } from '@edi-bridge/db'
 
+import { reportDefect } from './defect-report'
 import { publishRunChanges } from './live-events'
 import { failOnDefect } from './process-run'
 import { queueOrLeaveToSweep } from './queue-received-runs'
@@ -36,7 +37,11 @@ export const sweepStuckRuns = (stuckAfter: Duration.Input) =>
 
     const stuck = yield* Effect.promise(() =>
       db
-        .select({ workspaceId: runs.workspaceId, runId: runs.id })
+        .select({
+          workspaceId: runs.workspaceId,
+          runId: runs.id,
+          tradingPartnerId: runs.tradingPartnerId,
+        })
         .from(runs)
         .where(isStuck(db, cutoff)),
     )
@@ -45,7 +50,9 @@ export const sweepStuckRuns = (stuckAfter: Duration.Input) =>
   })
 
 // A stuck Run is a defect either way: its worker died or stalled past the bound.
-const releaseOrFail = (run: QueuedRun, cutoff: Date) =>
+type StuckRun = QueuedRun & { tradingPartnerId: string | null }
+
+const releaseOrFail = ({ tradingPartnerId, ...run }: StuckRun, cutoff: Date) =>
   Effect.gen(function* () {
     const db = yield* Database
 
@@ -84,7 +91,10 @@ const releaseOrFail = (run: QueuedRun, cutoff: Date) =>
     }
 
     if (yield* failOnDefect(run.runId)) {
-      yield* Effect.logError(`Stuck Run ${run.runId} failed as a defect`)
+      const stuck = new Error(`Stuck Run ${run.runId} failed as a defect`)
+
+      yield* Effect.logError(stuck.message)
+      yield* reportDefect({ ...run, tradingPartnerId, defect: stuck })
       yield* publishRunChanges([run.runId])
     }
   })
