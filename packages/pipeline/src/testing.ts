@@ -153,6 +153,7 @@ export async function seedInvoiceWorkspace(db: Db, name: string) {
         gln: '4071615111111',
         characterSet: 'UNOC',
         acknowledgementTimeLimitHours: 24,
+        testMode: false,
       })
       .returning(),
   )

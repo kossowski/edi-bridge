@@ -1314,6 +1314,31 @@ describe('the processing of a Run', () => {
     await expect(remoteFile(`/upload/unob/INVOIC-${reference}.edi`)).resolves.toBe(run?.output)
   })
 
+  it('marks the Interchange to a Trading Partner in Test Mode with the test indicator', async () => {
+    await sftp.exec(
+      `mkdir ${sftp.home}/upload/testing && chown ${sftp.username} ${sftp.home}/upload/testing`,
+    )
+
+    const testing = await sftpWorkspaceIn('Testing Foods', 'UNOC', '/upload/testing')
+
+    await connection.db
+      .update(tradingPartners)
+      .set({ testMode: true })
+      .where(eq(tradingPartners.id, testing.tradingPartnerId))
+
+    const { queue, runId } = await receiveInvoice(goldenInvoice, inMemoryRunQueue(), testing)
+
+    await processQueued(queue)
+
+    const run = await readRun(connection.db, runId)
+    const reference = String(run?.controlReference)
+
+    expect(run).toMatchObject({ status: 'delivered' })
+    expect(run?.output).toMatch(/^UNB\+UNOC:3\+4389876511114:14\+4071615111111:14\+/)
+    expect(run?.output).toContain(`+${reference}++++++1'UNH+`)
+    await expect(remoteFile(`/upload/testing/INVOIC-${reference}.edi`)).resolves.toBe(run?.output)
+  })
+
   it.each([
     ['UNOC', 'a code point above U+00FF', ['Rudi Rüssel €', 'Rüssel von Rudi'], 13],
     ['UNOA', 'a lower-case letter', ['Rudi Rüssel', 'Rüssel von Rudi'], 2],
@@ -3435,6 +3460,27 @@ describe('the CONTRL answering a received Interchange', () => {
           "UNZ+1+1'",
         isRetry: false,
       },
+    ])
+  })
+
+  it('marks the CONTRL to a Trading Partner in Test Mode with the test indicator', async () => {
+    const into = await answeringWorkspace('Testing Orders')
+    const delivery = recordingDelivery()
+
+    await connection.db
+      .update(tradingPartners)
+      .set({ testMode: true })
+      .where(eq(tradingPartners.id, into.tradingPartnerId))
+    await receiveInterchange(into, interchangeOf([ordersMessage]))
+    await sendWith(delivery.service)
+
+    expect(delivery.to(into.outboundChannelId).map(({ content }) => content)).toEqual([
+      "UNB+UNOC:3+4389876511114:14+4071615111111:14+YYMMDD:HHMM+1++++++1'" +
+        "UNH+1+CONTRL:D:3:UN:EAN002'" +
+        "UCI+00000001+4071615111111:14+4389876511114:14+7'" +
+        "UCM+ME0001+ORDERS:D:96A:UN:EAN008+7'" +
+        "UNT+4+1'" +
+        "UNZ+1+1'",
     ])
   })
 

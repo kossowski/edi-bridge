@@ -467,6 +467,7 @@ const loadDestination = ({ workspaceId, runId }: QueuedRun) =>
             name: tradingPartners.name,
             gln: tradingPartners.gln,
             characterSet: tradingPartners.characterSet,
+            testMode: tradingPartners.testMode,
           },
           channel: channels,
         })
@@ -536,7 +537,7 @@ const buildInterchange = (
 ) =>
   Effect.gen(function* () {
     const db = yield* Database
-    const { characterSet } = tradingPartner
+    const { characterSet, testMode } = tradingPartner
     // The pipeline stored the delivery input itself, so one that breaks its schema is a defect.
     const message = yield* Effect.orDie(parse(messageSchema, run.deliveryInput))
 
@@ -556,6 +557,7 @@ const buildInterchange = (
       receiver: tradingPartner.gln,
       sentAt: yield* DateTime.now,
       reference,
+      testMode,
     })
 
     const content = yield* encoded(interchange, characterSet)
