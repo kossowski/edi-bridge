@@ -31,6 +31,8 @@ const apiUrl = 'http://api.test'
 
 const server = setupServer()
 
+const anyFingerprint: unknown = expect.stringMatching(/^SHA256:/)
+
 beforeAll(() => server.listen({ onUnhandledFrame: 'error' }))
 
 afterEach(() => {
@@ -387,7 +389,7 @@ describe('POST /channels/:id/test', () => {
     expect(testChannelEndpoint.response.parse(body)).toEqual({
       outcome: 'succeeded',
       testedAt: '2026-10-10T12:00:00.000Z',
-      hostKey: { fingerprint: expect.stringMatching(/^SHA256:/), state: 'unchecked' },
+      hostKey: { fingerprint: anyFingerprint, state: 'unchecked' },
     })
   })
 
@@ -465,7 +467,7 @@ describe('the host key of an SFTP Channel', () => {
 
     expect(result).toMatchObject({
       outcome: 'succeeded',
-      hostKey: { fingerprint: expect.stringMatching(/^SHA256:/), state: 'unchecked' },
+      hostKey: { fingerprint: anyFingerprint, state: 'unchecked' },
     })
   })
 
