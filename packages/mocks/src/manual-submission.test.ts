@@ -287,11 +287,15 @@ describe('manualSubmissionHandler', () => {
       ),
     })
 
+    const notValidInUnoa: unknown = expect.stringMatching(
+      /^Byte \d+ \(0xFC\) is not valid in UNOA \(ASCII\), at .+\.$/,
+    )
+
     expect(response.status).toBe(422)
     expect(documentUndecodableProblemSchema.parse(await response.json())).toMatchObject({
       code: 'documentUndecodable',
       encoding: null,
-      message: expect.stringMatching(/^Byte \d+ \(0xFC\) is not valid in UNOA \(ASCII\), at .+\.$/),
+      message: notValidInUnoa,
     })
   })
 
