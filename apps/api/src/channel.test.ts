@@ -106,6 +106,9 @@ const update = (id: string, body: Body, target = admin) =>
 
 const list = (target = admin) => target.inject({ method: 'GET', url: channelsEndpoint.path })
 
+const accept = (id: string, body: Body, target = admin) =>
+  target.inject({ method: 'PUT', url: acceptHostKeyEndpoint.path.replace(':id', id), body })
+
 describe('POST /channels', () => {
   it('stores an inbound SFTP Channel and returns its credential masked', async () => {
     const { channel, webhookToken } = await created(sftpInbox)
@@ -276,9 +279,6 @@ describe('the host key fingerprint of an SFTP Channel', () => {
     expect(response.statusCode).toBe(400)
   })
 })
-
-const accept = (id: string, body: Body, target = admin) =>
-  target.inject({ method: 'PUT', url: acceptHostKeyEndpoint.path.replace(':id', id), body })
 
 describe('PUT /channels/:id/host-key', () => {
   it('stores the fingerprint the Admin accepted and returns the Channel', async () => {

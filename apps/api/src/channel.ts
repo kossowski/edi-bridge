@@ -421,7 +421,7 @@ export const testChannel = (id: string) =>
     const channel = toChannel(row, apiPublicUrl)
 
     // A seeded Channel points at a reserved host and never connects, not even for a test.
-    const outcome = row.seeded
+    const { reason, hostKey } = row.seeded
       ? { reason: 'seededChannel' as const, hostKey: null }
       : yield* handlingOf(channel.type)
           .reach(channel, secretOf(secrets, row))
@@ -432,7 +432,6 @@ export const testChannel = (id: string) =>
             ),
           )
 
-    const { reason, hostKey } = outcome
     const testedAt = new Date().toISOString()
 
     return (
