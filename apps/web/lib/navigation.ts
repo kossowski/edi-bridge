@@ -20,9 +20,13 @@ import {
 import type { IconSvgElement } from '@hugeicons/react'
 import type { Messages } from 'next-intl'
 
-import type { FixTarget } from '@edi-bridge/contracts'
+import {
+  type CreateMappingBody,
+  type FixTarget,
+  newMappingMessageTypes,
+} from '@edi-bridge/contracts'
 
-import type { SearchParamsReader } from './search-params'
+import { firstSearchParam, type SearchParamsReader } from './search-params'
 
 export const documentViews = ['documents', 'transmissions'] as const
 
@@ -225,6 +229,20 @@ export function flowHref(id: string) {
 
 export function mappingHref(id: string) {
   return `${navigationItems.mappings.href}/${id}`
+}
+
+const newMappingParam = 'new'
+
+export function newMappingHref(messageType: CreateMappingBody['messageType']) {
+  return `${navigationItems.mappings.href}?${new URLSearchParams({ [newMappingParam]: messageType })}`
+}
+
+export function newMappingMessageTypeIn(
+  searchParams: Readonly<Record<string, string | string[] | undefined>>,
+): CreateMappingBody['messageType'] | null {
+  const value = firstSearchParam(searchParams[newMappingParam])
+
+  return newMappingMessageTypes.find((messageType) => messageType === value) ?? null
 }
 
 export const newDocumentStructureHref = `${navigationItems.documentStructures.href}/new`

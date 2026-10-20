@@ -37,7 +37,7 @@ import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 import { Spinner } from '@edi-bridge/ui/components/spinner'
 import { cn } from '@edi-bridge/ui/lib/utils'
 
-type NewMessageType = CreateMappingBody['messageType']
+export type NewMessageType = CreateMappingBody['messageType']
 
 function Choice({
   messageType,
@@ -149,9 +149,11 @@ function DocumentStructuresUnavailable({ onRetry }: { onRetry: () => void }) {
 
 export function NewMappingChoices({
   direction,
+  messageType = null,
   className,
 }: {
   direction: Direction | null
+  messageType?: NewMessageType | null
   className?: string
 }) {
   const t = useTranslations('Mappings.new.documentStructure')
@@ -173,8 +175,10 @@ export function NewMappingChoices({
     return <NoDocumentStructure />
   }
 
-  const shown = newMappingMessageTypes.filter(
-    (messageType) => !direction || directionOf({ messageType }) === direction,
+  const shown = newMappingMessageTypes.filter((candidate) =>
+    messageType
+      ? candidate === messageType
+      : !direction || directionOf({ messageType: candidate }) === direction,
   )
 
   function choose(messageType: NewMessageType) {
@@ -215,13 +219,13 @@ export function NewMappingChoices({
         />
       )}
       <ul className={cn('grid gap-2', className)}>
-        {shown.map((messageType) => (
+        {shown.map((candidate) => (
           <Choice
-            key={messageType}
-            chosen={create.locked && create.messageType === messageType}
+            key={candidate}
+            chosen={create.locked && create.messageType === candidate}
             locked={create.locked || documentStructures.isPending}
-            messageType={messageType}
-            onChoose={() => choose(messageType)}
+            messageType={candidate}
+            onChoose={() => choose(candidate)}
           />
         ))}
       </ul>
@@ -236,10 +240,12 @@ export function NewMappingChoices({
 export function NewMappingSheet({
   open,
   direction,
+  messageType,
   onOpenChange,
 }: {
   open: boolean
   direction: Direction | null
+  messageType: NewMessageType | null
   onOpenChange: (open: boolean) => void
 }) {
   const t = useTranslations('Mappings.new')
@@ -252,7 +258,7 @@ export function NewMappingSheet({
           <SheetDescription>{t('description')}</SheetDescription>
         </SheetHeader>
         <div className="flex-1 overflow-y-auto px-4 pb-4">
-          <NewMappingChoices direction={direction} />
+          <NewMappingChoices direction={direction} messageType={messageType} />
         </div>
       </SheetContent>
     </Sheet>

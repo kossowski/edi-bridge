@@ -10,6 +10,7 @@ import {
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
+import { useRouter } from 'next/navigation'
 import { useId, useState } from 'react'
 
 import { AppPage } from '@/components/app-page'
@@ -23,9 +24,14 @@ import {
   mappingFilters,
   matchesFilter,
 } from '@/components/mappings/mapping-state'
-import { NewMappingChoices, NewMappingSheet } from '@/components/mappings/new-mapping'
+import {
+  NewMappingChoices,
+  NewMappingSheet,
+  type NewMessageType,
+} from '@/components/mappings/new-mapping'
 import { useCanChange } from '@/hooks/use-session'
 import { mappingsQuery } from '@/lib/api/queries'
+import { navigationItems } from '@/lib/navigation'
 import { Button } from '@edi-bridge/ui/components/button'
 import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 
@@ -101,7 +107,13 @@ function Lane({
   )
 }
 
-function FirstMapping({ canChange }: { canChange: boolean }) {
+function FirstMapping({
+  canChange,
+  messageType,
+}: {
+  canChange: boolean
+  messageType: NewMessageType | null
+}) {
   const t = useTranslations('Mappings')
   const titleId = useId()
 
@@ -128,6 +140,7 @@ function FirstMapping({ canChange }: { canChange: boolean }) {
       {canChange && (
         <NewMappingChoices
           direction={null}
+          messageType={messageType}
           className="w-full text-left @xl:grid-cols-2 @4xl:grid-cols-3"
         />
       )}
@@ -135,18 +148,34 @@ function FirstMapping({ canChange }: { canChange: boolean }) {
   )
 }
 
-export function MappingsScreen() {
+export function MappingsScreen({
+  newMessageType = null,
+}: {
+  newMessageType?: NewMessageType | null
+}) {
   const t = useTranslations()
   const tMappings = useTranslations('Mappings')
   const mappings = useQuery(mappingsQuery)
   const canChange = useCanChange()
+  const router = useRouter()
   const [filter, setFilter] = useState<MappingFilter>('all')
-  const [sheetOpen, setSheetOpen] = useState(false)
+  const [sheetOpen, setSheetOpen] = useState(newMessageType !== null)
   const [sheetDirection, setSheetDirection] = useState<Direction | null>(null)
+  const [sheetMessageType, setSheetMessageType] = useState(newMessageType)
 
   function openSheet(direction: Direction | null) {
     setSheetDirection(direction)
+    setSheetMessageType(null)
     setSheetOpen(true)
+  }
+
+  // The link from elsewhere leaves the address once the sheet closes, so a reload does not open it.
+  function changeSheetOpen(open: boolean) {
+    setSheetOpen(open)
+
+    if (!open && newMessageType !== null) {
+      router.replace(navigationItems.mappings.href, { scroll: false })
+    }
   }
 
   if (mappings.isError) {
@@ -169,7 +198,7 @@ export function MappingsScreen() {
   if (mappings.isSuccess && all.length === 0) {
     return (
       <AppPage title={t('Sidebar.items.mappings.label')}>
-        <FirstMapping canChange={canChange} />
+        <FirstMapping canChange={canChange} messageType={newMessageType} />
       </AppPage>
     )
   }
@@ -220,7 +249,12 @@ export function MappingsScreen() {
           />
         ))}
       </div>
-      <NewMappingSheet direction={sheetDirection} open={sheetOpen} onOpenChange={setSheetOpen} />
+      <NewMappingSheet
+        direction={sheetDirection}
+        messageType={sheetMessageType}
+        open={sheetOpen && canChange}
+        onOpenChange={changeSheetOpen}
+      />
     </AppPage>
   )
 }

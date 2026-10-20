@@ -7,6 +7,8 @@ import {
   documentHref,
   fixTargetHref,
   interchangeHref,
+  newMappingHref,
+  newMappingMessageTypeIn,
   orderHref,
   pageItems,
   sidebarItem,
@@ -131,5 +133,18 @@ describe('tradingPartnerHref', () => {
     expect(tradingPartnerHref('10000000-0000-4000-8000-000000000001')).toBe(
       '/trading-partners/10000000-0000-4000-8000-000000000001',
     )
+  })
+})
+
+describe('newMappingHref', () => {
+  it('opens the create step with the Message Type chosen', () => {
+    expect(newMappingHref('DESADV')).toBe('/mappings?new=DESADV')
+  })
+
+  it('reads back the chosen Message Type and ignores any other value', () => {
+    expect(newMappingMessageTypeIn({ new: 'DESADV' })).toBe('DESADV')
+    expect(newMappingMessageTypeIn({ new: ['INVOIC', 'ORDERS'] })).toBe('INVOIC')
+    expect(newMappingMessageTypeIn({ new: 'APERAK' })).toBeNull()
+    expect(newMappingMessageTypeIn({})).toBeNull()
   })
 })

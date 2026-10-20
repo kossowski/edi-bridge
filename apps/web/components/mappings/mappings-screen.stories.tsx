@@ -255,6 +255,56 @@ export const NewMappingFromLane = meta.story({
   },
 })
 
+export const NewMappingWithMessageType = meta.story({
+  args: { newMessageType: 'DESADV' },
+  async play({ msw }) {
+    const bodies: unknown[] = []
+
+    msw.use(
+      http.post(createUrl, async ({ request }) => {
+        bodies.push(await request.clone().json())
+      }),
+    )
+
+    const sheet = within(await screen.findByRole('dialog', { name: 'New Mapping' }))
+
+    await waitFor(() =>
+      expect(sheet.getByRole('button', { name: 'Dispatch advices you send' })).toBeVisible(),
+    )
+    await expect(sheet.getAllByRole('button', { name: /you (receive|send)$/ })).toHaveLength(1)
+
+    await chooseDocumentStructure(sheet)
+    await userEvent.click(sheet.getByRole('button', { name: 'Dispatch advices you send' }))
+
+    await waitFor(() =>
+      expect(getRouter().push).toHaveBeenCalledWith(
+        expect.stringMatching(/^\/mappings\/[\w-]+\?ai-draft=start$/),
+      ),
+    )
+    await expect(bodies).toEqual([
+      { messageType: 'DESADV', documentStructureId: documentStructure.id },
+    ])
+  },
+})
+
+export const NewMappingWithMessageTypeClosed = meta.story({
+  args: { newMessageType: 'DESADV' },
+  async play({ canvasElement }) {
+    await screen.findByRole('dialog', { name: 'New Mapping' })
+    await userEvent.keyboard('{Escape}')
+
+    await waitFor(() =>
+      expect(getRouter().replace).toHaveBeenCalledWith('/mappings', { scroll: false }),
+    )
+
+    const sheet = await openNewMappingSheet(canvasElement)
+
+    await waitFor(() =>
+      expect(sheet.getAllByRole('button', { name: /you (receive|send)$/ })).toHaveLength(3),
+    )
+  },
+})
+
 export const CreatingMapping = meta.story({
   beforeEach({ msw }) {
     msw.use(http.post(createUrl, () => delay('infinite')))
@@ -584,6 +634,17 @@ export const EmptyWorkspaceGerman = meta.story({
   },
 })
 
+export const EmptyWorkspaceWithMessageType = meta.story({
+  args: { newMessageType: 'INVOIC' },
+  beforeEach({ msw }) {
+    msw.use(...mappingHandlers(apiUrl, { mappings: [] }))
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByRole('button', { name: 'Invoices you send' })).toBeVisible()
+    await expect(canvas.getAllByRole('button', { name: /you (receive|send)$/ })).toHaveLength(1)
+  },
+})
+
 export const EmptyWorkspaceDark = meta.story({
   beforeEach({ msw }) {
     msw.use(...mappingHandlers(apiUrl, { mappings: [] }))
@@ -605,6 +666,18 @@ export const Viewer = meta.story({
 
       await expect(canvas.queryByRole('button', { name: 'New Mapping' })).toBeNull()
       await expect(canvas.queryByRole('button', { name: /^Another document/ })).toBeNull()
+    },
+  }),
+})
+
+export const ViewerWithMessageType = meta.story({
+  args: { newMessageType: 'DESADV' },
+  ...viewerStory({
+    async play({ canvas, canvasElement }) {
+      await lane(canvasElement, 'Going out')
+      await canvas.findByRole('link', { name: 'Dispatch advices to 2 partners' })
+
+      await expect(screen.queryByRole('dialog', { name: 'New Mapping' })).toBeNull()
     },
   }),
 })
