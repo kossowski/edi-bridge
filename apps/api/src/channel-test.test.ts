@@ -81,6 +81,8 @@ const tested = async (id: string, target = admin) => {
   return { status: response.statusCode, body: response.json<unknown>() }
 }
 
+const anyTimestamp: unknown = expect.any(String)
+
 const outcomeOf = async (input: ChannelInput) => {
   const { status, body } = await tested((await created(input)).id)
 
@@ -167,7 +169,7 @@ describe('POST /channels/:id/test for the host key of an SFTP Channel', () => {
       outcome: 'failed',
       reason: 'hostKeyMismatch',
       hostKey: { fingerprint: sftp.hostKeyFingerprint, state: 'mismatch' },
-      testedAt: expect.any(String),
+      testedAt: anyTimestamp,
     })
   })
 
@@ -202,7 +204,7 @@ describe('POST /channels/:id/test for an HTTP Channel', () => {
     expect(await outcomeOf(httpDelivery())).toEqual({
       outcome: 'succeeded',
       hostKey: null,
-      testedAt: expect.any(String),
+      testedAt: anyTimestamp,
     })
 
     expect(erp.received).toHaveLength(1)
