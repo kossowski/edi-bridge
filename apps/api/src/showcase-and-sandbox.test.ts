@@ -1,5 +1,6 @@
-import { and, count, eq } from 'drizzle-orm'
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import { hashPassword } from 'better-auth/crypto'
+import { and, count, eq, inArray } from 'drizzle-orm'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { secretBox } from '@edi-bridge/channels'
 import {
@@ -24,16 +25,20 @@ import {
   testChannels,
   webOrigin,
 } from './testing.js'
+import { storePassword } from './user.js'
 
 let api: TestApi
 
 const adminPassword = 'sandbox-admin-password'
 
-const ensure = (password = vi.fn(() => adminPassword)) =>
+const ensure = (password: string | undefined) =>
   ensureShowcaseAndSandbox(api.connection.db, {
     secrets: secretBox(testChannels.secretKey),
     adminPassword: password,
   })
+
+const adminSignIn = (password = adminPassword) =>
+  api.app.inject(signInRequest({ email: showcaseAdmin.email, password }))
 
 const showcaseSignIn = (headers: Record<string, string> = { origin: webOrigin }) =>
   api.app.inject({ method: 'POST', url: showcaseSignInEndpoint.path, headers })
@@ -41,17 +46,36 @@ const showcaseSignIn = (headers: Record<string, string> = { origin: webOrigin })
 const sessionOf = async (client: Client) =>
   sessionSchema.parse((await client.inject({ method: 'GET', url: sessionEndpoint.path })).json())
 
-const viewerId = async () => {
-  const [viewer] = await api.connection.db
+const userIdOf = async (email: string) => {
+  const [user] = await api.connection.db
     .select({ id: users.id })
     .from(users)
-    .where(eq(users.email, showcaseViewer.email))
+    .where(eq(users.email, email))
 
-  if (viewer === undefined) {
-    throw new Error('The showcase Viewer is missing')
+  if (user === undefined) {
+    throw new Error(`${email} is missing`)
   }
 
-  return viewer.id
+  return user.id
+}
+
+const membershipsOf = (userId: string) =>
+  api.connection.db
+    .select({ workspaceId: members.workspaceId, role: members.role })
+    .from(members)
+    .where(eq(members.userId, userId))
+
+const showcaseId = async () => {
+  const [showcase] = await api.connection.db
+    .select({ id: workspaces.id })
+    .from(workspaces)
+    .where(eq(workspaces.kind, 'showcase'))
+
+  if (showcase === undefined) {
+    throw new Error('The Showcase is missing')
+  }
+
+  return showcase.id
 }
 
 const runCount = async (kind: 'showcase' | 'sandbox') => {
@@ -92,15 +116,13 @@ describe('api start', () => {
 
 describe('ensureShowcaseAndSandbox', () => {
   it('creates the seeded Showcase and Sandbox with their fixed users once', async () => {
-    const password = vi.fn(() => adminPassword)
-
-    expect(await ensure(password)).toEqual({
+    expect(await ensure(adminPassword)).toEqual({
       showcase: 'created',
       sandbox: 'created',
       viewer: 'created',
       admin: 'created',
+      generatedPassword: null,
     })
-    expect(password).toHaveBeenCalledOnce()
 
     const created = await api.connection.db
       .select({ name: workspaces.name, kind: workspaces.kind, seeded: workspaces.seeded })
@@ -138,22 +160,17 @@ describe('ensureShowcaseAndSandbox', () => {
 
   it('changes nothing when run again: no new seed, no new password', async () => {
     const before = { showcase: await runCount('showcase'), sandbox: await runCount('sandbox') }
-    const password = vi.fn(() => 'another-sandbox-password')
-
-    expect(await ensure(password)).toEqual({
+    expect(await ensure('another-sandbox-password')).toEqual({
       showcase: 'found',
       sandbox: 'found',
       viewer: 'found',
       admin: 'found',
+      generatedPassword: null,
     })
-    expect(password).not.toHaveBeenCalled()
     expect({ showcase: await runCount('showcase'), sandbox: await runCount('sandbox') }).toEqual(
       before,
     )
-    expect(
-      (await api.app.inject(signInRequest({ email: showcaseAdmin.email, password: adminPassword })))
-        .statusCode,
-    ).toBe(200)
+    expect((await adminSignIn()).statusCode).toBe(200)
   })
 })
 
@@ -203,7 +220,7 @@ describe('POST /auth/sign-in/showcase', () => {
   })
 
   it('refuses once the Viewer is also Member of another Workspace', async () => {
-    const userId = await viewerId()
+    const userId = await userIdOf(showcaseViewer.email)
 
     await api.connection.db
       .insert(members)
@@ -222,7 +239,7 @@ describe('POST /auth/sign-in/showcase', () => {
   })
 
   it('refuses once the Viewer holds a role above Viewer', async () => {
-    const userId = await viewerId()
+    const userId = await userIdOf(showcaseViewer.email)
 
     await api.connection.db.update(members).set({ role: 'admin' }).where(eq(members.userId, userId))
 
@@ -237,7 +254,7 @@ describe('POST /auth/sign-in/showcase', () => {
   })
 
   it('refuses once the Viewer is an Operator', async () => {
-    const userId = await viewerId()
+    const userId = await userIdOf(showcaseViewer.email)
 
     await api.connection.db.update(users).set({ operator: true }).where(eq(users.id, userId))
 
@@ -248,6 +265,102 @@ describe('POST /auth/sign-in/showcase', () => {
       expect(response.cookies).toEqual([])
     } finally {
       await api.connection.db.update(users).set({ operator: false }).where(eq(users.id, userId))
+    }
+  })
+})
+
+describe('ensureShowcaseAndSandbox run again after a change', () => {
+  it('adds the missing memberships of the Viewer and the Admin', async () => {
+    const userIds = [await userIdOf(showcaseViewer.email), await userIdOf(showcaseAdmin.email)]
+
+    await api.connection.db.delete(members).where(inArray(members.userId, userIds))
+
+    expect(await ensure('another-sandbox-password')).toMatchObject({
+      viewer: 'membershipAdded',
+      admin: 'membershipAdded',
+      generatedPassword: null,
+    })
+    expect(await sessionOf(signedInClient(api.app, await showcaseSignIn()))).toMatchObject({
+      workspace: { kind: 'showcase' },
+      role: 'viewer',
+    })
+    expect(await sessionOf(signedInClient(api.app, await adminSignIn()))).toMatchObject({
+      workspace: { kind: 'sandbox' },
+      role: 'admin',
+    })
+  })
+
+  it('creates a missing showcase-admin with a generated password it returns', async () => {
+    await api.connection.db.delete(users).where(eq(users.email, showcaseAdmin.email))
+
+    const outcome = await ensure(undefined)
+
+    expect(outcome).toMatchObject({ viewer: 'found', admin: 'created' })
+    expect(outcome.generatedPassword).toEqual(expect.any(String))
+    expect((await adminSignIn(outcome.generatedPassword ?? '')).statusCode).toBe(200)
+
+    await storePassword(
+      api.connection.db,
+      await userIdOf(showcaseAdmin.email),
+      await hashPassword(adminPassword),
+    )
+  })
+
+  it('grants nothing and fails when the Viewer is an Operator', async () => {
+    const userId = await userIdOf(showcaseViewer.email)
+
+    await api.connection.db.delete(members).where(eq(members.userId, userId))
+    await api.connection.db.update(users).set({ operator: true }).where(eq(users.id, userId))
+
+    try {
+      await expect(ensure(adminPassword)).rejects.toThrow(
+        `${showcaseViewer.email} has rights beyond the Viewer of the Showcase`,
+      )
+      expect(await membershipsOf(userId)).toEqual([])
+    } finally {
+      await api.connection.db.update(users).set({ operator: false }).where(eq(users.id, userId))
+      await ensure(adminPassword)
+    }
+  })
+
+  it('grants nothing and fails when the showcase-admin is Member of another Workspace', async () => {
+    const userId = await userIdOf(showcaseAdmin.email)
+
+    await api.connection.db.delete(members).where(eq(members.userId, userId))
+    await api.connection.db
+      .insert(members)
+      .values({ userId, workspaceId: ownWorkspace.id, role: 'viewer' })
+
+    try {
+      await expect(ensure(adminPassword)).rejects.toThrow(
+        `${showcaseAdmin.email} has rights beyond the Admin of the Sandbox`,
+      )
+      expect(await membershipsOf(userId)).toEqual([
+        { workspaceId: ownWorkspace.id, role: 'viewer' },
+      ])
+    } finally {
+      await api.connection.db.delete(members).where(eq(members.userId, userId))
+      await ensure(adminPassword)
+    }
+  })
+
+  it('keeps a changed role of the Viewer in the Showcase and fails', async () => {
+    const userId = await userIdOf(showcaseViewer.email)
+
+    await api.connection.db.update(members).set({ role: 'admin' }).where(eq(members.userId, userId))
+
+    try {
+      await expect(ensure(adminPassword)).rejects.toThrow(
+        `${showcaseViewer.email} has rights beyond the Viewer of the Showcase`,
+      )
+      expect(await membershipsOf(userId)).toEqual([
+        { workspaceId: await showcaseId(), role: 'admin' },
+      ])
+    } finally {
+      await api.connection.db
+        .update(members)
+        .set({ role: 'viewer' })
+        .where(eq(members.userId, userId))
     }
   })
 })

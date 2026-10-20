@@ -71,7 +71,7 @@ To choose the password, set `SHOWCASE_ADMIN_PASSWORD` for this one command only.
 SHOWCASE_ADMIN_PASSWORD='<password>' node dist/create-demo-workspaces.js
 ```
 
-Running the command again is safe. It changes nothing that exists: it does not seed an existing Workspace again and keeps the password of the Sandbox Admin.
+Running the command again is safe. It does not seed an existing Workspace again, and it never changes an existing role or password. It adds what is missing: a Workspace, a user, or the membership of the Viewer in the Showcase or of the Admin in the Sandbox. If the Viewer or the Sandbox Admin is an Operator or has any other membership, the command grants nothing and fails with a message that names the user. Remove those rights and run the command again.
 
 The seeded Channels of both Workspaces point at reserved hosts and never send. **Test connection** on one of them answers that it never sends.
 

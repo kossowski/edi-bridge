@@ -111,7 +111,7 @@ beforeAll(async () => {
   api = await startTestApi()
   await ensureShowcaseAndSandbox(api.connection.db, {
     secrets: secretBox(testChannels.secretKey),
-    adminPassword: () => adminPassword,
+    adminPassword,
   })
 }, 60_000)
 

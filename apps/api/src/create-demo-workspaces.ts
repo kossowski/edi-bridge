@@ -1,4 +1,3 @@
-import { randomBytes } from 'node:crypto'
 import { z } from 'zod'
 
 import { secretBox, secretKeyEnv } from '@edi-bridge/channels'
@@ -13,12 +12,14 @@ import {
   showcaseWorkspace,
 } from './showcase-and-sandbox.js'
 
+const outcomeText = { created: 'created', found: 'found', membershipAdded: 'membership added' }
+
 const summary = (outcome: ShowcaseAndSandboxOutcome) =>
   [
-    `Showcase Workspace "${showcaseWorkspace.name}": ${outcome.showcase}`,
-    `Sandbox Workspace "${sandboxWorkspace.name}": ${outcome.sandbox}`,
-    `Viewer ${showcaseViewer.email} of the Showcase: ${outcome.viewer}`,
-    `Admin ${showcaseAdmin.email} of the Sandbox: ${outcome.admin}`,
+    `Showcase Workspace "${showcaseWorkspace.name}": ${outcomeText[outcome.showcase]}`,
+    `Sandbox Workspace "${sandboxWorkspace.name}": ${outcomeText[outcome.sandbox]}`,
+    `Viewer ${showcaseViewer.email} of the Showcase: ${outcomeText[outcome.viewer]}`,
+    `Admin ${showcaseAdmin.email} of the Sandbox: ${outcomeText[outcome.admin]}`,
   ].join('\n')
 
 async function createShowcaseAndSandbox() {
@@ -44,19 +45,17 @@ async function createShowcaseAndSandbox() {
 
   const connection = connect(databaseUrl)
 
-  let generated: string | undefined
-
   try {
     const outcome = await ensureShowcaseAndSandbox(connection.db, {
       secrets: secretBox(secretKey),
-      adminPassword: () => password ?? (generated = randomBytes(18).toString('base64url')),
+      adminPassword: password,
     })
 
     console.log(summary(outcome))
 
     // Printed once to the terminal of this command only; the api never sees or logs it.
-    if (generated !== undefined) {
-      console.log(`Password of ${showcaseAdmin.email}: ${generated}`)
+    if (outcome.generatedPassword !== null) {
+      console.log(`Password of ${showcaseAdmin.email}: ${outcome.generatedPassword}`)
       console.log('Store it now: the command does not show it again.')
     }
   } finally {

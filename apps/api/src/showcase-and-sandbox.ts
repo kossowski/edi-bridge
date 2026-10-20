@@ -1,9 +1,10 @@
 import { hashPassword } from 'better-auth/crypto'
 import { eq, sql } from 'drizzle-orm'
+import { randomBytes } from 'node:crypto'
 
 import { type SecretBox } from '@edi-bridge/channels'
 import { minPasswordLength, type WorkspaceKind, type WorkspaceRole } from '@edi-bridge/contracts'
-import { users, workspaces } from '@edi-bridge/db'
+import { members, users, workspaces } from '@edi-bridge/db'
 
 import { seedWorkspace } from './seed.js'
 import { addMembership, addUser, storePassword } from './user.js'
@@ -26,17 +27,20 @@ export const showcaseAdmin = {
 
 export interface ShowcaseAndSandboxInput {
   secrets: SecretBox
-  adminPassword: () => string
+  adminPassword: string | undefined
   now?: Date
 }
 
-type Outcome = 'created' | 'found'
+type WorkspaceOutcome = 'created' | 'found'
+
+type MemberOutcome = WorkspaceOutcome | 'membershipAdded'
 
 export interface ShowcaseAndSandboxOutcome {
-  showcase: Outcome
-  sandbox: Outcome
-  viewer: Outcome
-  admin: Outcome
+  showcase: WorkspaceOutcome
+  sandbox: WorkspaceOutcome
+  viewer: MemberOutcome
+  admin: MemberOutcome
+  generatedPassword: string | null
 }
 
 async function ensureWorkspace(
@@ -67,37 +71,67 @@ async function ensureWorkspace(
   return { id: created.id, outcome: 'created' as const }
 }
 
-async function ensureMember(
-  tx: Transaction,
-  { name, email }: { name: string; email: string },
-  membership: { workspaceId: string; role: WorkspaceRole },
-  passwordHash?: () => Promise<string>,
-) {
-  const [found] = await tx.select({ id: users.id }).from(users).where(eq(users.email, email))
-
-  if (found !== undefined) {
-    return 'found' as const
-  }
-
-  const userId = await addUser(tx, { name, email, operator: false })
-
-  if (passwordHash !== undefined) {
-    await storePassword(tx, userId, await passwordHash())
-  }
-
-  await addMembership(tx, { userId, ...membership })
-
-  return 'created' as const
-}
-
-async function hashedAdminPassword(adminPassword: () => string) {
-  const password = adminPassword()
-
+function checkedPassword(password: string) {
   if (password.length < minPasswordLength) {
     throw new Error(`The password must have at least ${minPasswordLength} characters.`)
   }
 
-  return hashPassword(password)
+  return password
+}
+
+interface Membership {
+  workspaceId: string
+  role: WorkspaceRole
+  label: string
+}
+
+async function ensureMember(
+  tx: Transaction,
+  { name, email }: { name: string; email: string },
+  { label, ...membership }: Membership,
+  password?: string,
+): Promise<MemberOutcome> {
+  const [found] = await tx
+    .select({ id: users.id, operator: users.operator })
+    .from(users)
+    .where(eq(users.email, email))
+
+  if (found === undefined) {
+    const userId = await addUser(tx, { name, email, operator: false })
+
+    if (password !== undefined) {
+      await storePassword(tx, userId, await hashPassword(checkedPassword(password)))
+    }
+
+    await addMembership(tx, { userId, ...membership })
+
+    return 'created'
+  }
+
+  const memberships = await tx
+    .select({ workspaceId: members.workspaceId, role: members.role })
+    .from(members)
+    .where(eq(members.userId, found.id))
+
+  // Every visitor shares this user, so the command never grants on top of a right it did not give.
+  if (
+    found.operator ||
+    memberships.some(
+      ({ workspaceId, role }) => workspaceId !== membership.workspaceId || role !== membership.role,
+    )
+  ) {
+    throw new Error(
+      `${email} has rights beyond the ${label}, so the command grants nothing. Remove those rights and run the command again.`,
+    )
+  }
+
+  if (memberships.length > 0) {
+    return 'found'
+  }
+
+  await addMembership(tx, { userId: found.id, ...membership })
+
+  return 'membershipAdded'
 }
 
 export function ensureShowcaseAndSandbox(
@@ -111,19 +145,28 @@ export function ensureShowcaseAndSandbox(
     const showcase = await ensureWorkspace(tx, showcaseWorkspace, { secrets, now })
     const sandbox = await ensureWorkspace(tx, sandboxWorkspace, { secrets, now })
 
-    // The Viewer gets no password: only the showcase sign-in creates their session.
+    // The Viewer gets no password: only the Showcase sign-in creates their session.
     const viewer = await ensureMember(tx, showcaseViewer, {
       workspaceId: showcase.id,
       role: 'viewer',
+      label: 'Viewer of the Showcase',
     })
+
+    const password = adminPassword ?? randomBytes(18).toString('base64url')
 
     const admin = await ensureMember(
       tx,
       showcaseAdmin,
-      { workspaceId: sandbox.id, role: 'admin' },
-      () => hashedAdminPassword(adminPassword),
+      { workspaceId: sandbox.id, role: 'admin', label: 'Admin of the Sandbox' },
+      password,
     )
 
-    return { showcase: showcase.outcome, sandbox: sandbox.outcome, viewer, admin }
+    return {
+      showcase: showcase.outcome,
+      sandbox: sandbox.outcome,
+      viewer,
+      admin,
+      generatedPassword: admin === 'created' && adminPassword === undefined ? password : null,
+    }
   })
 }
