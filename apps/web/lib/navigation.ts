@@ -213,8 +213,10 @@ export function documentHref(id: string) {
   return `${navigationItems.documents.href}/${id}`
 }
 
-export function tradingPartnerHref(id: string) {
-  return `${navigationItems.tradingPartners.href}/${id}`
+export function tradingPartnerHref(id: string, tab?: 'documents' | 'connections' | 'settings') {
+  const href = `${navigationItems.tradingPartners.href}/${id}`
+
+  return tab === undefined ? href : `${href}?${new URLSearchParams({ tab })}`
 }
 
 export function flowHref(id: string) {

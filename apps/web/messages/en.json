@@ -1129,11 +1129,12 @@
       "failed": "{direction, select, inbound {The {document} from {tradingPartner} could not be processed} other {The {document} to {tradingPartner} could not be processed}}",
       "rejected": "{tradingPartner} rejected the {document}",
       "overdue": "{tradingPartner} has not confirmed the {document}",
+      "confirmationNotSent": "{tradingPartner} got no receipt confirmation for the {document}",
       "resendAwaited": "Waiting for {tradingPartner} to send the {document} again",
       "confirmationPending": "Waiting for {tradingPartner} to confirm the {document}",
       "inProgress": "The {document} is being processed",
-      "sentUnconfirmed": "The {document} was sent to {tradingPartner}, with no receipt confirmation yet",
       "nextDocument": "Waiting for the {document}",
+      "confirmationNotTracked": "The {document} was sent to {tradingPartner} before receipt confirmations were tracked",
       "done": "Everything for this order is done",
       "progress": "{done, number} of {total, number} documents done"
     },
@@ -1164,6 +1165,8 @@
     "message": {
       "at": "{kind, select, received {Received} sent {Sent} other {Created}} <time>{date}</time>",
       "receiptConfirmation": "Receipt confirmation",
+      "notTracked": "Not tracked",
+      "notTrackedReason": "Sent before receipt confirmations were tracked.",
       "waiting": "{unit, select, days {Waiting {value, plural, one {# day} other {# days}}} other {Waiting {value, number} h}} — limit {limit, number} h",
       "replaced": "Replaced",
       "replacedBy": "Processed again:",
@@ -1179,6 +1182,11 @@
       "messageLabel": "Message to {tradingPartner}",
       "copyLabel": "message",
       "text": "Hello {tradingPartner} team,\n\nWe sent you the {document} for order {businessReference} on {sentAt} (transmission {controlReference}), but we have not received a receipt confirmation yet. Could you check whether it arrived in your system?\n\nThank you and kind regards"
+    },
+    "notSent": {
+      "state": "Not sent",
+      "reason": "{tradingPartner} got no receipt confirmation for this {document}, because {reason, select, noOutboundChannel {no document route sends documents to {tradingPartner}.} ambiguousChannel {the document routes to {tradingPartner} use different connections, so EDI Bridge cannot tell which one to use.} workspaceGlnMissing {your company's GLN is missing.} other {the header of the transmission from {tradingPartner} cannot be repeated in a valid receipt confirmation.}}",
+      "fix": "{reason, select, noOutboundChannel {<link>Add a document route to {tradingPartner}</link> so that later documents get a receipt confirmation.} ambiguousChannel {Check the <link>document routes of {tradingPartner}</link> and let them all use the same connection.} workspaceGlnMissing {<link>Record your company's GLN</link> so that later documents get a receipt confirmation.} other {Ask {tradingPartner} to check the header of its transmissions.}}"
     },
     "acknowledgement": {
       "state": {

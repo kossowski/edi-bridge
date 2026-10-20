@@ -40,12 +40,23 @@ describe('orderVerdictOf', () => {
     })
   })
 
-  it('needs attention for a not-sent CONTRL while another one is pending', () => {
+  it('names a not-sent CONTRL before a pending one', () => {
     expect(verdictOf(orderLifecycleReferences.partial)).toMatchObject({
       status: 'needs-attention',
-      reason: 'confirmationPending',
-      messageType: 'DESADV',
+      reason: 'confirmationNotSent',
+      messageType: 'ORDERS',
+      direction: 'inbound',
       done: 0,
+    })
+  })
+
+  it('names a sent document whose receipt confirmation was not tracked once all are done', () => {
+    expect(verdictOf(orderLifecycleReferences.multiPartner, 'Hansemarkt GmbH')).toEqual({
+      status: 'done',
+      reason: 'confirmationNotTracked',
+      messageType: 'DESADV',
+      direction: 'outbound',
+      done: 3,
     })
   })
 
@@ -98,16 +109,19 @@ describe('orderVerdictOf for a sent document without receipt confirmation', () =
     }
   }
 
-  it.each([
-    ['without an Interchange', () => null],
-    [
-      'without an Acknowledgement',
-      (current: OrderLifecycleMessage['interchange']) => ({ ...current!, acknowledgement: null }),
-    ],
-  ])('calls a delivered dispatch advice %s sent, not awaited', (_, interchange) => {
-    expect(orderVerdictOf(withDispatchAdvice(interchange))).toMatchObject({
+  it('names the next document before an untracked receipt confirmation', () => {
+    expect(
+      orderVerdictOf(withDispatchAdvice((current) => ({ ...current!, acknowledgement: null }))),
+    ).toMatchObject({ status: 'on-track', reason: 'nextDocument', messageType: 'INVOIC' })
+  })
+
+  it('keeps a delivered dispatch advice without an Interchange in progress', () => {
+    const { messages } = withDispatchAdvice(() => null)
+    const invoic = full.messages.find(({ messageType }) => messageType === 'INVOIC')!
+
+    expect(orderVerdictOf({ ...full, messages: [...messages, invoic] })).toMatchObject({
       status: 'on-track',
-      reason: 'sentUnconfirmed',
+      reason: 'inProgress',
       messageType: 'DESADV',
       direction: 'outbound',
     })

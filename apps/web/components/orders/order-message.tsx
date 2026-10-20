@@ -1,6 +1,13 @@
 'use client'
 
-import { ArrowRight01Icon, Clock01Icon, Mail01Icon, RepeatIcon } from '@hugeicons/core-free-icons'
+import {
+  ArrowRight01Icon,
+  Clock01Icon,
+  Mail01Icon,
+  MailBlock01Icon,
+  MinusSignCircleIcon,
+  RepeatIcon,
+} from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useFormatter, useTranslations } from 'next-intl'
 import Link from 'next/link'
@@ -10,16 +17,20 @@ import { CopyButton } from '@/components/copy-button'
 import { linkClass } from '@/components/detail-parts'
 import { RunStatusBadge } from '@/components/documents/run-status'
 import { AcknowledgementStateBadge } from '@/components/orders/acknowledgement-state'
-import { waitingTimeOf } from '@/components/orders/order-verdict'
+import { confirmationNotTracked, waitingTimeOf } from '@/components/orders/order-verdict'
 import { usePlainNames } from '@/components/plain-names'
 import { Term } from '@/components/term'
-import { documentHref } from '@/lib/navigation'
+import { documentHref, navigationItems, tradingPartnerHref } from '@/lib/navigation'
 import { Badge } from '@edi-bridge/ui/components/badge'
 import { Button, buttonVariants } from '@edi-bridge/ui/components/button'
 import { Textarea } from '@edi-bridge/ui/components/textarea'
 import { cn } from '@edi-bridge/ui/lib/utils'
 
-import type { OrderLifecycle, OrderLifecycleMessage } from '@edi-bridge/contracts'
+import type {
+  AcknowledgementNotSentReason,
+  OrderLifecycle,
+  OrderLifecycleMessage,
+} from '@edi-bridge/contracts'
 
 export const dateTimeFormat = { dateStyle: 'medium', timeStyle: 'short' } as const
 
@@ -114,6 +125,84 @@ function OverdueHelp({
   )
 }
 
+const notSentFixHref: Record<
+  AcknowledgementNotSentReason,
+  (tradingPartner: OrderTradingPartner) => string | null
+> = {
+  noOutboundChannel: ({ id }) => tradingPartnerHref(id, 'documents'),
+  ambiguousChannel: ({ id }) => tradingPartnerHref(id, 'documents'),
+  workspaceGlnMissing: () => navigationItems.settings.href,
+  unechoableInterchangeHeader: () => null,
+}
+
+function NotSentHelp({
+  tradingPartner,
+  message,
+  reason,
+}: {
+  tradingPartner: OrderTradingPartner
+  message: OrderLifecycleMessage
+  reason: AcknowledgementNotSentReason
+}) {
+  const t = useTranslations('Orders.notSent')
+  const tMessage = useTranslations('Orders.message')
+  const plainNames = usePlainNames()
+
+  const fixHref = notSentFixHref[reason](tradingPartner)
+
+  const values = {
+    reason,
+    tradingPartner: tradingPartner.name,
+    document: plainNames.messageTypeNameInText(message.messageType),
+    messageType: message.messageType,
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="flex items-center gap-1.5">
+        <span className="text-muted-foreground">{tMessage('receiptConfirmation')}</span>
+        <Badge
+          variant="outline"
+          className="gap-1 bg-amber-500/10 text-amber-800 dark:text-amber-300">
+          <HugeiconsIcon icon={MailBlock01Icon} strokeWidth={2} aria-hidden />
+          {t('state')}
+        </Badge>
+      </span>
+      <p>
+        {t('reason', values)}{' '}
+        {t.rich('fix', {
+          ...values,
+          link: (chunks) =>
+            fixHref === null ? (
+              chunks
+            ) : (
+              <Link href={fixHref} className={linkClass}>
+                {chunks}
+              </Link>
+            ),
+        })}
+      </p>
+    </div>
+  )
+}
+
+function NotTracked() {
+  const t = useTranslations('Orders.message')
+
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+      <span className="flex items-center gap-1.5">
+        <span className="text-muted-foreground">{t('receiptConfirmation')}</span>
+        <Badge variant="outline" className="text-muted-foreground gap-1">
+          <HugeiconsIcon icon={MinusSignCircleIcon} strokeWidth={2} aria-hidden />
+          {t('notTracked')}
+        </Badge>
+      </span>
+      <span className="text-muted-foreground">{t('notTrackedReason')}</span>
+    </div>
+  )
+}
+
 function sentKind({ direction, run }: OrderLifecycleMessage) {
   if (direction === 'inbound') {
     return 'received'
@@ -138,6 +227,7 @@ export function OrderMessage({
   const plainNames = usePlainNames()
   const { run, interchange } = message
   const acknowledgement = interchange?.acknowledgement ?? null
+  const notSentReason = interchange?.notSentReason ?? null
   const replaced = run.replacedBy !== null
   const failed = run.status === 'failed' && !replaced
   const waiting = acknowledgement === 'pending' || acknowledgement === 'overdue'
@@ -202,6 +292,10 @@ export function OrderMessage({
             </span>
           )}
         </div>
+      )}
+      {confirmationNotTracked(message) && !replaced && <NotTracked />}
+      {notSentReason && !replaced && (
+        <NotSentHelp message={message} reason={notSentReason} tradingPartner={tradingPartner} />
       )}
       {failed && run.waitingForTradingPartnerSince !== null && (
         <p className="text-muted-foreground flex items-center gap-2">
