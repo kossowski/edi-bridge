@@ -209,6 +209,7 @@ export const loadRun = (id: string) =>
         error: runs.error,
         waitingForTradingPartnerSince: runs.waitingForTradingPartnerSince,
         replacesRunId: runs.replacesRunId,
+        duplicateOfRunId: runs.duplicateOfRunId,
       }).where(inWorkspace(runs, workspace.id, eq(runs.id, id))),
     )
 
@@ -242,6 +243,7 @@ export const loadRun = (id: string) =>
 type DetailRow = SummaryRow & {
   error: (typeof runs.$inferSelect)['error']
   waitingForTradingPartnerSince: Date | null
+  duplicateOfRunId: string | null
 }
 
 const toDetail = (
@@ -253,21 +255,29 @@ const toDetail = (
   const shared = {
     ...summary,
     ...loaded,
-    // Interchanges, parsed Messages and Duplicates come with inbound processing.
+    // Interchanges and parsed Messages come with inbound processing.
     interchange: null,
     message: null,
-    duplicateOf: null,
+  }
+
+  const unfailed = {
+    failureStage: null,
+    error: null,
+    problem: null,
+    waitingForTradingPartnerSince: null,
+  }
+
+  if (summary.status === 'duplicate') {
+    return {
+      ...shared,
+      ...unfailed,
+      status: summary.status,
+      duplicateOf: row.duplicateOfRunId === null ? null : { id: row.duplicateOfRunId },
+    }
   }
 
   if (summary.status !== 'failed') {
-    return {
-      ...shared,
-      status: summary.status,
-      failureStage: null,
-      error: null,
-      problem: null,
-      waitingForTradingPartnerSince: null,
-    }
+    return { ...shared, ...unfailed, status: summary.status, duplicateOf: null }
   }
 
   const fixer = whoFixes(summary)
@@ -283,6 +293,7 @@ const toDetail = (
     error: row.error,
     problem: { ...row.problem, whoFixes: fixer },
     waitingForTradingPartnerSince: row.waitingForTradingPartnerSince?.toISOString() ?? null,
+    duplicateOf: null,
   }
 }
 
