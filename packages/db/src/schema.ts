@@ -212,6 +212,8 @@ export const tradingPartners = pgTable(
     testMode: boolean().notNull().default(true),
     testInterchangeSentAt: timestamp({ withTimezone: true, mode: 'date' }),
     contrlReceivedAt: timestamp({ withTimezone: true, mode: 'date' }),
+    testRejectedAt: timestamp({ withTimezone: true, mode: 'date' }),
+    testRejectedRunId: uuid().references((): AnyPgColumn => runs.id, { onDelete: 'set null' }),
     nextControlReference: integer().notNull().default(1),
     createdAt: timestamp({ withTimezone: true, mode: 'date' }).notNull().defaultNow(),
   },

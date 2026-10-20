@@ -1,4 +1,16 @@
-import { and, asc, desc, eq, exists, gt, inArray, isNull, lt, notExists } from 'drizzle-orm'
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  exists,
+  gt,
+  inArray,
+  isNotNull,
+  isNull,
+  lt,
+  notExists,
+} from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import { Data, DateTime, Effect, Match, Predicate, Ref, Result } from 'effect'
 import { z } from 'zod'
@@ -492,7 +504,19 @@ type ClaimedRun = typeof runs.$inferSelect
 
 type OnboardingStep = 'testInterchangeSentAt' | 'contrlReceivedAt'
 
-// Traffic completes an onboarding step only in Test Mode, and only the first time.
+// Traffic counts for an onboarding step only in Test Mode, and only until the step is complete.
+const awaitingOnboardingStep = (
+  workspaceId: string,
+  tradingPartnerIds: ReadonlyArray<string | null>,
+  step: OnboardingStep,
+) =>
+  and(
+    eq(tradingPartners.workspaceId, workspaceId),
+    inArray(tradingPartners.id, tradingPartnerIds.filter(Predicate.isNotNull)),
+    eq(tradingPartners.testMode, true),
+    isNull(tradingPartners[step]),
+  )
+
 const recordOnboardingStep = (
   tx: Transaction,
   workspaceId: string,
@@ -502,15 +526,45 @@ const recordOnboardingStep = (
 ) =>
   tx
     .update(tradingPartners)
-    .set({ [step]: at })
+    .set({
+      [step]: at,
+      // An accepted test answers the earlier rejection.
+      ...(step === 'contrlReceivedAt' && { testRejectedAt: null, testRejectedRunId: null }),
+    })
+    .where(awaitingOnboardingStep(workspaceId, tradingPartnerIds, step))
+
+// Only the rejection of the latest test Interchange counts: a later one may still be accepted.
+const recordTestRejection = (
+  tx: Transaction,
+  workspaceId: string,
+  { runId, tradingPartnerId }: { runId: string; tradingPartnerId: string | null },
+  at: Date,
+) => {
+  const rejected = alias(runs, 'rejected')
+  const later = alias(runs, 'later')
+
+  return tx
+    .update(tradingPartners)
+    .set({ testRejectedAt: at, testRejectedRunId: runId })
     .where(
       and(
-        eq(tradingPartners.workspaceId, workspaceId),
-        inArray(tradingPartners.id, tradingPartnerIds.filter(Predicate.isNotNull)),
-        eq(tradingPartners.testMode, true),
-        isNull(tradingPartners[step]),
+        awaitingOnboardingStep(workspaceId, [tradingPartnerId], 'contrlReceivedAt'),
+        notExists(
+          tx
+            .select({ id: later.id })
+            .from(later)
+            .innerJoin(rejected, eq(rejected.id, runId))
+            .where(
+              and(
+                eq(later.tradingPartnerId, tradingPartners.id),
+                isNotNull(later.controlReference),
+                gt(later.handedOverAt, rejected.handedOverAt),
+              ),
+            ),
+        ),
       ),
     )
+}
 
 // A defect after the hand-over leaves the Run failed at delivery, and its Retry must not deliver again.
 const handOver = (
@@ -1367,20 +1421,29 @@ const acknowledge = async (
         ),
       ),
     )
-    .returning({ tradingPartnerId: runs.tradingPartnerId })
+    .returning({ id: runs.id, tradingPartnerId: runs.tradingPartnerId })
 
-  // The Trading Partner's system could read the test only when its CONTRL accepts the Interchange.
-  if (state !== 'accepted' || acknowledged.length === 0) {
+  if (acknowledged.length === 0) {
     return
   }
 
-  await recordOnboardingStep(
-    tx,
-    workspaceId,
-    acknowledged.map(({ tradingPartnerId }) => tradingPartnerId),
-    'contrlReceivedAt',
-    receivedAt,
-  )
+  // The Trading Partner's system could read the test only when its CONTRL accepts the Interchange.
+  if (state === 'accepted') {
+    await recordOnboardingStep(
+      tx,
+      workspaceId,
+      acknowledged.map(({ tradingPartnerId }) => tradingPartnerId),
+      'contrlReceivedAt',
+      receivedAt,
+    )
+
+    return
+  }
+
+  // Each rejected Run is checked against the Interchanges handed over after it.
+  for (const { id, tradingPartnerId } of acknowledged) {
+    await recordTestRejection(tx, workspaceId, { runId: id, tradingPartnerId }, receivedAt)
+  }
 }
 
 const processInbound = ({
