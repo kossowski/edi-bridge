@@ -97,10 +97,16 @@ export const tasksEndpoint: Endpoint<Tasks> = {
 export function whoActsOnFailedRun({
   failureStage,
   messageType,
+  waitingForTradingPartner,
 }: {
   failureStage: FailureStage
   messageType: MessageType
+  waitingForTradingPartner: boolean
 }): TaskActor {
+  if (waitingForTradingPartner) {
+    return 'tradingPartner'
+  }
+
   switch (failureStage) {
     case 'delivery': {
       return 'retry'

@@ -24,8 +24,19 @@ describe('whoActsOnFailedRun', () => {
     ['validation', 'CONTRL', 'tradingPartner'],
     ['validation', 'INVOIC', 'you'],
   ] as const)('gives a Run that failed at %s with a %s to %s', (failureStage, messageType, who) => {
-    expect(whoActsOnFailedRun({ failureStage, messageType })).toBe(who)
+    expect(whoActsOnFailedRun({ failureStage, messageType, waitingForTradingPartner: false })).toBe(
+      who,
+    )
   })
+
+  it.each(['delivery', 'mapping', 'validation'] as const)(
+    'gives a Run that failed at %s and waits for a resend to the Trading Partner',
+    (failureStage) => {
+      expect(
+        whoActsOnFailedRun({ failureStage, messageType: 'INVOIC', waitingForTradingPartner: true }),
+      ).toBe('tradingPartner')
+    },
+  )
 })
 
 describe('taskSchema', () => {

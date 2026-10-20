@@ -89,14 +89,19 @@ type FailedRun = Extract<RunSummary, { status: 'failed' }>
 
 const isFailed = (run: RunSummary): run is FailedRun => run.status === 'failed'
 
-function failedRunTasks(runs: RunStore, from: number) {
+type WaitingForTradingPartner = ReadonlyMap<string, string> | undefined
+
+const whoActsOn = (run: FailedRun, waiting: WaitingForTradingPartner) =>
+  whoActsOnFailedRun({ ...run, waitingForTradingPartner: waiting?.has(run.id) ?? false })
+
+function failedRunTasks(runs: RunStore, waiting: WaitingForTradingPartner, from: number) {
   return runs.all().flatMap((run): Task[] =>
     isFailed(run) && Date.parse(run.receivedAt) >= from && runs.replacingOf(run.id) === undefined
       ? [
           {
             id: `run:${run.id}`,
             kind: 'failedRun',
-            whoActs: whoActsOnFailedRun(run),
+            whoActs: whoActsOn(run, waiting),
             tradingPartner: run.tradingPartner,
             at: run.receivedAt,
             run: { id: run.id, messageType: run.messageType, failureStage: run.failureStage },
@@ -127,8 +132,11 @@ function overdueAcknowledgementTasks(
   }))
 }
 
-function dominantWhoActs(failedRuns: readonly FailedRun[]): TaskActor {
-  const counts = taskCountsOf(failedRuns.map((run) => ({ whoActs: whoActsOnFailedRun(run) })))
+function dominantWhoActs(
+  failedRuns: readonly FailedRun[],
+  waiting: WaitingForTradingPartner,
+): TaskActor {
+  const counts = taskCountsOf(failedRuns.map((run) => ({ whoActs: whoActsOn(run, waiting) })))
   const [first, second] = taskActors.toSorted((a, b) => counts[b] - counts[a])
 
   return counts[first!] > counts[second!] ? first! : 'you'
@@ -138,6 +146,7 @@ function failingTradingPartnerTasks(
   tradingPartners: ReadonlyArray<TradingPartner>,
   runs: readonly RunSummary[],
   overdueAcknowledgements: ReadonlyArray<OverdueAcknowledgement>,
+  waiting: WaitingForTradingPartner,
   from: number,
   now: Date,
 ) {
@@ -153,7 +162,7 @@ function failingTradingPartnerTasks(
             {
               id: `tradingPartner:${health.tradingPartner.id}`,
               kind: 'failingTradingPartner',
-              whoActs: dominantWhoActs(failedRuns.get(health.tradingPartner.id) ?? []),
+              whoActs: dominantWhoActs(failedRuns.get(health.tradingPartner.id) ?? [], waiting),
               tradingPartner: health.tradingPartner,
               at: health.lastRunAt ?? now.toISOString(),
               delivered: health.delivered,
@@ -166,7 +175,12 @@ function failingTradingPartnerTasks(
 }
 
 export function toTasks(
-  { runs, tradingPartners, overdueAcknowledgements }: WorkspaceActivity,
+  {
+    runs,
+    tradingPartners,
+    overdueAcknowledgements,
+    waitingForTradingPartnerSince,
+  }: WorkspaceActivity,
   now = new Date(),
 ): Tasks {
   const from = now.getTime() - tasksLookback
@@ -174,9 +188,16 @@ export function toTasks(
   const all = store.all()
 
   const tasks = [
-    ...failedRunTasks(store, from),
+    ...failedRunTasks(store, waitingForTradingPartnerSince, from),
     ...overdueAcknowledgementTasks(overdueAcknowledgements),
-    ...failingTradingPartnerTasks(tradingPartners, all, overdueAcknowledgements, from, now),
+    ...failingTradingPartnerTasks(
+      tradingPartners,
+      all,
+      overdueAcknowledgements,
+      waitingForTradingPartnerSince,
+      from,
+      now,
+    ),
   ].sort((a, b) => Date.parse(b.at) - Date.parse(a.at) || a.id.localeCompare(b.id))
 
   return tasksSchema.parse({ tasks, counts: taskCountsOf(tasks) })

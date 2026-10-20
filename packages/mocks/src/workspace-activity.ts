@@ -27,6 +27,7 @@ export type WorkspaceActivity = {
   runs: ReadonlyArray<RunSummary> | RunStore
   tradingPartners: ReadonlyArray<TradingPartner>
   overdueAcknowledgements: ReadonlyArray<OverdueAcknowledgement>
+  waitingForTradingPartnerSince?: ReadonlyMap<string, string> | undefined
 }
 
 export type WorkspaceActivityState = 'empty' | 'large' | 'loading' | 'error'
@@ -131,9 +132,13 @@ function seedRunStore() {
   return createRunStore(runs, seedReprocessed(runs))
 }
 
-export function seedWorkspaceActivity(runs: RunStore = seedRunStore()): WorkspaceActivity {
+export function seedWorkspaceActivity(
+  runs: RunStore = seedRunStore(),
+  waitingForTradingPartnerSince?: ReadonlyMap<string, string>,
+): WorkspaceActivity {
   return {
     runs,
+    waitingForTradingPartnerSince,
     tradingPartners: seedTradingPartners,
     get overdueAcknowledgements() {
       return seedOverdueAcknowledgements(runs.all())

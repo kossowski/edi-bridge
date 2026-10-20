@@ -3,7 +3,6 @@ import { alias } from 'drizzle-orm/pg-core'
 import { Clock, Effect } from 'effect'
 
 import {
-  type FailureStage,
   healthStatusOf,
   taskActors,
   type MessageType,
@@ -50,12 +49,6 @@ const listFailedRuns = (db: Database, workspaceId: string, from: Date) =>
 
 type FailedRunRow = Awaited<ReturnType<typeof listFailedRuns>>[number]
 
-// A failed Run that waits for a resend is the Trading Partner's to act on, whatever its stage.
-const whoActsOn = (row: FailedRunRow, failureStage: FailureStage): TaskActor =>
-  row.waitingForTradingPartnerSince === null
-    ? whoActsOnFailedRun({ failureStage, messageType: row.messageType })
-    : 'tradingPartner'
-
 // The query selects failed Runs only; the status check narrows the failure to read its stage.
 const toFailedRunTask = (row: FailedRunRow): Task[] => {
   const failure = failureOf(row)
@@ -68,7 +61,11 @@ const toFailedRunTask = (row: FailedRunRow): Task[] => {
     {
       id: `run:${row.id}`,
       kind: 'failedRun',
-      whoActs: whoActsOn(row, failure.failureStage),
+      whoActs: whoActsOnFailedRun({
+        failureStage: failure.failureStage,
+        messageType: row.messageType,
+        waitingForTradingPartner: row.waitingForTradingPartnerSince !== null,
+      }),
       tradingPartner: { id: row.tradingPartnerId, name: row.tradingPartnerName },
       at: row.receivedAt.toISOString(),
       run: { id: row.id, messageType: row.messageType, failureStage: failure.failureStage },

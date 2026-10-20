@@ -484,8 +484,11 @@ export function createHandlers(
     runsHandler(apiUrl, runs, { flows, mappings: mappingVersionStore }),
     interchangesHandler(apiUrl, runs),
     liveEventsHandler(apiUrl, { ...liveEvents, runs }),
-    homeHandler(apiUrl, seedWorkspaceActivity(runs)),
-    tasksHandler(apiUrl, seedWorkspaceActivity(runs)),
+    homeHandler(apiUrl, seedWorkspaceActivity(runs, orderLifecycles.waitingForTradingPartnerSince)),
+    tasksHandler(
+      apiUrl,
+      seedWorkspaceActivity(runs, orderLifecycles.waitingForTradingPartnerSince),
+    ),
     orderLifecycleListHandler(apiUrl, orderLifecycles.orderLifecycles, {
       runs,
       tradingPartners: tradingPartnerStore,

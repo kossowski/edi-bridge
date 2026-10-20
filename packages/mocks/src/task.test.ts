@@ -130,6 +130,31 @@ describe('GET /tasks', () => {
     expect(counts).toEqual({ you: 0, retry: 1, tradingPartner: 1 })
   })
 
+  it('gives a failed Run that waits for a resend to the Trading Partner', async () => {
+    const waiting = createRun({
+      tradingPartner: summaryOf(rheinkauf),
+      messageType: 'ORDERS',
+      status: 'failed',
+      failureStage: 'mapping',
+      receivedAt: '2026-10-10T11:00:00.000Z',
+    })
+
+    server.use(
+      tasksHandler(
+        apiUrl,
+        data({
+          runs: [waiting],
+          waitingForTradingPartnerSince: new Map([[waiting.id, '2026-10-10T11:30:00.000Z']]),
+        }),
+      ),
+    )
+
+    const { tasks, counts } = await getTasks()
+
+    expect(tasks).toEqual([expect.objectContaining({ whoActs: 'tradingPartner' })])
+    expect(counts).toEqual({ you: 0, retry: 0, tradingPartner: 1 })
+  })
+
   it('drops a failed Run once a Reprocess replaces it', async () => {
     const failed = createRun({
       tradingPartner: summaryOf(rheinkauf),
