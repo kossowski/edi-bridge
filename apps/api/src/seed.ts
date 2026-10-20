@@ -168,41 +168,17 @@ function stepsOf(runId: string, messageType: MessageType, receivedAt: Date, endi
 
 type Failure = { error: RunError; problem: Omit<RunProblem, 'whoFixes'> }
 
-export async function seedWorkspace(
+async function seedSetup(
   tx: Transaction,
   workspaceId: string,
-  { secrets, now = new Date() }: SeedOptions,
+  { secrets, onboardedAt }: { secrets: SecretBox; onboardedAt: Date },
 ) {
   const publishedBy = await seedPublisherId(tx)
-  const onboardedAt = at(now, 30 * dayMs)
 
   await tx
     .update(workspaces)
     .set({ gln: seedCompany.gln, seeded: true })
     .where(eq(workspaces.id, workspaceId))
-
-  const partners = await Promise.all(
-    seedTradingPartners.map(async (seed) => ({
-      seed,
-      row: await one(
-        tx
-          .insert(tradingPartners)
-          .values({
-            workspaceId,
-            name: seed.name,
-            gln: seed.gln,
-            characterSet: 'UNOC',
-            acknowledgementTimeLimitHours: seed.acknowledgementTimeLimitHours,
-            testMode: seed.testMode,
-            ...(!seed.testMode && {
-              testInterchangeSentAt: onboardedAt,
-              contrlReceivedAt: later(onboardedAt, hourMs),
-            }),
-          })
-          .returning(),
-      ),
-    })),
-  )
 
   const lookupTable = async (
     name: string,
@@ -235,19 +211,6 @@ export async function seedWorkspace(
     { sourceCode: 'PCE', targetCode: 'ST' },
     { sourceCode: 'CT', targetCode: 'KAR' },
   ])
-
-  for (const { seed, row } of partners) {
-    if (seed.stores.length > 0) {
-      await lookupTable(
-        `${seed.name} stores`,
-        seed.stores.map(({ gln }, index) => ({
-          sourceCode: gln,
-          targetCode: `F${String(index + 1).padStart(3, '0')}`,
-        })),
-        { kind: 'addresses', tradingPartnerId: row.id },
-      )
-    }
-  }
 
   const lookupEntries = new Map([
     [invoiceUnits.id, invoiceUnits.entries],
@@ -337,7 +300,6 @@ export async function seedWorkspace(
   )
 
   const invoicGraph = graphOf(invoicReferenceVersion, invoiceUnits.id)
-  const invoicVersion = { ...invoicReferenceVersion, ...invoicGraph }
 
   const invoicMapping = await mapping(
     'ERP invoice to INVOIC',
@@ -352,7 +314,6 @@ export async function seedWorkspace(
   )
 
   const ordersGraph = graphOf(ordersReferenceVersion, orderUnits.id)
-  const ordersVersion = { ...ordersReferenceVersion, ...ordersGraph }
 
   const ordersMapping = await mapping(
     'ORDERS to ERP order',
@@ -410,48 +371,127 @@ export async function seedWorkspace(
     url: `https://erp.edi-bridge-seed.${seedChannelDomain}/orders`,
   })
 
-  const partnerChannels = await Promise.all(
-    partners.map(async ({ seed, row }) => {
-      const sftp = {
-        type: 'sftp' as const,
-        tradingPartnerId: row.id,
-        host: `sftp.${seed.slug}.${seedChannelDomain}`,
-        port: 22,
-        username: 'edi-bridge-seed',
-        authentication: 'password' as const,
-      }
-
-      return {
-        inbound: await channel({
-          ...sftp,
-          direction: 'inbound',
-          name: `${seed.name} outbox`,
-          remotePath: '/outbox',
-          pollingIntervalMinutes: 5,
-        }),
-        outbound: await channel({
-          ...sftp,
-          direction: 'outbound',
-          name: `${seed.name} inbox`,
-          remotePath: '/inbox',
-        }),
-      }
-    }),
-  )
-
-  let nextControlReferences = partners.map(() => 1)
-
-  const claimReference = (partner: number) => {
-    const reference = nextControlReferences[partner] ?? 1
-
-    nextControlReferences = nextControlReferences.map((value, index) =>
-      index === partner ? value + 1 : value,
+  const flow = (values: Omit<typeof flows.$inferInsert, 'workspaceId'>) =>
+    one(
+      tx
+        .insert(flows)
+        .values({ ...values, workspaceId, createdAt: onboardedAt, updatedAt: onboardedAt })
+        .returning(),
     )
+
+  const partners = []
+
+  for (const seed of seedTradingPartners) {
+    const row = await one(
+      tx
+        .insert(tradingPartners)
+        .values({
+          workspaceId,
+          name: seed.name,
+          gln: seed.gln,
+          characterSet: 'UNOC',
+          acknowledgementTimeLimitHours: seed.acknowledgementTimeLimitHours,
+          testMode: seed.testMode,
+          ...(!seed.testMode && {
+            testInterchangeSentAt: onboardedAt,
+            contrlReceivedAt: later(onboardedAt, hourMs),
+          }),
+        })
+        .returning(),
+    )
+
+    if (seed.stores.length > 0) {
+      await lookupTable(
+        `${seed.name} stores`,
+        seed.stores.map(({ gln }, index) => ({
+          sourceCode: gln,
+          targetCode: `F${String(index + 1).padStart(3, '0')}`,
+        })),
+        { kind: 'addresses', tradingPartnerId: row.id },
+      )
+    }
+
+    const sftp = {
+      type: 'sftp' as const,
+      tradingPartnerId: row.id,
+      host: `sftp.${seed.slug}.${seedChannelDomain}`,
+      port: 22,
+      username: 'edi-bridge-seed',
+      authentication: 'password' as const,
+    }
+
+    const inbound = await channel({
+      ...sftp,
+      direction: 'inbound',
+      name: `${seed.name} outbox`,
+      remotePath: '/outbox',
+      pollingIntervalMinutes: 5,
+    })
+
+    const outbound = await channel({
+      ...sftp,
+      direction: 'outbound',
+      name: `${seed.name} inbox`,
+      remotePath: '/inbox',
+    })
+
+    const ordersFlow = await flow({
+      tradingPartnerId: row.id,
+      messageType: 'ORDERS',
+      name: `Orders from ${seed.name}`,
+      inboundChannelId: inbound.id,
+      destinationChannelId: erpInbox.id,
+      mappingVersionId: ordersMapping.versionId,
+    })
+
+    const invoicFlow = await flow({
+      tradingPartnerId: row.id,
+      messageType: 'INVOIC',
+      name: `Invoices to ${seed.name}`,
+      inboundChannelId: erpWebhook.id,
+      destinationChannelId: outbound.id,
+      mappingVersionId: invoicMapping.versionId,
+    })
+
+    partners.push({ seed, row, inbound, outbound, ordersFlow, invoicFlow })
+  }
+
+  return {
+    partners,
+    erpWebhook,
+    lookupEntries,
+    orderUnits,
+    invoiceStructure,
+    orderStructure,
+    invoicMapping: { ...invoicMapping, version: { ...invoicReferenceVersion, ...invoicGraph } },
+    ordersMapping: { ...ordersMapping, version: { ...ordersReferenceVersion, ...ordersGraph } },
+  }
+}
+
+type Setup = Awaited<ReturnType<typeof seedSetup>>
+
+type SeededPartner = Setup['partners'][number]
+
+async function seedTraffic(tx: Transaction, workspaceId: string, setup: Setup, now: Date) {
+  const {
+    erpWebhook,
+    lookupEntries,
+    orderUnits,
+    invoiceStructure,
+    orderStructure,
+    invoicMapping,
+    ordersMapping,
+  } = setup
+
+  const nextControlReferences = new Map(setup.partners.map(({ row }) => [row.id, 1]))
+
+  const claimReference = ({ row }: SeededPartner) => {
+    const reference = nextControlReferences.get(row.id) ?? 1
+
+    nextControlReferences.set(row.id, reference + 1)
 
     return reference
   }
-
-  const sentAt = (date: Date) => DateTime.fromDateUnsafe(date)
 
   const interchangeOf = (
     message: Message,
@@ -463,7 +503,7 @@ export async function seedWorkspace(
       characterSet: 'UNOC',
       sender: seedCompany.gln,
       receiver: partner.gln,
-      sentAt: sentAt(date),
+      sentAt: DateTime.fromDateUnsafe(date),
       reference,
       testIndicator: false,
     })
@@ -495,57 +535,13 @@ export async function seedWorkspace(
         .returning(),
     )
 
-  for (const [index, { seed, row }] of partners.entries()) {
-    const partnerChannel = partnerChannels[index]
+  for (const [index, partner] of setup.partners.entries()) {
+    const { seed, row, inbound: inboundChannel, outbound: outboundChannel } = partner
 
-    if (partnerChannel === undefined) {
-      continue
-    }
-
-    const ordersFlow = await one(
-      tx
-        .insert(flows)
-        .values({
-          workspaceId,
-          tradingPartnerId: row.id,
-          messageType: 'ORDERS',
-          name: `Orders from ${seed.name}`,
-          inboundChannelId: partnerChannel.inbound.id,
-          destinationChannelId: erpInbox.id,
-          mappingVersionId: ordersMapping.versionId,
-          createdAt: onboardedAt,
-          updatedAt: onboardedAt,
-        })
-        .returning(),
-    )
-
-    const invoicFlow = await one(
-      tx
-        .insert(flows)
-        .values({
-          workspaceId,
-          tradingPartnerId: row.id,
-          messageType: 'INVOIC',
-          name: `Invoices to ${seed.name}`,
-          inboundChannelId: erpWebhook.id,
-          destinationChannelId: partnerChannel.outbound.id,
-          mappingVersionId: invoicMapping.versionId,
-          createdAt: onboardedAt,
-          updatedAt: onboardedAt,
-        })
-        .returning(),
-    )
-
-    if (seed.testMode) {
-      continue
-    }
-
-    for (let cycle = 0; cycle < 6; cycle++) {
+    for (const [cycle, scenario] of seed.orders.entries()) {
       // The newest order arrives at now, so a new Workspace has traffic of today at any hour.
       const orderedAt = at(now, cycle * 27 * hourMs + index * (5 * hourMs + minuteMs))
       const sequence = String(100_000 + index * 1000 + cycle)
-      const unreadable = index === 1 && cycle === 3
-      const missingCode = index === 0 && cycle === 2
 
       const order: SeedOrder = {
         number: `B-${sequence}`,
@@ -557,7 +553,7 @@ export async function seedWorkspace(
           {
             article: pick(seedArticles, cycle + index),
             quantity: 6 * (cycle + 2),
-            unit: missingCode ? 'KGM' : 'PCE',
+            unit: scenario === 'missingCode' ? 'KGM' : 'PCE',
           },
           {
             article: pick(seedArticles, cycle + index + 1),
@@ -568,10 +564,15 @@ export async function seedWorkspace(
       }
 
       const reference = String(4000 + cycle).padStart(8, '0')
-      const content = ordersInterchange(order, reference, unreadable ? { segmentCount: 99 } : {})
+
+      const content = ordersInterchange(
+        order,
+        reference,
+        scenario === 'unreadableOrder' ? { segmentCount: 99 } : {},
+      )
 
       const document = await insertDocument({
-        channelId: partnerChannel.inbound.id,
+        channelId: inboundChannel.id,
         fileName: `ORDERS_${order.number}.edi`,
         content,
         interchangeSender: seed.gln,
@@ -588,7 +589,7 @@ export async function seedWorkspace(
 
       const inbound = {
         documentId: document.id,
-        flowId: ordersFlow.id,
+        flowId: partner.ordersFlow.id,
         tradingPartnerId: row.id,
         mappingVersionId: ordersMapping.versionId,
         messageIndex: 1,
@@ -627,14 +628,14 @@ export async function seedWorkspace(
         continue
       }
 
-      const contrlReference = claimReference(index)
+      const contrlReference = claimReference(partner)
       const contrlAt = later(orderedAt, 2 * stepMs)
 
       await tx.insert(acknowledgements).values({
         workspaceId,
         documentId: document.id,
         tradingPartnerId: row.id,
-        channelId: partnerChannel.outbound.id,
+        channelId: outboundChannel.id,
         controlReference: contrlReference,
         content: interchangeOf(buildContrl(content, '1'), seed, contrlReference, contrlAt),
         deliveryAttemptedAt: contrlAt,
@@ -646,7 +647,7 @@ export async function seedWorkspace(
 
       const mapped = Effect.runSync(
         Effect.result(
-          applyInboundMappingVersion(ordersVersion, orderStructure, parsed, {
+          applyInboundMappingVersion(ordersMapping.version, orderStructure, parsed, {
             lookupTables: lookupEntries,
           }).pipe(Effect.flatMap((written) => writeDocument(orderStructure, written))),
         ),
@@ -698,12 +699,11 @@ export async function seedWorkspace(
         { status: 'delivered' },
       )
 
-      // The Trading Partner sent the order again, which the Duplicate check stopped.
-      if (index === 0 && cycle === 3) {
+      if (scenario === 'resentOrder') {
         const resentAt = later(orderedAt, 45 * minuteMs)
 
         const resent = await insertDocument({
-          channelId: partnerChannel.inbound.id,
+          channelId: inboundChannel.id,
           fileName: `ORDERS_${order.number}_resent.edi`,
           content,
           interchangeSender: seed.gln,
@@ -746,18 +746,17 @@ export async function seedWorkspace(
       const { message } = Effect.runSync(
         readDocument(invoiceStructure, invoiceText).pipe(
           Effect.flatMap((read) =>
-            mapMessage(invoicVersion, read, { lookupTables: lookupEntries }),
+            mapMessage(invoicMapping.version, read, { lookupTables: lookupEntries }),
           ),
         ),
       )
 
-      const invoicReferenceNumber = claimReference(index)
+      const invoicReferenceNumber = claimReference(partner)
       const handedOverAt = later(invoicedAt, 4 * stepMs)
-      const unreachable = index === 1 && cycle === 1
 
       const outbound = {
         documentId: invoiceDocument.id,
-        flowId: invoicFlow.id,
+        flowId: partner.invoicFlow.id,
         tradingPartnerId: row.id,
         mappingVersionId: invoicMapping.versionId,
         businessReference: order.number,
@@ -768,7 +767,7 @@ export async function seedWorkspace(
         receivedAt: invoicedAt,
       }
 
-      if (unreachable) {
+      if (scenario === 'unreachableHost') {
         await insertRun(
           {
             ...outbound,
@@ -784,8 +783,8 @@ export async function seedWorkspace(
               reason: 'unreachable',
               fixTarget: {
                 kind: 'channel',
-                channelId: partnerChannel.outbound.id,
-                name: partnerChannel.outbound.name,
+                channelId: outboundChannel.id,
+                name: outboundChannel.name,
               },
             },
           },
@@ -796,15 +795,13 @@ export async function seedWorkspace(
         continue
       }
 
-      // A day old by then, so past the time limit of the Trading Partner.
-      const overdue = index === 0 && cycle === 1
-
       await insertRun(
         {
           ...outbound,
           status: 'delivered',
           handedOverAt,
-          acknowledgementState: overdue ? 'overdue' : 'accepted',
+          // Handed over a day ago, so past the time limit of the Trading Partner.
+          acknowledgementState: scenario === 'overdueAcknowledgement' ? 'overdue' : 'accepted',
         },
         'INVOIC',
         { status: 'delivered' },
@@ -812,10 +809,20 @@ export async function seedWorkspace(
     }
   }
 
-  for (const [index, { row }] of partners.entries()) {
+  for (const { row } of setup.partners) {
     await tx
       .update(tradingPartners)
-      .set({ nextControlReference: nextControlReferences[index] ?? 1 })
+      .set({ nextControlReference: nextControlReferences.get(row.id) ?? 1 })
       .where(eq(tradingPartners.id, row.id))
   }
+}
+
+export async function seedWorkspace(
+  tx: Transaction,
+  workspaceId: string,
+  { secrets, now = new Date() }: SeedOptions,
+) {
+  const setup = await seedSetup(tx, workspaceId, { secrets, onboardedAt: at(now, 30 * dayMs) })
+
+  await seedTraffic(tx, workspaceId, setup, now)
 }

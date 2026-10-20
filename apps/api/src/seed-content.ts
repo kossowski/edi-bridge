@@ -23,6 +23,14 @@ export interface SeedStore {
   city: string
 }
 
+export type OrderScenario =
+  | 'delivered'
+  | 'overdueAcknowledgement'
+  | 'missingCode'
+  | 'resentOrder'
+  | 'unreadableOrder'
+  | 'unreachableHost'
+
 export interface SeedTradingPartner {
   name: string
   slug: string
@@ -32,6 +40,7 @@ export interface SeedTradingPartner {
   acknowledgementTimeLimitHours: number
   testMode: boolean
   stores: SeedStore[]
+  orders: OrderScenario[]
 }
 
 const kassel: SeedStore = {
@@ -60,6 +69,14 @@ const lindenhof: SeedTradingPartner = {
       city: 'Göttingen',
     },
   ],
+  orders: [
+    'delivered',
+    'overdueAcknowledgement',
+    'missingCode',
+    'resentOrder',
+    'delivered',
+    'delivered',
+  ],
 }
 
 export const seedTradingPartners: SeedTradingPartner[] = [
@@ -81,6 +98,14 @@ export const seedTradingPartners: SeedTradingPartner[] = [
         city: 'Dresden',
       },
     ],
+    orders: [
+      'delivered',
+      'unreachableHost',
+      'delivered',
+      'unreadableOrder',
+      'delivered',
+      'delivered',
+    ],
   },
   {
     name: 'Kaiserstein Warenhaus KG',
@@ -91,6 +116,7 @@ export const seedTradingPartners: SeedTradingPartner[] = [
     acknowledgementTimeLimitHours: 24,
     testMode: true,
     stores: [],
+    orders: [],
   },
 ]
 
