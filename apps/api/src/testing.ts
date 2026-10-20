@@ -146,7 +146,6 @@ const one = async <Row>(rows: Promise<Row[]>) => {
   return row
 }
 
-// A Trading Partner with an ORDERS and an INVOIC Flow, to add Runs to.
 export async function addTradingPartnerWithFlows(
   database: Database,
   workspace: InvoiceWorkspace,
@@ -219,11 +218,11 @@ export async function addTradingPartnerWithFlows(
   }
 }
 
-// A seeded Workspace of its own, so its numbers stay apart from other tests.
 export async function seedWorkspaceWithAdmin(
   api: { app: Client; connection: { db: Database } },
   name: string,
 ) {
+  // A Workspace of its own, so its numbers stay apart from other tests.
   const workspace = await seedInvoiceWorkspace(api.connection.db, name)
   const slug = name.toLowerCase().replaceAll(/[^a-z0-9]+/g, '-')
 
