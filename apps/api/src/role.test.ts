@@ -6,6 +6,7 @@ import type { InjectOptions } from 'fastify'
 import {
   acceptAiDraftEndpoint,
   acceptAiProposedPartsEndpoint,
+  acceptHostKeyEndpoint,
   acceptInviteEndpoint,
   channelEndpoint,
   channelsEndpoint,
@@ -348,6 +349,14 @@ const changes: Change[] = [
   [
     'test a Channel',
     () => ({ method: 'POST', url: withId(testChannelEndpoint.path, ids.channel) }),
+  ],
+  [
+    'accept the host key of a Channel',
+    () => ({
+      method: 'PUT',
+      url: withId(acceptHostKeyEndpoint.path, ids.channel),
+      body: { hostKeyFingerprint: 'SHA256:uNiVztksCsDhcc0u9e8BujQXVUpKZIDTMczCvj3tD2s' },
+    }),
   ],
   ['create a Flow', () => ({ method: 'POST', url: createFlowEndpoint.path, body: flowInput })],
   [

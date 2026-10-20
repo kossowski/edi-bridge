@@ -9,6 +9,7 @@ import { ChannelReach, channelReach, secretBox } from '@edi-bridge/channels'
 import {
   acceptAiDraftEndpoint,
   acceptAiProposedPartsEndpoint,
+  acceptHostKeyEndpoint,
   acceptInviteEndpoint,
   aiBudgetEndpoint,
   type AiBudgetExhaustedProblem,
@@ -123,6 +124,7 @@ import { hintMissingCodes } from './ai-missing-code-hints.js'
 import { acceptAiDraft, acceptAiProposedParts } from './ai-review.js'
 import { type AuthSettings, mountAuth } from './auth.js'
 import {
+  acceptHostKey,
   ChannelEnvironment,
   type ChannelSettings,
   createChannel,
@@ -633,6 +635,14 @@ function registerRoutes(
 
   app.post<{ Params: { id: string } }>(testChannelEndpoint.path, (request, reply) =>
     respond(request, reply, testChannel(request.params.id)),
+  )
+
+  app.put<{ Params: { id: string } }>(acceptHostKeyEndpoint.path, (request, reply) =>
+    respond(
+      request,
+      reply,
+      acceptHostKey(request.params.id, parse(acceptHostKeyEndpoint.body, request.body)),
+    ),
   )
 
   app.get(flowsEndpoint.path, (request, reply) => respond(request, reply, listFlows))

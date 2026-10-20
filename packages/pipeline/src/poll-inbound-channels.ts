@@ -1,10 +1,9 @@
 import { and, eq, getTableColumns, sql } from 'drizzle-orm'
-import { Clock, Duration, Effect, Schedule } from 'effect'
+import { Cause, Clock, Duration, Effect, Option, Schedule } from 'effect'
 
+import { DownloadFailed, type SftpFile } from '@edi-bridge/channels'
 import { pollingIntervalMinutes } from '@edi-bridge/contracts'
 import { channels } from '@edi-bridge/db'
-
-import type { SftpFile } from '@edi-bridge/channels'
 
 import { type DecodedDocument, decodeDocument } from './decode-document'
 import { receive } from './receive'
@@ -80,6 +79,12 @@ const receiveFile = (channel: InboundChannel, file: SftpFile, state: ChannelPoll
         cause,
       ),
     ),
+  )
+
+const reasonOf = (cause: Cause.Cause<unknown>) =>
+  Cause.findErrorOption(cause).pipe(
+    Option.filter((error) => error instanceof DownloadFailed),
+    Option.match({ onNone: () => '', onSome: ({ reason }) => `: ${reason}` }),
   )
 
 const pollChannel = (channel: InboundChannel, state: ChannelPolling) =>
@@ -174,7 +179,7 @@ export const pollInboundChannels = (minute: Duration.Input = Duration.minutes(1)
         // Each Channel polls in its own fiber, so a failure or defect stops only that Channel.
         yield* pollChannel(channel, state).pipe(
           Effect.catchCause((cause) =>
-            Effect.logError(`Inbound Channel ${channel.id} not polled`, cause),
+            Effect.logError(`Inbound Channel ${channel.id} not polled${reasonOf(cause)}`, cause),
           ),
           Effect.ensuring(
             Effect.sync(() => {

@@ -12,6 +12,7 @@ import {
   sftpChannelDelivery,
 } from '@edi-bridge/channels'
 import {
+  mismatchingHostKeyFingerprint,
   startTestErp,
   startTestSftpServer,
   type TestErp,
@@ -1501,6 +1502,48 @@ describe('the processing of a Run', () => {
     })
     expect(run?.output).toMatch(/^UNB\+UNOC:3\+.*UNZ\+1\+1'$/)
     expect(ranStages(run)).toEqual(['receipt', 'mapping', 'validation', 'delivery'])
+  })
+
+  it('fails a Run at delivery when its SFTP server shows another host key, naming the Channel to fix', async () => {
+    const impostor = await seedInvoiceWorkspace(connection.db, 'Impostor Foods')
+
+    const channelId = await deliverOverSftp(connection.db, impostor, {
+      ...sftpLogin(),
+      hostKeyFingerprint: mismatchingHostKeyFingerprint,
+    })
+
+    const { queue, runId } = await receiveInvoice(goldenInvoice, inMemoryRunQueue(), impostor)
+
+    await processQueued(queue)
+
+    expect(await readRun(connection.db, runId)).toMatchObject({
+      status: 'failed',
+      failureStage: 'delivery',
+      error: { code: 'hostKeyMismatch', position: null, details: null },
+      problem: {
+        reason: 'hostKeyMismatch',
+        fixTarget: { kind: 'channel', channelId, name: 'Hanse Retail SFTP inbox' },
+      },
+    })
+  })
+
+  it('delivers a Run over an SFTP server that shows the confirmed host key', async () => {
+    const confirmed = await seedInvoiceWorkspace(connection.db, 'Confirmed Foods')
+    const remotePath = '/upload/confirmed'
+
+    // Its own folder, since an INVOIC of another Workspace may already hold the file name.
+    await sftp.exec(`install -d -m 777 ${sftp.home}${remotePath}`)
+    await deliverOverSftp(connection.db, confirmed, {
+      ...sftpLogin(),
+      remotePath,
+      hostKeyFingerprint: sftp.hostKeyFingerprint,
+    })
+
+    const { queue, runId } = await receiveInvoice(goldenInvoice, inMemoryRunQueue(), confirmed)
+
+    await processQueued(queue)
+
+    expect(await readRun(connection.db, runId)).toMatchObject({ status: 'delivered' })
   })
 
   it('fails a Run at delivery over a seeded Channel without opening a connection', async () => {
@@ -4236,6 +4279,23 @@ describe('the CONTRL answering a received Interchange', () => {
 
     expect(sent?.handedOverAt).toBeInstanceOf(Date)
     expect(sent?.deliveryError).toBeNull()
+  })
+
+  it('refuses to send a CONTRL to an SFTP server that shows another host key', async () => {
+    const into = await answeringWorkspace('Impostor Orders')
+
+    await deliverOverSftp(connection.db, into, {
+      ...sftpLogin(),
+      hostKeyFingerprint: mismatchingHostKeyFingerprint,
+    })
+
+    const { receipt } = await receiveInterchange(into, interchangeOf([ordersMessage]))
+    await sendWith(sftpDelivery)
+
+    await expect(acknowledgementOf(receipt.document.id)).resolves.toMatchObject({
+      handedOverAt: null,
+      deliveryError: 'hostKeyMismatch',
+    })
   })
 
   it('sends a CONTRL whose attempt a worker restart cut off once the bound passed', async () => {

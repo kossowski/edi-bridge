@@ -1,0 +1,2 @@
+ALTER TABLE "channels" ADD COLUMN "host_key_fingerprint" text;--> statement-breakpoint
+ALTER TABLE "channels" ADD CONSTRAINT "channels_host_key_fingerprint" CHECK ("channels"."type" = 'sftp' or "channels"."host_key_fingerprint" is null);

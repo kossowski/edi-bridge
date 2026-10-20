@@ -5,6 +5,7 @@ import type { InjectOptions } from 'fastify'
 
 import { secretBox, secretContext, type SecretColumn } from '@edi-bridge/channels'
 import {
+  acceptHostKeyEndpoint,
   type ChannelInput,
   channelEndpoint,
   channelsEndpoint,
@@ -62,6 +63,10 @@ const sftpSettings = {
 
 const sftpInbox: ChannelInput = { ...sftpSettings, credential: 'sftp-password-4711' }
 
+const hostKeyFingerprint = 'SHA256:uNiVztksCsDhcc0u9e8BujQXVUpKZIDTMczCvj3tD2s'
+
+const otherHostKeyFingerprint = 'SHA256:p2QAMXNIC1TJYWeIOttrVc98/R1BUFWu3/LiyKgUfQM'
+
 let api: TestApi
 
 let admin: Client
@@ -96,13 +101,24 @@ const created = async (body: ChannelInput, target = admin) => {
 const get = (id: string, target = admin) =>
   target.inject({ method: 'GET', url: channelEndpoint.path.replace(':id', id) })
 
+const update = (id: string, body: Body, target = admin) =>
+  target.inject({ method: 'PUT', url: updateChannelEndpoint.path.replace(':id', id), body })
+
 const list = (target = admin) => target.inject({ method: 'GET', url: channelsEndpoint.path })
+
+const accept = (id: string, body: Body, target = admin) =>
+  target.inject({ method: 'PUT', url: acceptHostKeyEndpoint.path.replace(':id', id), body })
 
 describe('POST /channels', () => {
   it('stores an inbound SFTP Channel and returns its credential masked', async () => {
     const { channel, webhookToken } = await created(sftpInbox)
 
-    expect(channel).toEqual({ ...sftpSettings, id: channel.id, credential: { lastFour: null } })
+    expect(channel).toEqual({
+      ...sftpSettings,
+      id: channel.id,
+      credential: { lastFour: null },
+      hostKeyFingerprint: null,
+    })
     expect(webhookToken).toBeNull()
 
     const response = await get(channel.id)
@@ -224,6 +240,83 @@ describe('an outbound SFTP Channel', () => {
   })
 })
 
+describe('the host key fingerprint of an SFTP Channel', () => {
+  it('is stored when the Admin pastes it into a new Channel', async () => {
+    const { channel } = await created({ ...sftpInbox, hostKeyFingerprint })
+
+    expect(channel).toMatchObject({ hostKeyFingerprint })
+    expect(channelEndpoint.response.parse((await get(channel.id)).json())).toMatchObject({
+      hostKeyFingerprint,
+    })
+  })
+
+  it('is kept when an update leaves it out and removed when an update sends null', async () => {
+    const { channel } = await created({ ...sftpInbox, hostKeyFingerprint })
+
+    const kept = await update(channel.id, { ...sftpSettings, name: 'Hansemarkt outbox' })
+
+    expect(channelEndpoint.response.parse(kept.json())).toMatchObject({ hostKeyFingerprint })
+
+    const replaced = await update(channel.id, {
+      ...sftpSettings,
+      hostKeyFingerprint: otherHostKeyFingerprint,
+    })
+
+    expect(channelEndpoint.response.parse(replaced.json())).toMatchObject({
+      hostKeyFingerprint: otherHostKeyFingerprint,
+    })
+
+    const removed = await update(channel.id, { ...sftpSettings, hostKeyFingerprint: null })
+
+    expect(channelEndpoint.response.parse(removed.json())).toMatchObject({
+      hostKeyFingerprint: null,
+    })
+  })
+
+  it('answers 400 for a fingerprint that is not an OpenSSH SHA256 fingerprint', async () => {
+    const response = await post({ ...sftpInbox, hostKeyFingerprint: 'MD5:16:27:ac:a5:76:28' })
+
+    expect(response.statusCode).toBe(400)
+  })
+})
+
+describe('PUT /channels/:id/host-key', () => {
+  it('stores the fingerprint the Admin accepted and returns the Channel', async () => {
+    const { channel } = await created(sftpInbox)
+
+    const response = await accept(channel.id, { hostKeyFingerprint })
+
+    expect(response.statusCode).toBe(200)
+    expect(acceptHostKeyEndpoint.response.parse(response.json())).toEqual({
+      ...channel,
+      hostKeyFingerprint,
+    })
+    expect(channelEndpoint.response.parse((await get(channel.id)).json())).toMatchObject({
+      hostKeyFingerprint,
+    })
+  })
+
+  it('answers 409 for a Channel that has no host key', async () => {
+    const { channel } = await created(httpDelivery)
+
+    const response = await accept(channel.id, { hostKeyFingerprint })
+
+    expect(response.statusCode).toBe(409)
+    expect(response.json()).toEqual({ message: 'Only SFTP Channels have a host key' })
+  })
+
+  it("answers 400 for an invalid fingerprint and 404 for another Workspace's Channel", async () => {
+    const { channel } = await created(sftpInbox)
+    const { channel: foreign } = await created(sftpInbox, otherAdmin)
+
+    expect((await accept(channel.id, { hostKeyFingerprint: 'SHA256:short' })).statusCode).toBe(400)
+    expect((await accept(foreign.id, { hostKeyFingerprint })).statusCode).toBe(404)
+    expect(channelEndpoint.response.parse((await get(channel.id)).json())).toMatchObject({
+      hostKeyFingerprint: null,
+    })
+  })
+})
+
 const addTradingPartner = async (workspaceId: string) => {
   const [row] = await api.connection.db
     .insert(tradingPartners)
@@ -289,9 +382,6 @@ describe('the Channels of another Workspace', () => {
   })
 })
 
-const update = (id: string, body: Body, target = admin) =>
-  target.inject({ method: 'PUT', url: updateChannelEndpoint.path.replace(':id', id), body })
-
 describe('PUT /channels/:id', () => {
   it('changes the settings and keeps the stored credential when none is sent', async () => {
     const { channel } = await created(sftpInbox)
@@ -309,6 +399,7 @@ describe('PUT /channels/:id', () => {
       ...changes,
       id: channel.id,
       credential: { lastFour: null },
+      hostKeyFingerprint: null,
     })
     expect(channelEndpoint.response.parse((await get(channel.id)).json())).toEqual(response.json())
 

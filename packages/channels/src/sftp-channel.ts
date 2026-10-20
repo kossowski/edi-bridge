@@ -12,7 +12,7 @@ export interface SftpChannel {
   remotePath: string | null
   authentication: SftpAuthentication | null
   encryptedCredential: string | null
-  hostKeyFingerprint?: HostKeyFingerprint | null
+  hostKeyFingerprint: HostKeyFingerprint | null
 }
 
 // The database checks that an SFTP Channel has all its settings, so a missing one is a defect.
@@ -46,7 +46,7 @@ export const sftpLogin = (secrets: SecretBox, channel: SftpChannel): SftpLogin =
     port,
     username,
     remotePath,
-    hostKeyFingerprint: hostKeyFingerprint ?? null,
+    hostKeyFingerprint,
     credential:
       authentication === 'password' ? { password: credential } : { privateKey: credential },
   }

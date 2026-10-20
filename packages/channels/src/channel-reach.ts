@@ -23,7 +23,7 @@ export interface SftpLogin {
   username: string
   credential: SftpCredential
   remotePath: string
-  hostKeyFingerprint?: HostKeyFingerprint | null
+  hostKeyFingerprint: HostKeyFingerprint | null
 }
 
 export interface HttpDestination {
@@ -113,9 +113,9 @@ const fingerprintOf = (hostKey: Buffer) =>
 
 const hostKeyState = (
   fingerprint: HostKeyFingerprint,
-  stored: HostKeyFingerprint | null | undefined,
+  stored: HostKeyFingerprint | null,
 ): HostKeyState => {
-  if (stored === null || stored === undefined) {
+  if (stored === null) {
     return 'unchecked'
   }
 
