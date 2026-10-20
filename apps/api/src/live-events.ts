@@ -17,7 +17,7 @@ export const silentLiveEvents: LiveEventHub = {
   subscribe: () => () => {},
 }
 
-// Cloudflare and Traefik end a response idle for 100 s, so a comment keeps the stream open.
+// Cloudflare ends a response idle for 100 s, so a comment keeps the stream open.
 export const defaultHeartbeatMs = 25_000
 
 // Proxies pass the stream on as it is written instead of buffering it.
@@ -45,6 +45,10 @@ export function liveEventStreams(hub: LiveEventHub, heartbeatMs: number) {
       }, heartbeatMs)
 
       const end = () => {
+        if (!open.has(end)) {
+          return
+        }
+
         clearInterval(heartbeat)
         unsubscribe()
         open.delete(end)
