@@ -16,6 +16,7 @@ import {
 } from '@/components/lookup-tables/lookup-table-form-values'
 import { scopeKey } from '@/components/lookup-tables/lookup-table-scope'
 import { TradingPartnerChoice } from '@/components/lookup-tables/trading-partner-choice'
+import { useLanguage } from '@/hooks/use-language'
 import { isConflict, updateLookupTable } from '@/lib/api/client'
 import { lookupTableQuery, storeSavedLookupTable } from '@/lib/api/queries'
 import { maxLookupTableNameLength } from '@edi-bridge/contracts'
@@ -51,6 +52,7 @@ function LookupTableForm({
   const t = useTranslations('LookupTables.form')
   const errorMessage = useFieldErrorMessage()
   const queryClient = useQueryClient()
+  const language = useLanguage()
   const baseId = useId()
   const formRef = useRef<HTMLFormElement>(null)
 
@@ -62,7 +64,7 @@ function LookupTableForm({
   const save = useMutation({
     mutationFn: async (settings: LookupTableSettings) => {
       const { entries } = await queryClient.fetchQuery({
-        ...lookupTableQuery(table.id),
+        ...lookupTableQuery(table.id, language),
         staleTime: 0,
       })
 

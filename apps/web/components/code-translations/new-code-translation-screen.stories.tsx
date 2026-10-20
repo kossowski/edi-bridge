@@ -353,6 +353,7 @@ export const German = meta.story({
     const suggestions = within(await canvas.findByRole('list', { name: /^Vorgeschlagene Werte/ }))
 
     await expect(await suggestions.findByRole('button', { name: 'Übernehmen: ST' })).toBeVisible()
+    await expect(suggestions.getByText('PCE bedeutet Stück.')).toBeVisible()
     await expect(canvas.getByText(/^Legt/)).toHaveTextContent('Legt Mengeneinheiten ohne Werte an.')
     await expect(canvas.getByText('Von der KI vorgeschlagen')).toBeVisible()
     await expect(canvas.getByRole('heading', { level: 1 })).toHaveTextContent(

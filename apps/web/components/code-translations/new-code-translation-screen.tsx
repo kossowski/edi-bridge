@@ -29,6 +29,7 @@ import { LoadError } from '@/components/load-error'
 import { scopeInputOf, scopeKey } from '@/components/lookup-tables/lookup-table-scope'
 import { TradingPartnerChoice } from '@/components/lookup-tables/trading-partner-choice'
 import { ChoiceCards } from '@/components/trading-partners/choice-cards'
+import { useLanguage } from '@/hooks/use-language'
 import { createLookupTable } from '@/lib/api/client'
 import {
   lookupTableSuggestionsQuery,
@@ -39,6 +40,7 @@ import {
 import { lookupTableHref } from '@/lib/navigation'
 import {
   type Direction,
+  type Language,
   type LookupTableEntry,
   type LookupTableKind,
   lookupTableKinds,
@@ -62,10 +64,11 @@ type AddRow =
 function suggestionsQueryOf(
   kind: LookupTableKind,
   scope: LookupTableScopeInput,
+  language: Language,
 ): LookupTableSuggestionsQuery {
   return scope.kind === 'tradingPartner'
-    ? { kind, tradingPartnerId: scope.tradingPartnerId }
-    : { kind }
+    ? { kind, tradingPartnerId: scope.tradingPartnerId, language }
+    : { kind, language }
 }
 
 function useKindSides(kind: LookupTableKind, direction: Direction): Sides {
@@ -300,7 +303,12 @@ function FirstValues({
   const router = useRouter()
   const direction = kindDirections[kind]
   const sides = useKindSides(kind, direction)
-  const suggestions = useQuery(lookupTableSuggestionsQuery(suggestionsQueryOf(kind, scope)))
+  const language = useLanguage()
+
+  const suggestions = useQuery(
+    lookupTableSuggestionsQuery(suggestionsQueryOf(kind, scope, language)),
+  )
+
   const valuesId = useId()
   const valuesHeading = useRef<HTMLHeadingElement>(null)
   const valuesList = useRef<HTMLUListElement>(null)

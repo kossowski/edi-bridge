@@ -52,6 +52,7 @@ import {
   interchangesEndpoint,
   liveEventsEndpoint,
   lookupTableEndpoint,
+  type Language,
   type LookupTableImportBody,
   lookupTableImportPreviewEndpoint,
   type LookupTableInput,
@@ -572,13 +573,17 @@ export function listLookupTables() {
   return request(lookupTablesEndpoint)
 }
 
-export function getLookupTable(id: string) {
-  return request(lookupTableEndpoint, { path: toPath(lookupTableEndpoint.path, { id }) })
+export function getLookupTable(id: string, language: Language) {
+  return request(lookupTableEndpoint, {
+    path: toPath(lookupTableEndpoint.path, { id }),
+    query: { language },
+  })
 }
 
-export function listLookupTableMissingCodes(id: string) {
+export function listLookupTableMissingCodes(id: string, language: Language) {
   return request(lookupTableMissingCodesEndpoint, {
     path: toPath(lookupTableMissingCodesEndpoint.path, { id }),
+    query: { language },
   })
 }
 

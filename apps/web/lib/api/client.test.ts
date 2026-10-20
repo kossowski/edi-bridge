@@ -40,6 +40,7 @@ import {
 
 import {
   acceptAiProposedParts,
+  aiBudgetExhaustedProblemOf,
   ApiError,
   createChannel,
   createLookupTable,
@@ -518,7 +519,7 @@ describe('Lookup Table actions', () => {
 
   it('renames a Lookup Table and keeps its entries', async () => {
     server.use(...lookupTableHandlers(apiUrl))
-    const { entries } = await getLookupTable(units.id)
+    const { entries } = await getLookupTable(units.id, 'en')
 
     await expect(
       updateLookupTable(units.id, {
@@ -530,10 +531,45 @@ describe('Lookup Table actions', () => {
     ).resolves.toMatchObject({ name: 'Units', entries: units.entries })
   })
 
+  it('reads the code meanings of a Lookup Table in the page language', async () => {
+    server.use(...lookupTableHandlers(apiUrl))
+
+    const { codeMeanings } = await getLookupTable(units.id, 'de')
+
+    expect(codeMeanings).toContainEqual({ code: 'PCE', meaning: 'Stück' })
+  })
+
+  it('reads the meanings of missing codes in the page language', async () => {
+    server.use(...lookupTableHandlers(apiUrl, { runs: [] }))
+
+    const codes = await listLookupTableMissingCodes(units.id, 'de')
+
+    expect(codes.find(({ code }) => code === 'BTL')?.meaning).toBe('Flasche')
+  })
+
+  it('reads the meanings of suggested values in the page language', async () => {
+    server.use(...lookupTableHandlers(apiUrl))
+
+    const { entries } = await getLookupTableSuggestions({ kind: 'countries', language: 'de' })
+
+    expect(entries[0]?.targetMeaning).toBe('Deutschland')
+  })
+
+  it('rejects suggested values with the budget when the AI budget is used up', async () => {
+    server.use(...lookupTableHandlers(apiUrl, { suggestions: 'aiBudgetExhausted' }))
+
+    const error = await getLookupTableSuggestions({ kind: 'units', language: 'en' }).then(
+      () => null,
+      (caught: Error) => caught,
+    )
+
+    expect(aiBudgetExhaustedProblemOf(error)).toMatchObject({ code: 'aiBudgetExhausted' })
+  })
+
   it('lists the codes a Lookup Table is missing', async () => {
     server.use(...lookupTableHandlers(apiUrl, { runs: [] }))
 
-    const codes = await listLookupTableMissingCodes(units.id)
+    const codes = await listLookupTableMissingCodes(units.id, 'en')
 
     expect(codes.map(({ code, urgency }) => [code, urgency])).toEqual([
       ['BTL', 'upcoming'],
@@ -547,6 +583,7 @@ describe('Lookup Table actions', () => {
     const { entries } = await getLookupTableSuggestions({
       kind: 'countries',
       tradingPartnerId: hansemarkt.id,
+      language: 'en',
     })
 
     expect(entries[0]).toEqual({
@@ -561,7 +598,7 @@ describe('Lookup Table actions', () => {
     const storeNumbers = seedLookupTableNamed('Hansemarkt store numbers')
 
     await expect(deleteLookupTable(storeNumbers.id)).resolves.toBeUndefined()
-    await expect(getLookupTable(storeNumbers.id)).rejects.toMatchObject({ status: 404 })
+    await expect(getLookupTable(storeNumbers.id, 'en')).rejects.toMatchObject({ status: 404 })
   })
 })
 
@@ -575,7 +612,7 @@ describe('Lookup Table CSV import', () => {
     const { rows } = await previewLookupTableImport(units.id, { csv })
 
     expect(rows.map(({ status }) => status)).toEqual(['unchanged', 'changed', 'added', 'invalid'])
-    await expect(getLookupTable(units.id)).resolves.toMatchObject({ entries: units.entries })
+    await expect(getLookupTable(units.id, 'en')).resolves.toMatchObject({ entries: units.entries })
   })
 
   it('merges the imported entries and keeps entries missing from the CSV', async () => {

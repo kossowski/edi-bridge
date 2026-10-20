@@ -15,6 +15,7 @@ import {
 } from '@/components/code-translations/lookup-table-values'
 import { LoadFailure } from '@/components/detail-parts'
 import { ImportCsvDialog } from '@/components/lookup-tables/import-csv-dialog'
+import { useLanguage } from '@/hooks/use-language'
 import { useSession } from '@/hooks/use-session'
 import { ApiError } from '@/lib/api/client'
 import { lookupTableMissingCodesQuery, lookupTableQuery } from '@/lib/api/queries'
@@ -55,8 +56,9 @@ export function LookupTableScreen({
 }) {
   const t = useTranslations('CodeTranslation')
   const tImport = useTranslations('LookupTable.import')
-  const { data, error, isPending, refetch } = useQuery(lookupTableQuery(id))
-  const missing = useQuery(lookupTableMissingCodesQuery(id))
+  const language = useLanguage()
+  const { data, error, isPending, refetch } = useQuery(lookupTableQuery(id, language))
+  const missing = useQuery(lookupTableMissingCodesQuery(id, language))
   const session = useSession()
   const [importOpen, setImportOpen] = useState(false)
   const [imported, setImported] = useState('')

@@ -8,7 +8,7 @@ import {
 } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 
-import { remainingAiReview } from '@edi-bridge/contracts'
+import { defaultLanguage, languages, remainingAiReview } from '@edi-bridge/contracts'
 
 import type {
   AcceptAiProposedPartsBody,
@@ -21,6 +21,7 @@ import type {
   InterchangeListQuery,
   OrderLifecycleListQuery,
   Invite,
+  Language,
   LookupTable,
   LookupTableSuggestionsQuery,
   LookupTableSummary,
@@ -531,30 +532,45 @@ export const lookupTablesQuery = queryOptions({
   queryFn: listLookupTables,
 })
 
-export function lookupTableQuery(id: string) {
+export function lookupTableQuery(id: string, language: Language) {
   return queryOptions({
-    queryKey: lookupTableKeys.detail(id),
-    queryFn: () => getLookupTable(id),
+    queryKey: [...lookupTableKeys.detail(id), language] as const,
+    queryFn: () => getLookupTable(id, language),
   })
 }
 
-export function lookupTableMissingCodesQuery(id: string) {
+export function lookupTableMissingCodesQuery(id: string, language: Language) {
   return queryOptions({
-    queryKey: lookupTableKeys.missingCodes(id),
-    queryFn: () => listLookupTableMissingCodes(id),
+    queryKey: [...lookupTableKeys.missingCodes(id), language] as const,
+    queryFn: () => listLookupTableMissingCodes(id, language),
   })
 }
 
+// Each fetch spends AI budget, so the suggestions are fetched once and never again on their own.
 export function lookupTableSuggestionsQuery(query: LookupTableSuggestionsQuery) {
   return queryOptions({
     queryKey: lookupTableKeys.suggestions(query),
     queryFn: () => getLookupTableSuggestions(query),
     staleTime: Infinity,
+    gcTime: Infinity,
+    retry: false,
   })
 }
 
+// A save answers with code meanings in the default language; other languages read theirs again.
 export function storeSavedLookupTable(queryClient: QueryClient, saved: LookupTable) {
-  queryClient.setQueryData(lookupTableQuery(saved.id).queryKey, saved)
+  queryClient.setQueryData(lookupTableQuery(saved.id, defaultLanguage).queryKey, saved)
+
+  for (const language of languages.filter((other) => other !== defaultLanguage)) {
+    const { queryKey } = lookupTableQuery(saved.id, language)
+
+    queryClient.setQueryData(
+      queryKey,
+      (cached) => cached && { ...saved, codeMeanings: cached.codeMeanings },
+    )
+    void queryClient.invalidateQueries({ queryKey, exact: true })
+  }
+
   void queryClient.invalidateQueries({ queryKey: lookupTableKeys.list() })
   void queryClient.invalidateQueries({ queryKey: lookupTableKeys.missingCodes(saved.id) })
 }
