@@ -26,8 +26,10 @@ import {
   createChannel,
   createFlows,
   createHandlers,
+  documentStructureHandlers,
   flowHandlers,
   seedChannels,
+  seedDocumentStructureOf,
   seedFlows,
   seedMappings,
   seedTradingPartners,
@@ -52,6 +54,9 @@ const untouchedInbox = {
 }
 
 const withUntouchedInbox = [...seedChannels, untouchedInbox]
+
+const oneDataFormat = (messageType: 'DESADV' | 'INVOIC') =>
+  documentStructureHandlers(apiUrl, { documentStructures: [seedDocumentStructureOf[messageType]] })
 
 function serverError() {
   return HttpResponse.json({ message: 'Internal Server Error' }, { status: 500 })
@@ -295,6 +300,9 @@ export const AddDocumentWithExistingMapping = meta.story({
 
 export const AddDocumentWithAi = meta.story({
   ...at(awaiting, 'documents'),
+  beforeEach({ msw }) {
+    msw.use(...oneDataFormat('DESADV'))
+  },
   async play({ canvasElement }) {
     const sheet = within(await openSheet(canvasElement))
     await userEvent.click(sheet.getByRole('radio', { name: /^Dispatch advices/ }))
@@ -309,6 +317,17 @@ export const AddDocumentWithAi = meta.story({
       sheet.getByRole('link', { name: 'Open the mapping and draft with AI' }),
     ).toHaveAttribute('href', expect.stringMatching(/^\/mappings\/[\da-f-]+\?ai-draft=start$/))
     await userEvent.click(sheet.getByRole('button', { name: 'Done' }))
+  },
+})
+
+export const AddDocumentWithAiChoosesDataFormat = meta.story({
+  ...at(awaiting, 'documents'),
+  async play({ canvasElement }) {
+    const sheet = within(await openSheet(canvasElement))
+    await userEvent.click(sheet.getByRole('radio', { name: /^Dispatch advices/ }))
+    await userEvent.click(await sheet.findByRole('radio', { name: /^Create a new one with AI/ }))
+    await userEvent.click(sheet.getByRole('button', { name: 'Create the mapping' }))
+    await expect(getRouter().push).toHaveBeenCalledWith('/mappings?new=DESADV')
   },
 })
 
@@ -375,7 +394,10 @@ export const AddDocumentFails = meta.story({
 export const CreateMappingFails = meta.story({
   ...at(awaiting, 'documents'),
   beforeEach({ msw }) {
-    msw.use(http.post(`${apiUrl}${createMappingEndpoint.path}`, serverError))
+    msw.use(
+      ...oneDataFormat('INVOIC'),
+      http.post(`${apiUrl}${createMappingEndpoint.path}`, serverError),
+    )
   },
   async play({ canvasElement }) {
     const sheet = within(await openSheet(canvasElement))
@@ -388,15 +410,13 @@ export const CreateMappingFails = meta.story({
   },
 })
 
-export const CreateMappingWithoutDataFormat = meta.story({
+export const CreateMappingDataFormatGone = meta.story({
   ...at(awaiting, 'documents'),
   beforeEach({ msw }) {
     msw.use(
+      ...oneDataFormat('INVOIC'),
       http.post(`${apiUrl}${createMappingEndpoint.path}`, () =>
-        HttpResponse.json(
-          { message: 'The Workspace has no Document Structure to map yet.' },
-          { status: 422 },
-        ),
+        HttpResponse.json({ message: 'The Document Structure does not exist.' }, { status: 422 }),
       ),
       http.get(`${apiUrl}${publishedMappingVersionsEndpoint.path}`, () => HttpResponse.json([])),
     )
@@ -408,7 +428,7 @@ export const CreateMappingWithoutDataFormat = meta.story({
       await sheet.findByRole('radio', { name: /^Create a new one with AI/ }),
     ).toBeChecked()
     await userEvent.click(sheet.getByRole('button', { name: 'Create the mapping' }))
-    await expect(await sheet.findByText(/has no data format to translate to yet/)).toBeVisible()
+    await expect(await sheet.findByText(/Your data format no longer exists/)).toBeVisible()
   },
 })
 
