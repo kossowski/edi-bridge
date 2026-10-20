@@ -14,7 +14,7 @@ import { documents, invites, runs, tradingPartners, users, workspaces } from '@e
 import { processRun } from '@edi-bridge/pipeline'
 import { pipelineServices } from '@edi-bridge/pipeline/testing'
 
-import { resetSandbox } from './sandbox-reset.js'
+import { findSandbox, resetSandbox, resetTheSandbox } from './sandbox-reset.js'
 import { ensureShowcaseAndSandbox, showcaseAdmin } from './showcase-and-sandbox.js'
 import {
   addMember,
@@ -145,7 +145,6 @@ describe('POST /operator/workspaces/:workspaceId/reset', () => {
     const showcaseId = await idOf('showcase')
     const seeded = countsOf(await snapshot(sandboxId))
 
-    // What an Admin changed in the Sandbox, and what the Operator set, before the reset.
     const created = await sandboxAdmin.inject({
       method: createTradingPartnerEndpoint.method,
       url: createTradingPartnerEndpoint.path,
@@ -299,5 +298,63 @@ describe('a Run queued before the reset', () => {
           ),
         ),
     ).toEqual([])
+  })
+})
+
+describe('the reset-sandbox command', () => {
+  it('finds the one Sandbox', async () => {
+    expect(await findSandbox(api.connection.db)).toEqual({
+      id: await idOf('sandbox'),
+      name: 'Kranichsee Getränke GmbH',
+    })
+  })
+
+  it('finds no Sandbox when none exists', async () => {
+    const sandboxId = await idOf('sandbox')
+    const { db } = api.connection
+
+    await db.update(workspaces).set({ kind: 'standard' }).where(eq(workspaces.id, sandboxId))
+
+    try {
+      expect(await findSandbox(db)).toBeUndefined()
+      await expect(resetTheSandbox(db, { secrets })).rejects.toThrow('No Sandbox Workspace exists')
+    } finally {
+      await db.update(workspaces).set({ kind: 'sandbox' }).where(eq(workspaces.id, sandboxId))
+    }
+  })
+
+  it('refuses to reset when several Sandboxes exist', async () => {
+    const { db } = api.connection
+
+    const second = await one(
+      db
+        .insert(workspaces)
+        .values({ name: 'Zweite Sandbox GmbH', kind: 'sandbox' })
+        .returning({ id: workspaces.id }),
+    )
+
+    try {
+      await expect(findSandbox(db)).rejects.toThrow('Several Sandbox Workspaces exist')
+    } finally {
+      await db.delete(workspaces).where(eq(workspaces.id, second.id))
+    }
+  })
+
+  it('restores the seed of the Sandbox and touches no other Workspace', async () => {
+    const sandboxId = await idOf('sandbox')
+    const others = [await idOf('showcase'), standardId, ownWorkspace.id, otherWorkspace.id]
+    const { db } = api.connection
+
+    await resetSandbox(db, sandboxId, { secrets })
+
+    const seeded = countsOf(await snapshot(sandboxId))
+
+    await db.delete(runs).where(eq(runs.workspaceId, sandboxId))
+
+    const othersBefore = await Promise.all(others.map(snapshot))
+
+    expect(await resetTheSandbox(db, { secrets })).toBe('Kranichsee Getränke GmbH')
+    expect(countsOf(await snapshot(sandboxId))).toEqual(seeded)
+    expect(await Promise.all(others.map(snapshot))).toEqual(othersBefore)
   })
 })

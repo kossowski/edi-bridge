@@ -20,9 +20,8 @@ import type { Database, Transaction } from './db.js'
 
 export type SandboxResetOutcome = 'reset' | 'notFound' | 'notSandbox'
 
-// Flows, Runs and Acknowledgements hold references without cascade, so each table goes in turn.
 async function deleteWorkspaceData(tx: Transaction, workspaceId: string) {
-  // Runs go first and take their steps along, the order in which the worker locks them too.
+  // No cascade from the Workspace; Runs go first, in the order the worker locks them too.
   await tx.delete(runs).where(eq(runs.workspaceId, workspaceId))
   await tx.delete(acknowledgements).where(eq(acknowledgements.workspaceId, workspaceId))
   await tx.delete(documents).where(eq(documents.workspaceId, workspaceId))
@@ -35,7 +34,6 @@ async function deleteWorkspaceData(tx: Transaction, workspaceId: string) {
   await tx.delete(aiTokenUsage).where(eq(aiTokenUsage.workspaceId, workspaceId))
 }
 
-// Keeps the Workspace row, its Operator settings, Members and invites; replaces the rest by the seed.
 export function resetSandbox(
   database: Database,
   workspaceId: string,
@@ -76,4 +74,18 @@ export async function findSandbox(database: Database) {
   }
 
   return found[0]
+}
+
+export async function resetTheSandbox(database: Database, options: SeedOptions) {
+  const sandbox = await findSandbox(database)
+
+  if (sandbox === undefined) {
+    throw new Error('No Sandbox Workspace exists. Run create-demo-workspaces first.')
+  }
+
+  if ((await resetSandbox(database, sandbox.id, options)) !== 'reset') {
+    throw new Error(`The Sandbox Workspace "${sandbox.name}" is gone or no longer a Sandbox.`)
+  }
+
+  return sandbox.name
 }

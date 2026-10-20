@@ -141,8 +141,6 @@ export const createWorkspace = (input: Effect.Effect<WorkspaceInput, ValidationE
     return yield* Effect.flatMap(loadSummaries(created.id, now), exactlyOne)
   })
 
-const notSandbox = new Conflict({ message: 'Only the Sandbox Workspace can be reset' })
-
 export const resetSandboxWorkspace = (workspaceId: string) =>
   Effect.gen(function* () {
     yield* rejectingInvalidId(workspaceId)
@@ -158,7 +156,7 @@ export const resetSandboxWorkspace = (workspaceId: string) =>
     }
 
     if (outcome === 'notSandbox') {
-      return yield* notSandbox
+      return yield* new Conflict({ message: 'Only the Sandbox Workspace can be reset' })
     }
 
     return yield* Effect.flatMap(loadSummaries(workspaceId, now), exactlyOne)

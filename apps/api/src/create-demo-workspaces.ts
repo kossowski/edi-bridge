@@ -1,8 +1,6 @@
 import { z } from 'zod'
 
-import { secretBox, secretKeyEnv } from '@edi-bridge/channels'
-import { connect, localDatabaseUrl, migrate } from '@edi-bridge/db'
-
+import { runSeedCommand } from './command.js'
 import {
   type ShowcaseAndSandboxOutcome,
   ensureShowcaseAndSandbox,
@@ -22,33 +20,13 @@ const summary = (outcome: ShowcaseAndSandboxOutcome) =>
     `Admin ${showcaseAdmin.email} of the Sandbox: ${outcomeText[outcome.admin]}`,
   ].join('\n')
 
-async function createShowcaseAndSandbox() {
-  const env = z
-    .object({
-      DATABASE_URL: z.url().default(localDatabaseUrl),
-      CHANNEL_SECRET_KEY: secretKeyEnv(process.env.NODE_ENV === 'production'),
-      SHOWCASE_ADMIN_PASSWORD: z.string().optional(),
-    })
-    .safeParse(process.env)
-
-  if (!env.success) {
-    throw new Error(`Invalid environment configuration:\n${z.prettifyError(env.error)}`)
-  }
-
-  const {
-    DATABASE_URL: databaseUrl,
-    CHANNEL_SECRET_KEY: secretKey,
-    SHOWCASE_ADMIN_PASSWORD: password,
-  } = env.data
-
-  await migrate(databaseUrl)
-
-  const connection = connect(databaseUrl)
-
-  try {
-    const outcome = await ensureShowcaseAndSandbox(connection.db, {
-      secrets: secretBox(secretKey),
-      adminPassword: password,
+await runSeedCommand(
+  'The Showcase and Sandbox could not be created.',
+  z.object({ SHOWCASE_ADMIN_PASSWORD: z.string().optional() }),
+  async (db, secrets, env) => {
+    const outcome = await ensureShowcaseAndSandbox(db, {
+      secrets,
+      adminPassword: env.SHOWCASE_ADMIN_PASSWORD,
     })
 
     console.log(summary(outcome))
@@ -58,16 +36,5 @@ async function createShowcaseAndSandbox() {
       console.log(`Password of ${showcaseAdmin.email}: ${outcome.generatedPassword}`)
       console.log('Store it now: the command does not show it again.')
     }
-  } finally {
-    await connection.close()
-  }
-}
-
-try {
-  await createShowcaseAndSandbox()
-} catch (error) {
-  console.error(
-    error instanceof Error ? error.message : 'The Showcase and Sandbox could not be created.',
-  )
-  process.exitCode = 1
-}
+  },
+)
