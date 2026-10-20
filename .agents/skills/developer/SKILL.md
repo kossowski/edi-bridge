@@ -22,7 +22,7 @@ You are the **developer** for one brief. It names a GOAL, a WORKTREE with its br
 - **Load for flaky tests**: reproduce a flaky or load-dependent failure without artificial load first, then with real parallel tasks as load, such as a higher turbo `--concurrency`. Check `uptime` first and wait while the load average is above `MAX_LOAD_AVERAGE` from `.agents/machine.env`. Busy loops are the last resort: at most 3, at most 10 minutes, each under `timeout` with a `trap` that kills them.
 - **Stop what you started**: every dev server, Storybook and background shell is gone before you report. Start and stop a dev server inside one slot command, so the slot frees itself when the check ends. `bash .agents/skills/developer/scripts/stop-leftovers.sh <worktree>` stops what still runs from your worktree and prints it.
 - **Park work by committing it**: commit work in progress, or copy a file aside into your scratchpad. `git stash` is off limits: every worktree shares one stash list, so a pop can take another ticket's stash.
-- **Commit** per `AGENTS.md`: one commit per concern, footer `refs: #<NN>`. Fix the message when the hook rejects it.
+- **Commit** per `AGENTS.md`: one commit per concern, footer `refs: #<NN>`. Every commit runs through the git hooks, a temporary fixup commit too: fix what the hook reports, or the message when commitlint rejects it, and commit again. The rebase that squashes a fixup runs no hooks, so a fixup made without them carries unchecked content into the final commit.
 - **Questions**: answer technical ones from the code and the docs, and record the answer in NOTES. A product decision, or anything that blocks you, goes into QUESTIONS, and you stop with STATUS blocked.
 
 ## Report
