@@ -113,7 +113,7 @@ const sidebarGroupSources: ReadonlyArray<SidebarGroupSource> = [
       { key: 'tradingPartners', page: 'tradingPartners' },
       { key: 'mappings', page: 'mappings' },
       { key: 'codeTranslations', page: 'codeTranslations' },
-      { key: 'dataFormats', page: 'documentStructures' },
+      { key: 'documentStructures', page: 'documentStructures' },
     ],
   },
   {

@@ -73,7 +73,7 @@
         "label": "Code translations",
         "hint": "Codes that are translated, e.g. unit ST becomes PCE"
       },
-      "dataFormats": {
+      "documentStructures": {
         "label": "Your data formats",
         "hint": "The shape of the files from your own systems"
       },
@@ -2299,7 +2299,7 @@
     "path": {
       "inbound": "goes into",
       "outbound": "goes to",
-      "dataFormat": "Your data format:",
+      "documentStructure": "Your data format:",
       "noPartner": "No trading partner yet"
     },
     "title": {
@@ -2352,7 +2352,7 @@
       "creating": "Creating the Mapping…",
       "failed": "The Mapping could not be created. Try again.",
       "noDocumentStructure": "Add your data format first, so the AI knows the shape of your files.",
-      "addDataFormat": "Add a data format",
+      "addDocumentStructure": "Add a data format",
       "documentStructureGone": "This data format no longer exists. Choose another one."
     },
     "first": {

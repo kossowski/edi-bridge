@@ -64,7 +64,7 @@ export function NoDocumentStructure() {
         <Link
           href={newDocumentStructureHref}
           className={buttonVariants({ variant: 'outline', size: 'sm' })}>
-          {t('addDataFormat')}
+          {t('addDocumentStructure')}
         </Link>
       </AlertDescription>
     </Alert>
