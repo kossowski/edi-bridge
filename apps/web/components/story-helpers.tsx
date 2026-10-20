@@ -1,5 +1,6 @@
 import { getRouter } from '@storybook/nextjs-vite/navigation.mock'
 import { NextIntlClientProvider } from 'next-intl'
+// A private Next module, but the one Storybook's own router provider fills.
 import {
   PathnameContext,
   SearchParamsContext,
@@ -95,7 +96,6 @@ function MemoryHistory({ start, children }: { start: StoryNavigation; children: 
   )
 }
 
-// Router push, replace and back move through a history of the story's own, so Back can be tested.
 export const withMemoryHistory = (
   Story: () => ReactNode,
   { parameters }: { parameters: { nextjs?: { navigation?: StoryNavigation } } },
