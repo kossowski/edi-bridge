@@ -416,6 +416,15 @@ const unreached: ReadonlySet<ConnectionFailure> = new Set([
   'seededChannel',
 ])
 
+// The server of the seeded Channel stored with an old key shows its new key.
+export function refusesHostKey(record: ChannelRecord) {
+  return (
+    record.type === 'sftp' &&
+    record.hostKeyFingerprint != null &&
+    record.hostKeyFingerprint !== serverHostKey(record.host)
+  )
+}
+
 function testedHostKey(
   record: ChannelRecord,
   failure: ConnectionFailure | undefined,

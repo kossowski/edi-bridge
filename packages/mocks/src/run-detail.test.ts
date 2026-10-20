@@ -18,10 +18,10 @@ import {
 } from '@edi-bridge/contracts'
 import { parse, validate } from '@edi-bridge/edifact'
 
-import { seedChannels } from './channel'
+import { seedChannels, serverHostKey } from './channel'
 import { seedFlows } from './flow'
 import { seedLookupTableNamed } from './lookup-table'
-import { createRun, createRuns } from './run'
+import { createRun, createRuns, seedRuns } from './run'
 import { runDetailHandlers, seedExpiredDocuments, seedReprocessed } from './run-detail'
 import { createRunStore, interchangeIdOf } from './run-store'
 import { seedTradingPartners } from './trading-partner'
@@ -302,6 +302,7 @@ describe('GET /runs/:id', () => {
         'characterSetUnsupported:false',
         'channelDefect:true',
         'destinationUnreachable:true',
+        'hostKeyMismatch:true',
       ]),
     )
     // Like the api, every one keeps the Message it built, with or without an Interchange.
@@ -523,6 +524,39 @@ describe('the problem of a failed Run', () => {
       whoFixes: 'retry',
       fixTarget: { kind: 'channel', channelId: channel.id, name: channel.name },
     })
+  })
+
+  it('seeds one delivery that an SFTP server refused with another host key, fixed at its Channel', async () => {
+    const runs = createRuns({ count: 2000 })
+    const refused = runs.filter(({ problem }) => problem?.reason === 'hostKeyMismatch')
+    server.use(...runDetailHandlers(apiUrl, { runs }))
+
+    expect(refused).toHaveLength(1)
+
+    const run = refused[0]!
+    const flow = seedFlows.find(({ id }) => id === run.flow.id)!
+    const channel = seedChannels.find(({ id }) => id === flow.destinationChannelId)!
+    const { body } = await getRun(run.id)
+
+    expect(channel.type === 'sftp' && channel.hostKeyFingerprint).not.toBe(
+      channel.type === 'sftp' && serverHostKey(channel.host),
+    )
+    expect(body).toMatchObject({
+      direction: 'outbound',
+      failureStage: 'delivery',
+      error: { code: 'hostKeyMismatch', position: null },
+      problem: {
+        reason: 'hostKeyMismatch',
+        whoFixes: 'retry',
+        fixTarget: { kind: 'channel', channelId: channel.id, name: channel.name },
+      },
+    })
+  })
+
+  it('lists the delivery refused for another host key among the seeded Runs', () => {
+    expect(seedRuns().filter(({ problem }) => problem?.reason === 'hostKeyMismatch')).toHaveLength(
+      1,
+    )
   })
 
   it('seeds every kind of fix target and everyone who fixes a problem', async () => {

@@ -37,6 +37,7 @@ export type GeneratedErrorCode =
   | 'missingSourceField'
   | 'destinationUnreachable'
   | 'destinationUnavailable'
+  | 'hostKeyMismatch'
   | 'glnMissing'
   | 'channelDefect'
   | 'characterSetUnsupported'
@@ -45,8 +46,10 @@ export type GeneratedErrorCode =
 export type GeneratedError = RunError & { code: GeneratedErrorCode }
 
 // `defect` pins whether the Run stops on a Defect, for a story or test that needs one either way.
+// `refusedHostKey` marks the delivery the SFTP server refused for another host key.
 type ProblemFields = Pick<RunSummary, 'id' | 'messageType' | 'flow' | 'failureStage'> & {
   defect?: boolean | undefined
+  refusedHostKey?: boolean | undefined
 }
 
 export type BrokenPiece =
@@ -117,6 +120,13 @@ export function failsBeforeInterchange(run: ProblemFields) {
 const defectError: GeneratedError = {
   code: 'processingDefect',
   message: 'The processing stopped on an unexpected error',
+  position: null,
+  details: null,
+}
+
+const hostKeyMismatchError: GeneratedError = {
+  code: 'hostKeyMismatch',
+  message: 'The SFTP server showed a different host key from the one confirmed',
   position: null,
   details: null,
 }
@@ -227,6 +237,10 @@ export function problemReasonOf(
     }
 
     case 'delivery': {
+      if (run.refusedHostKey) {
+        return 'hostKeyMismatch'
+      }
+
       return incompleteSetupOf(run) === null ? 'unreachable' : 'incompleteSetup'
     }
   }
@@ -570,6 +584,10 @@ function failureOf(run: RunSummary, faker: Faker, { fault, broken }: FaultyMessa
       },
       broken: { kind: 'mapping', fieldPath: `${lines}[].gtin` },
     }
+  }
+
+  if (run.problem?.reason === 'hostKeyMismatch') {
+    return { error: hostKeyMismatchError, broken: null }
   }
 
   const incompleteSetup = incompleteSetupOf(run)

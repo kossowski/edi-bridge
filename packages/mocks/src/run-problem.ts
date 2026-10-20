@@ -32,6 +32,7 @@ const reasons = {
   missingSourceField: 'missingField',
   destinationUnreachable: 'unreachable',
   destinationUnavailable: 'unreachable',
+  hostKeyMismatch: 'hostKeyMismatch',
   glnMissing: 'incompleteSetup',
   channelDefect: 'incompleteSetup',
   characterSetUnsupported: 'incompleteSetup',
