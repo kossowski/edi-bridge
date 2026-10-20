@@ -293,7 +293,7 @@ describe('POST /operator/workspaces with seed', () => {
       .from(documents)
       .where(eq(documents.workspaceId, created.id))
 
-    const vatIds = contents.flatMap(({ text }) => text.match(/DE\d{9}/g) ?? [])
+    const vatIds = contents.flatMap(({ text }) => text?.match(/DE\d{9}/g) ?? [])
 
     expect(vatIds.length).toBeGreaterThan(0)
 

@@ -3,6 +3,7 @@ import {
   type AnyPgColumn,
   boolean,
   check,
+  customType,
   date,
   index,
   integer,
@@ -45,6 +46,8 @@ import {
   workspaceKinds,
   workspaceRoles,
 } from '@edi-bridge/contracts'
+
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({ dataType: () => 'bytea' })
 
 export const workspaceKind = pgEnum('workspace_kind', workspaceKinds)
 
@@ -496,7 +499,9 @@ export const documents = pgTable(
       .notNull()
       .references(() => channels.id),
     fileName: text().notNull(),
-    content: text().notNull(),
+    content: text(),
+    // Text would hold U+FFFD for bytes not valid in their encoding, so those are kept as bytes.
+    bytes: bytea(),
     // The UNB keys that make a later copy of the Interchange a Duplicate; null for no Interchange.
     interchangeSender: text(),
     interchangeControlReference: text(),
@@ -519,6 +524,7 @@ export const documents = pgTable(
       'documents_interchange',
       sql`num_nonnulls(${table.interchangeSender}, ${table.interchangeControlReference}) in (0, 2)`,
     ),
+    check('documents_content', sql`num_nonnulls(${table.content}, ${table.bytes}) = 1`),
   ],
 )
 

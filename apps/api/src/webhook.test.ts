@@ -1,4 +1,4 @@
-import { count } from 'drizzle-orm'
+import { count, eq } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 import {
@@ -17,6 +17,7 @@ import {
 } from '@edi-bridge/contracts'
 import { documents } from '@edi-bridge/db'
 import {
+  addOrdersFlow,
   golden,
   goldenInvoice,
   type InvoiceWorkspace,
@@ -275,4 +276,76 @@ describe('POST /webhooks/:id', () => {
 
     expect(sender.statusCode).toBe(422)
   })
+})
+
+describe('POST /webhooks/:id with a Document in an encoding other than UTF-8', () => {
+  const ordersInterchange = golden('orders-reference.edi', 'latin1')
+
+  beforeAll(async () => {
+    await addOrdersFlow(api.connection.db, workspace, { url: 'http://erp.invalid/' })
+  })
+
+  const storedOf = async (response: Awaited<ReturnType<typeof post>>) => {
+    expect(response.statusCode, response.body).toBe(201)
+
+    const { documentId } = receiveWebhookEndpoint.response.parse(response.json())
+
+    const [stored] = await api.connection.db
+      .select({ content: documents.content, bytes: documents.bytes })
+      .from(documents)
+      .where(eq(documents.id, documentId))
+
+    return stored
+  }
+
+  it('decodes a Document with the charset of its Content-Type', async () => {
+    const invoice = goldenInvoice.replace('Rudi R\u00fcssel', 'Rudi R\u00fcssel \u20ac')
+
+    const response = await post(Buffer.from(invoice.replace('\u20ac', '\x80'), 'latin1'), {
+      contentType: 'application/json; charset=windows-1252',
+    })
+
+    expect(await storedOf(response)).toEqual({ content: invoice, bytes: null })
+  })
+
+  it.each([
+    ['without a charset', 'application/edifact'],
+    ['with a charset other than its UNB names', 'application/edifact; charset=utf-8'],
+  ])(
+    'decodes an Interchange %s with the character set its UNB names',
+    async (_case, contentType) => {
+      const response = await post(Buffer.from(ordersInterchange, 'latin1'), { contentType })
+
+      expect(await storedOf(response)).toEqual({ content: ordersInterchange, bytes: null })
+    },
+  )
+
+  it('keeps the bytes of an Interchange not valid in the character set its UNB names', async () => {
+    const bytes = Buffer.from(ordersInterchange.replace('UNOC', 'UNOW'), 'latin1')
+
+    const response = await post(bytes, { contentType: 'application/edifact' })
+
+    expect(await storedOf(response)).toEqual({ content: null, bytes })
+    expect(receiveWebhookEndpoint.response.parse(response.json()).runs).toHaveLength(1)
+  })
+
+  it.each([
+    ['without a charset', 'application/json', 'Byte 574 (0xFC) is not valid utf-8'],
+    [
+      'with an unknown charset',
+      'application/json; charset=klingon',
+      'The encoding klingon is unknown',
+    ],
+  ])(
+    'answers 422 and stores nothing for a Document not valid in its encoding %s',
+    async (_case, contentType, message) => {
+      const documentsBefore = await storedDocuments()
+
+      const response = await post(Buffer.from(goldenInvoice, 'latin1'), { contentType })
+
+      expect(response.statusCode).toBe(422)
+      expect(response.json()).toEqual({ message })
+      expect(await storedDocuments()).toBe(documentsBefore)
+    },
+  )
 })

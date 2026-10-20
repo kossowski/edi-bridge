@@ -218,6 +218,13 @@
       "when": 1792480350865,
       "tag": "0030_acknowledgement_seeded_channel",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1792486426585,
+      "tag": "0031_document_bytes",
+      "breakpoints": true
     }
   ]
 }

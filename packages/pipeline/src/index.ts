@@ -2,7 +2,12 @@ export { bullmqRunQueue, runQueueName } from './bullmq-run-queue'
 
 export { channelDelivery } from './channel-delivery'
 
-export { decodeDocument } from './decode-document'
+export {
+  type DecodedDocument,
+  decodeDocument,
+  DocumentUndecodable,
+  namesOtherEncoding,
+} from './decode-document'
 
 export { deleteExpiredDocuments } from './delete-expired-documents'
 

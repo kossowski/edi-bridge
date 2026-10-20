@@ -139,7 +139,7 @@ const arrive = async (
       workspaceId: into.id,
       channelId: into.inboundChannelId,
       fileName: 'invoice.json',
-      content,
+      content: { text: content },
       manualSubmission: false,
     }).pipe(pipelineServices(connection.db, runQueue)),
   )

@@ -6,7 +6,8 @@ import type { Connection } from './client.js'
 
 export type RawDocument = typeof documents.$inferSelect
 
-export type NewDocument = Pick<RawDocument, 'workspaceId' | 'channelId' | 'fileName' | 'content'> &
+export type NewDocument = Pick<RawDocument, 'workspaceId' | 'channelId' | 'fileName'> &
+  ({ content: string; bytes?: null } | { content?: null; bytes: Buffer }) &
   Partial<
     Pick<
       RawDocument,

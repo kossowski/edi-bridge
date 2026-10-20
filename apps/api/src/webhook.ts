@@ -6,11 +6,18 @@ import { z } from 'zod'
 import { secretContext } from '@edi-bridge/channels'
 import { documentSchema, type WebhookSubmission } from '@edi-bridge/contracts'
 import { channels, postgresDocumentStorage } from '@edi-bridge/db'
-import { Database, decodeDocument, Documents, receive } from '@edi-bridge/pipeline'
+import { readableOf } from '@edi-bridge/edifact'
+import {
+  Database,
+  decodeDocument,
+  Documents,
+  namesOtherEncoding,
+  receive,
+} from '@edi-bridge/pipeline'
 
 import { ChannelEnvironment } from './channel.js'
 import { Db } from './db.js'
-import { RateLimited, Unauthorized } from './errors.js'
+import { RateLimited, Unauthorized, Unprocessable } from './errors.js'
 import { parse } from './parse.js'
 import { WebhookRateLimit } from './webhook-rate-limit.js'
 
@@ -65,10 +72,36 @@ const authenticate = (channelId: string, presented: string | undefined) =>
     return { workspaceId: channel.workspaceId, rateLimitPerMinute }
   })
 
+const charsetOf = (contentType: string | undefined) =>
+  contentType?.match(/;\s*charset\s*=\s*"?([^";\s]+)"?/i)?.[1]
+
+// The sender gets the refusal in its response and can send again, so nothing undecodable is stored.
+const decodedBody = (channelId: string, body: Buffer, contentType: string | undefined) =>
+  Effect.gen(function* () {
+    const charset = charsetOf(contentType)
+    const decoded = decodeDocument(body, charset)
+    const { characterSet } = decoded
+
+    if (characterSet === undefined) {
+      return 'undecodable' in decoded
+        ? yield* new Unprocessable({ message: decoded.undecodable.message })
+        : decoded
+    }
+
+    if (charset !== undefined && namesOtherEncoding(characterSet, charset)) {
+      yield* Effect.logWarning(
+        `A webhook Document on Channel ${channelId} names the charset ${charset}, its UNB ${characterSet}; it is decoded in ${characterSet}`,
+      )
+    }
+
+    return decoded
+  })
+
 export const receiveOnWebhook = (
   channelId: string,
   presentedToken: string | undefined,
   body: Buffer,
+  contentType: string | undefined,
 ) =>
   Effect.gen(function* () {
     const { workspaceId, rateLimitPerMinute } = yield* authenticate(channelId, presentedToken)
@@ -79,14 +112,17 @@ export const receiveOnWebhook = (
       return yield* new RateLimited({ retryAfterSeconds: decision.retryAfterSeconds })
     }
 
-    const content = yield* parse(documentSchema.shape.content, decodeDocument(body))
+    const decoded = yield* decodedBody(channelId, body, contentType)
+
+    yield* parse(documentSchema.shape.content, readableOf(decoded))
+
     const db = yield* Db
 
     const receipt = yield* receive({
       workspaceId,
       channelId,
       fileName: webhookFileName,
-      content,
+      content: decoded,
       manualSubmission: false,
     }).pipe(
       Effect.provideService(Database, db),

@@ -81,6 +81,7 @@ import type { DeliveryFailed, OutboundDocument } from '@edi-bridge/channels'
 import type { ParseError } from '@edi-bridge/edifact'
 
 import { referencesOf } from './business-reference'
+import { decodeDocument, type DocumentUndecodable } from './decode-document'
 import { enveloped, framed } from './envelope'
 import { publishRunChanges } from './live-events'
 import { parse } from './parse'
@@ -98,6 +99,7 @@ export class MessageInvalid extends Data.TaggedError('MessageInvalid')<{
 
 export class MessageUnreadable extends Data.TaggedError('MessageUnreadable')<{
   readonly cause: ParseError
+  readonly content: string
   readonly interchange: ParsedInterchange
 }> {}
 
@@ -179,10 +181,11 @@ const mappingFixTarget = (
 const mappingFailure = (
   pinned: Pinned,
   loaded: LoadedLookupTables,
-  error: MappingError | DocumentReadError | DocumentWriteError,
+  error: MappingError | DocumentReadError | DocumentWriteError | DocumentUndecodable,
 ): Failure =>
   Match.value(error).pipe(
     Match.tagsExhaustive({
+      DocumentUndecodable: (undecodable) => undecodableFailure('mapping', undecodable, null),
       DocumentReadError: ({ code }): Failure => ({
         stage: 'mapping',
         error: {
@@ -293,6 +296,33 @@ const positionIn = (tags: readonly string[], position: Position): RunError['posi
 
 type TradingPartner = { id: string; name: string }
 
+const undecodableFailure = (
+  stage: 'parse' | 'mapping',
+  { message, characterSetError }: DocumentUndecodable,
+  fixTarget: FixTarget | null,
+): Failure => {
+  const tag = segmentTagSchema.safeParse(characterSetError?.tag)
+
+  return {
+    stage,
+    error: {
+      code: 'invalid-byte-sequence',
+      message,
+      position:
+        characterSetError !== undefined && tag.success
+          ? {
+              segment: characterSetError.position.segment,
+              tag: tag.data,
+              element: characterSetError.position.element ?? null,
+              component: characterSetError.position.component ?? null,
+            }
+          : null,
+      details: null,
+    },
+    problem: { reason: 'unreadable', fixTarget },
+  }
+}
+
 // The Trading Partner fixes an inbound Message that breaks at parse or validation by sending it again.
 const resendTarget = ({ id, name }: TradingPartner): FixTarget => ({
   kind: 'tradingPartner',
@@ -301,9 +331,8 @@ const resendTarget = ({ id, name }: TradingPartner): FixTarget => ({
 })
 
 const parseFailure = (
-  content: string,
   sender: TradingPartner,
-  { cause, interchange }: MessageUnreadable,
+  { cause, content, interchange }: MessageUnreadable,
 ): Failure => ({
   stage: 'parse',
   error: {
@@ -315,13 +344,17 @@ const parseFailure = (
   problem: { reason: 'unreadable', fixTarget: resendTarget(sender) },
 })
 
-type ReadMessage = { interchange: ParsedInterchange; message: Message; messageIndex: number }
+type ReadMessage = {
+  content: string
+  interchange: ParsedInterchange
+  message: Message
+  messageIndex: number
+}
 
 // Validation sees the Message alone in its Interchange, so its positions map back to the real ones.
 const inboundValidationFailure = (
-  content: string,
   sender: TradingPartner,
-  { interchange, message, messageIndex }: ReadMessage,
+  { content, interchange, message, messageIndex }: ReadMessage,
   { cause }: MessageInvalid,
 ): Failure => {
   const tags = segmentTagsOf(content, interchange)
@@ -1302,16 +1335,17 @@ type Processing = {
   holding: Holding
   queued: QueuedRun
   run: ClaimedRun
-  content: string
+  document: StoredDocument
   pinned: Pinned
   lookupTables: LoadedLookupTables
   tradingPartner: TradingPartner
 }
 
-const processOutbound = ({ holding, queued, run, content, pinned, lookupTables }: Processing) =>
+const processOutbound = ({ holding, queued, run, document, pinned, lookupTables }: Processing) =>
   Effect.gen(function* () {
     const mapped = yield* step(holding, 'mapping', () =>
-      readDocument(pinned.structure, content).pipe(
+      storedTextOf(document, encodingOf(pinned.structure)).pipe(
+        Effect.flatMap((content) => readDocument(pinned.structure, content)),
         Effect.flatMap((document) =>
           mapMessage(
             { ...pinned.graph, target: { kind: 'messageType', messageType: pinned.messageType } },
@@ -1363,9 +1397,30 @@ const processOutbound = ({ holding, queued, run, content, pinned, lookupTables }
     )
   })
 
+type StoredDocument = { content: string | null; bytes: Buffer | null }
+
+// Receipt kept the bytes only when they are not valid in the encoding they name.
+const storedTextOf = (
+  { content, bytes }: StoredDocument,
+  encoding?: string,
+): Effect.Effect<string, DocumentUndecodable> => {
+  if (content !== null) {
+    return Effect.succeed(content)
+  }
+
+  if (bytes === null) {
+    return Effect.die(new Error('The Document has neither content nor bytes'))
+  }
+
+  const decoded = decodeDocument(bytes, encoding)
+
+  return 'text' in decoded ? Effect.succeed(decoded.text) : Effect.fail(decoded.undecodable)
+}
+
 // Receipt routed the Message by this envelope, so the Interchange reads again here.
-const readMessage = (content: string, messageIndex: number | null) =>
+const readMessage = (document: StoredDocument, messageIndex: number | null) =>
   Effect.gen(function* () {
+    const content = yield* storedTextOf(document)
     const interchange = parseMessages(content)
     const message = messageIndex === null ? undefined : interchange.messages[messageIndex - 1]
 
@@ -1374,10 +1429,10 @@ const readMessage = (content: string, messageIndex: number | null) =>
     }
 
     if (isBrokenMessage(message)) {
-      return yield* new MessageUnreadable({ cause: message.error, interchange })
+      return yield* new MessageUnreadable({ cause: message.error, content, interchange })
     }
 
-    return { interchange, message, messageIndex } satisfies ReadMessage
+    return { content, interchange, message, messageIndex } satisfies ReadMessage
   })
 
 const validatedInbound = ({ interchange, message }: ReadMessage) =>
@@ -1488,7 +1543,7 @@ const processInbound = ({
   holding,
   queued,
   run,
-  content,
+  document,
   pinned,
   lookupTables,
   tradingPartner,
@@ -1498,14 +1553,19 @@ const processInbound = ({
     const read = yield* step(
       holding,
       'parse',
-      () => readMessage(content, run.messageIndex),
+      () => readMessage(document, run.messageIndex),
       async (tx, { message }) => {
         await tx.update(runs).set(referencesOf(message)).where(eq(runs.id, run.id))
       },
     )
 
     if (Result.isFailure(read)) {
-      return yield* fail(holding, parseFailure(content, tradingPartner, read.failure))
+      return yield* fail(
+        holding,
+        Predicate.isTagged(read.failure, 'DocumentUndecodable')
+          ? undecodableFailure('parse', read.failure, resendTarget(tradingPartner))
+          : parseFailure(tradingPartner, read.failure),
+      )
     }
 
     const { message } = read.success
@@ -1529,7 +1589,7 @@ const processInbound = ({
     if (Result.isFailure(checked)) {
       return yield* fail(
         holding,
-        inboundValidationFailure(content, tradingPartner, read.success, checked.failure),
+        inboundValidationFailure(tradingPartner, read.success, checked.failure),
       )
     }
 
@@ -1653,7 +1713,7 @@ const processClaimed = (
       holding,
       queued,
       run,
-      content: document.content,
+      document,
       pinned,
       lookupTables,
       tradingPartner,

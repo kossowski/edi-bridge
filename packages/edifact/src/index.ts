@@ -1,3 +1,12 @@
+export {
+  CharacterSetError,
+  decodeBytes,
+  decodeInterchange,
+  hexOf,
+  readableOf,
+  syntaxCharacterSets,
+} from './character-set'
+
 export { buildContrl, BuildContrlError } from './contrl'
 
 export { readAcknowledgedInterchange, ReadAcknowledgementError } from './acknowledgement'
@@ -9,6 +18,8 @@ export { parse, ParseError, parseMessages, readInterchange } from './parse'
 export { serialize, SerializeError, serializeMessage } from './serialize'
 
 export { validate, ValidationError, validationErrorCodes } from './validate'
+
+export type { DecodedBytes, DecodedInterchange, SyntaxCharacterSet } from './character-set'
 
 export type { BuildContrlErrorCode } from './contrl'
 
