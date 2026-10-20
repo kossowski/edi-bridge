@@ -6,7 +6,7 @@ import {
   SearchParamsContext,
 } from 'next/dist/shared/lib/hooks-client-context.shared-runtime'
 import { type ReactNode, useLayoutEffect, useMemo, useState } from 'react'
-import { expect } from 'storybook/test'
+import { expect, screen, waitFor } from 'storybook/test'
 
 import { LiveEventsProvider } from '@/components/live-events-provider'
 import messagesDe from '@/messages/de.json'
@@ -23,6 +23,15 @@ export {
   waitForFocusOn,
   waitForMenuClosed,
 } from '@edi-bridge/ui/testing/checks'
+
+export async function closeSelectPopup(close: () => Promise<void>) {
+  const popup = screen.getByRole('listbox').closest('[data-base-ui-portal]')
+  await expect(popup).toBeInTheDocument()
+  await close()
+  // The closed popup keeps its focus guards until the next frame, which Chromium throttles in a
+  // hidden iframe, and axe fails a story that ends before then with aria-hidden-focus.
+  await waitFor(() => expect(popup?.querySelector('[data-base-ui-focus-guard]')).toBeNull())
+}
 
 export async function expectNoPageScroll(canvasElement: HTMLElement) {
   const page = canvasElement.ownerDocument.documentElement

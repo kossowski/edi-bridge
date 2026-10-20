@@ -2,6 +2,7 @@ import { expect, screen, userEvent, waitFor, within } from 'storybook/test'
 
 import type { StoryContext } from '@storybook/nextjs-vite'
 
+import { closeSelectPopup } from '@/components/story-helpers'
 import { type WizardDocument } from '@/components/trading-partners/partner-wizard-state'
 import { type Direction } from '@edi-bridge/contracts'
 
@@ -93,13 +94,4 @@ export async function chooseMapping(canvas: Canvas, document: WizardDocument, ma
   await userEvent.click(mappingSelect(canvas, document))
   const option = await screen.findByRole('option', { name: new RegExp(`^${mapping}`) })
   await closeSelectPopup(() => userEvent.click(option))
-}
-
-export async function closeSelectPopup(close: () => Promise<void>) {
-  const popup = screen.getByRole('listbox').closest('[data-base-ui-portal]')
-  await expect(popup).toBeInTheDocument()
-  await close()
-  // The closed popup keeps its focus guards until the next frame, which Chromium throttles in a
-  // hidden iframe, and axe fails a story that ends before then with aria-hidden-focus.
-  await waitFor(() => expect(popup?.querySelector('[data-base-ui-focus-guard]')).toBeNull())
 }
