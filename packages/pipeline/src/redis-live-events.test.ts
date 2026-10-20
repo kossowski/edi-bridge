@@ -1,7 +1,9 @@
 import { Effect } from 'effect'
 import { Redis } from 'ioredis'
 import { randomUUID } from 'node:crypto'
+import { createServer } from 'node:net'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import { z } from 'zod'
 
 import type { RunSummary } from '@edi-bridge/contracts'
 
@@ -122,6 +124,30 @@ describe('live events over Redis', () => {
       other.disconnect()
       publisher.close()
       subscriber.close()
+    }
+  })
+
+  it('drops a live event at once while Redis does not answer', async () => {
+    const silent = createServer(() => {})
+
+    await new Promise<void>((resolve) => silent.listen(0, '127.0.0.1', resolve))
+
+    const { port } = z.object({ port: z.number() }).parse(silent.address())
+    const publisher = redisLiveEvents(`redis://127.0.0.1:${port}`)
+    const startedAt = Date.now()
+
+    try {
+      await Effect.runPromise(
+        publisher.service.publish({
+          workspaceId: randomUUID(),
+          event: changed(runOf('received')),
+        }),
+      )
+
+      expect(Date.now() - startedAt).toBeLessThan(1_000)
+    } finally {
+      publisher.close()
+      silent.close()
     }
   })
 

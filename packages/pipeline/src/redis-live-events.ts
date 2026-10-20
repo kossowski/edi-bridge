@@ -27,8 +27,8 @@ export function redisLiveEvents(
   redisUrl: string,
   { timeout = '5 seconds' }: { timeout?: Duration.Input } = {},
 ) {
-  // One attempt per reconnect drops the events queued during an outage instead of piling them up.
-  const redis = new Redis(redisUrl, { maxRetriesPerRequest: 1 })
+  // During an outage a publish fails at once instead of waiting in a queue for Redis to return.
+  const redis = new Redis(redisUrl, { enableOfflineQueue: false, maxRetriesPerRequest: 1 })
 
   // A failed publish reports the outage itself, so ioredis need not log it too.
   redis.on('error', () => {})
