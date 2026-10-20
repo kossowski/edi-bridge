@@ -116,7 +116,14 @@ const inboundSftpChannels = Effect.gen(function* () {
         pollingIntervalMinutes: sql<number>`${channels.pollingIntervalMinutes}`,
       })
       .from(channels)
-      .where(and(eq(channels.type, 'sftp'), eq(channels.direction, 'inbound'))),
+      .where(
+        and(
+          eq(channels.type, 'sftp'),
+          eq(channels.direction, 'inbound'),
+          // A seeded Channel names a reserved .invalid host, so a demo never reaches a real server.
+          eq(channels.seeded, false),
+        ),
+      ),
   )
 })
 

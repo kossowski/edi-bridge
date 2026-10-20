@@ -377,6 +377,24 @@ describe('the polling of inbound SFTP Channels', () => {
     await polling.polled(created.channelId, 1)
   })
 
+  it('never polls a seeded Channel', async () => {
+    const seeded = await outbox({ 'orders.edi': threeOrders })
+    const other = await outbox()
+
+    await connection.db
+      .update(channels)
+      .set({ seeded: true })
+      .where(eq(channels.id, seeded.channelId))
+
+    const polling = await startPolling()
+
+    await polling.pollAgain(other.channelId)
+    await polling.polled(other.channelId, 2)
+
+    expect(polling.lists(seeded.channelId)).toBe(0)
+    expect(seeded.remaining()).toEqual(['orders.edi'])
+  })
+
   const overSftp = (
     login: { host: string; port: number },
     options: Parameters<typeof receiveOverSftp>[3] = {},
