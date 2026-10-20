@@ -467,6 +467,7 @@ export const ConnectionsLoading = meta.story({
 
     await expect(trigger).toHaveAttribute('aria-disabled', 'true')
     await expect(trigger).toHaveTextContent('Loading connections…')
+    await expect((await sheet()).getByRole('button', { name: 'Upload' })).toBeDisabled()
   },
 })
 

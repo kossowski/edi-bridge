@@ -468,7 +468,9 @@ function ManualSubmissionForm({
         )}
       </div>
       <FormFooter>
-        <Button disabled={submission.isPending || channels.isError} type="submit">
+        <Button
+          disabled={submission.isPending || channels.isPending || channels.isError}
+          type="submit">
           {submission.isPending && <Spinner aria-hidden data-icon="inline-start" />}
           {submission.isPending ? t('submitting') : t('submit')}
         </Button>
