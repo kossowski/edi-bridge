@@ -450,6 +450,13 @@ describe('the host key of an SFTP Channel', () => {
     return send('PUT', toPath(acceptHostKeyEndpoint.path, { id }), { hostKeyFingerprint })
   }
 
+  it('serves null as the key of an SFTP Channel without one, as the API does', () => {
+    expect(toChannel({ ...sftpInput, id: crypto.randomUUID() }, apiUrl)).toHaveProperty(
+      'hostKeyFingerprint',
+      null,
+    )
+  })
+
   it('shows the server key of a Channel without one as unchecked', async () => {
     const existing: ChannelRecord = { ...sftpInput, id: crypto.randomUUID() }
     server.use(...channelHandlers(apiUrl, { channels: [existing] }))
@@ -465,11 +472,13 @@ describe('the host key of an SFTP Channel', () => {
   it('shows the same server key on every test of the same host', async () => {
     const first: ChannelRecord = { ...sftpInput, id: crypto.randomUUID() }
     const second: ChannelRecord = { ...sftpInput, id: crypto.randomUUID(), direction: 'outbound' }
+
     const elsewhere: ChannelRecord = {
       ...sftpInput,
       id: crypto.randomUUID(),
       host: 'sftp.b.example',
     }
+
     server.use(...channelHandlers(apiUrl, { channels: [first, second, elsewhere] }))
 
     const key = (await testChannel(first.id)).hostKey?.fingerprint

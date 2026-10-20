@@ -73,7 +73,11 @@ function webhookUrl(apiUrl: string, id: string) {
 export function toChannel(record: ChannelRecord, apiUrl: string): Channel {
   switch (record.type) {
     case 'sftp':
-      return channelSchema.parse({ ...record, credential: hidden })
+      return channelSchema.parse({
+        ...record,
+        credential: hidden,
+        hostKeyFingerprint: record.hostKeyFingerprint ?? null,
+      })
     case 'webhook': {
       const { token, ...rest } = record
 
@@ -112,7 +116,7 @@ function assertServable(record: ChannelRecord) {
 
 const base64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
 
-// Stands in for the key the SFTP server at this host presents: the same host always shows the same.
+// Seeded by host, so every test of one server shows one key and a mismatch stays reproducible.
 export function serverHostKey(host: string): HostKeyFingerprint {
   const faker = seededFaker(`hostKey:${host}`)
 
