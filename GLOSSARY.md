@@ -31,6 +31,7 @@ _Avoid_: Playground, test workspace
 **Operator**:
 The person running the platform, above all Workspaces, who creates Workspaces and their users.
 _Avoid_: Superadmin, root, owner
+_On screen_: Operator (DE: Operator)
 
 **Member**:
 A user with a role, Admin or Viewer, in one Workspace. A user can be a Member of several Workspaces.

@@ -16,7 +16,6 @@ const noName = 'has no on-screen name'
 
 const withoutOnScreenName = {
   'Sandbox Workspace': noName,
-  Operator: noName,
   Member: noName,
   Invite: noName,
   Admin: `${noName}; the screens name the role`,
@@ -43,12 +42,13 @@ const leftOut: Record<Language, Record<string, string>> = {
   en: {
     ...withoutOnScreenName,
     Workspace: sameName,
+    Operator: sameName,
     Mapping: sameName,
     Draft: sameName,
     Overdue: sameName,
     Duplicate: sameName,
   },
-  de: { ...withoutOnScreenName, Mapping: sameName },
+  de: { ...withoutOnScreenName, Operator: sameName, Mapping: sameName },
 }
 
 function glossaryTerms(): ReadonlyArray<GlossaryTerm> {
