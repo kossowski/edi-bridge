@@ -76,7 +76,13 @@ export function liveEventSubscriber(redisUrl: string) {
     }
 
     for (const listener of listeners.get(published.data.workspaceId) ?? []) {
-      listener(published.data.event)
+      try {
+        listener(published.data.event)
+      } catch (error) {
+        console.warn(
+          `live event listener failed: ${error instanceof Error ? error.message : String(error)}`,
+        )
+      }
     }
   })
 

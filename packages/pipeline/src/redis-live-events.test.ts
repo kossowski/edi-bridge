@@ -93,6 +93,35 @@ describe('live events over Redis', () => {
     }
   })
 
+  it('hands a live event to every listener of the Workspace when one of them throws', async () => {
+    const publisher = redisLiveEvents(redis.url)
+    const subscriber = liveEventSubscriber(redis.url)
+    const workspaceId = randomUUID()
+    const received: unknown[] = []
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    try {
+      await subscriber.ready
+      subscriber.subscribe(workspaceId, () => {
+        throw new Error('The stream is closed')
+      })
+      subscriber.subscribe(workspaceId, (event) => received.push(event))
+
+      const event = changed(runOf('received'))
+
+      await Effect.runPromise(publisher.service.publish({ workspaceId, event }))
+
+      await vi.waitFor(() => {
+        expect(received).toEqual([event])
+      })
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('The stream is closed'))
+    } finally {
+      warn.mockRestore()
+      publisher.close()
+      subscriber.close()
+    }
+  })
+
   it('skips a message that is no live event and hands on the next', async () => {
     const publisher = redisLiveEvents(redis.url)
     const subscriber = liveEventSubscriber(redis.url)
