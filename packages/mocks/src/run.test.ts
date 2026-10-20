@@ -14,7 +14,13 @@ import {
   toSearchParams,
 } from '@edi-bridge/contracts'
 
-import { type FlowRecord, type MappingRecord, seedFlows, seedMappings } from './flow'
+import {
+  type FlowRecord,
+  type MappingRecord,
+  mappingVersionsForFlow,
+  seedFlows,
+  seedMappings,
+} from './flow'
 import { createRun, createRuns, runsHandler, seedRuns } from './run'
 import { runDetailHandlers, seedReprocessed } from './run-detail'
 import { createRunStore } from './run-store'
@@ -210,9 +216,10 @@ describe('GET /runs', () => {
     ])
   })
 
-  it('filters by the Mapping Version each Run recorded, else the one its Flow pins', async () => {
+  describe('filters by the Mapping Version each Run recorded, else the one its Flow pins', () => {
     const { mappings, mappingVersions, flows, runs, filters } = runMappingFilterCase
     const idOf = (key: string) => stableUuid(`run-mapping-filter-case:${key}`)
+    // SAFETY: the seed has a Flow for every Message Type, ORDERS among them.
     const template = seedFlows.find(({ messageType }) => messageType === 'ORDERS')!
 
     const mappingRecords: MappingRecord[] = mappings.map((mapping) => ({
@@ -246,34 +253,88 @@ describe('GET /runs', () => {
     const recorded = new Map(
       runs.map(({ key, recordedMappingVersion }) => [
         idOf(key),
-        recordedMappingVersion === null ? null : versionById.get(idOf(recordedMappingVersion))!,
+        recordedMappingVersion === null
+          ? null
+          : // SAFETY: the case records only Mapping Versions it declares, and versionById holds them all.
+            versionById.get(idOf(recordedMappingVersion))!,
       ]),
     )
 
-    server.use(
-      runsHandler(
-        apiUrl,
-        runs.map(({ key, flow }) =>
-          createRun({
-            id: idOf(key),
-            flow: { id: idOf(flow), name: flow },
-            messageType: 'ORDERS',
-          }),
+    it.each(filters)('serves the Runs of the Mappings $mappings', async (filter) => {
+      server.use(
+        runsHandler(
+          apiUrl,
+          runs.map(({ key, flow }) =>
+            createRun({
+              id: idOf(key),
+              flow: { id: idOf(flow), name: flow },
+              messageType: 'ORDERS',
+            }),
+          ),
+          {
+            flows: flowRecords,
+            mappings: mappingRecords,
+            recordedMappingVersionOf: (run) => recorded.get(run.id) ?? null,
+          },
         ),
-        {
-          flows: flowRecords,
-          mappings: mappingRecords,
-          recordedMappingVersionOf: (run) => recorded.get(run.id)!,
-        },
-      ),
-    )
+      )
 
-    for (const filter of filters) {
       const { body } = await listRuns({ mappingId: filter.mappings.map(idOf) })
 
       expect(new Set(body?.runs.map((run) => run.id))).toEqual(new Set(filter.runs.map(idOf)))
-    }
+    })
   })
+
+  it.each(['parse', 'validation'] as const)(
+    'keeps a Run failed at %s with its Mapping after its Flow moves to another Mapping',
+    async (failureStage) => {
+      // SAFETY: the seed has a Flow for every Message Type, ORDERS among them.
+      const ordersFlow = seedFlows.find(({ messageType }) => messageType === 'ORDERS')!
+
+      const [recordedMapping] = mappingVersionsForFlow({ flow: ordersFlow, messageType: 'ORDERS' })
+
+      const otherMapping = seedMappings.find(
+        ({ mappingId }) => mappingId !== recordedMapping?.mappingId,
+      )
+
+      const flow = { id: ordersFlow.id, name: ordersFlow.name }
+      const receivedAt = '2026-10-01T08:00:00.000Z'
+
+      const failed = createRun({
+        id: '00000000-0000-4000-8000-000000000001',
+        flow,
+        messageType: 'ORDERS',
+        receivedAt,
+        status: 'failed',
+        failureStage,
+      })
+
+      const received = createRun({
+        id: '00000000-0000-4000-8000-000000000002',
+        flow,
+        messageType: 'ORDERS',
+        receivedAt,
+        status: 'received',
+        failureStage: null,
+      })
+
+      server.use(
+        runsHandler(apiUrl, [failed, received], {
+          flows: seedFlows.map((flow) =>
+            flow.id === ordersFlow.id
+              ? { ...flow, mappingVersionId: otherMapping?.versions[0]?.id ?? '' }
+              : flow,
+          ),
+        }),
+      )
+
+      const byRecorded = await listRuns({ mappingId: [recordedMapping?.mappingId ?? ''] })
+      const byPinned = await listRuns({ mappingId: [otherMapping?.mappingId ?? ''] })
+
+      expect(byRecorded.body?.runs.map((run) => run.id)).toEqual([failed.id])
+      expect(byPinned.body?.runs.map((run) => run.id)).toEqual([received.id])
+    },
+  )
 
   it('filters by a time range that includes both of its ends', async () => {
     server.use(

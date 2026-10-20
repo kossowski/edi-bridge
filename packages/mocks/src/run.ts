@@ -19,7 +19,6 @@ import {
   type FlowStore,
   type MappingCatalogue,
   type MappingRecord,
-  recordedMappingVersionOf as seededRecordedMappingVersionOf,
   seedFlows,
   seedMappings,
   toFlowStore,
@@ -29,6 +28,7 @@ import { hash } from './hash'
 import { problemReasonOf } from './interchange'
 import { includesText, pageOf } from './list'
 import { badRequest } from './responses'
+import { recordedMappingVersionOf as seededRecordedMappingVersionOf } from './run-steps'
 import { createRunStore, interchangeIdOf, type RunStore, toRunStore } from './run-store'
 import { seedTradingPartners } from './trading-partner'
 
@@ -327,7 +327,7 @@ export function runsHandler(
     const { status } = query.data
     const text = query.data.q?.toLowerCase() ?? ''
 
-    // Mirrors the api: a Run not yet processed falls back to the version its Flow pins now.
+    // Mirrors the api: a Run not yet claimed falls back to the version its Flow pins now.
     const mappingOfRun = (run: RunSummary) => {
       const recorded = recordedMappingVersionOf(run)
 

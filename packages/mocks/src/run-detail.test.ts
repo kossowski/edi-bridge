@@ -143,7 +143,7 @@ describe('GET /runs/:id', () => {
         ['delivery', 'skipped'],
       ])
       expect(body?.message).toBeNull()
-      expect(body?.mappingVersion).toBeNull()
+      expect(body?.mappingVersion).not.toBeNull()
       expect(segment?.slice(0, 3)).toBe(position?.tag)
       expect(segment?.split('+')[position!.element!]).toBeDefined()
     }

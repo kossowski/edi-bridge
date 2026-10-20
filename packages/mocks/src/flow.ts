@@ -27,7 +27,6 @@ import {
 
 import { type ChannelRecord, type ChannelStore, seedChannels, toChannelStore } from './channel'
 import { badRequest, conflict, notFound, unprocessable } from './responses'
-import { statusOf } from './run-steps'
 import { seedId } from './seed-id'
 import { seededFaker } from './seeded-faker'
 import { hasTraffic, seedTradingPartners } from './trading-partner'
@@ -54,7 +53,25 @@ const sharedMappingFlowIds = seedSummaries
   .slice(-2)
   .map(({ id }) => id)
 
+// Generating the versions costs too much to repeat for every seeded Run of a filtered list.
+const versionsByFlow = new Map<string, ReadonlyArray<MappingVersionSummary>>()
+
 export function mappingVersionsForFlow({
+  flow,
+  messageType,
+}: Pick<RunSummary, 'flow' | 'messageType'>): ReadonlyArray<MappingVersionSummary> {
+  const key = JSON.stringify([flow.id, flow.name, messageType])
+  let versions = versionsByFlow.get(key)
+
+  if (versions === undefined) {
+    versions = generateMappingVersions({ flow, messageType })
+    versionsByFlow.set(key, versions)
+  }
+
+  return versions
+}
+
+function generateMappingVersions({
   flow,
   messageType,
 }: Pick<RunSummary, 'flow' | 'messageType'>): MappingVersionSummary[] {
@@ -81,29 +98,6 @@ export function mappingVersionsForFlow({
       publishedAt: new Date(firstPublication + (version - 1) * 23 * 86_400_000).toISOString(),
     })
   })
-}
-
-// Generating the versions costs too much to repeat for every seeded Run of a filtered list.
-const versionsByFlowId = new Map<string, MappingVersionSummary[]>()
-
-// A Run records the version published when it arrived; one whose mapping has not run records none.
-export function recordedMappingVersionOf(run: RunSummary): MappingVersionSummary | null {
-  if (['pending', 'skipped'].includes(statusOf(run, 'mapping')!)) {
-    return null
-  }
-
-  let versions = versionsByFlowId.get(run.flow.id)
-
-  if (versions === undefined) {
-    versions = mappingVersionsForFlow(run)
-    versionsByFlowId.set(run.flow.id, versions)
-  }
-
-  const receivedAt = Date.parse(run.receivedAt)
-
-  return (
-    versions.find(({ publishedAt }) => Date.parse(publishedAt) <= receivedAt) ?? versions.at(-1)!
-  )
 }
 
 // A Mapping with its published versions, newest first. The Message Type is what the Mapping
