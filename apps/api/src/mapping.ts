@@ -124,8 +124,8 @@ const insertNumbered = ({ messageType, documentStructureId }: CreateMappingBody)
     const db = yield* Db
     const workspace = yield* CurrentWorkspace
 
-    // Until Document Structures carry a Message Type, any one of the Workspace fits.
-    const [structures, existing] = yield* Effect.promise(() =>
+    // The Message Type isn't checked against the Document Structure yet.
+    const [[structure], existing] = yield* Effect.promise(() =>
       Promise.all([
         db
           .select({ id: documentStructures.id, name: documentStructures.name })
@@ -143,8 +143,6 @@ const insertNumbered = ({ messageType, documentStructureId }: CreateMappingBody)
           .where(inWorkspace(mappings, workspace.id)),
       ]),
     )
-
-    const [structure] = structures
 
     if (!structure) {
       return yield* unknownDocumentStructure()

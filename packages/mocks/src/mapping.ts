@@ -1052,7 +1052,7 @@ export function mappingHandlers(
 
       const { messageType, documentStructureId } = body.data
 
-      // Until Document Structures carry a Message Type, any one of the Workspace fits.
+      // The Message Type isn't checked against the Document Structure yet.
       const documentStructure = structures.get(documentStructureId)
 
       if (!documentStructure) {
