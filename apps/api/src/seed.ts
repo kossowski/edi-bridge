@@ -541,7 +541,8 @@ export async function seedWorkspace(
     }
 
     for (let cycle = 0; cycle < 6; cycle++) {
-      const orderedAt = at(now, cycle * 27 * hourMs + index * 5 * hourMs + (index + 1) * minuteMs)
+      // The newest order arrives at now, so a new Workspace has traffic of today at any hour.
+      const orderedAt = at(now, cycle * 27 * hourMs + index * (5 * hourMs + minuteMs))
       const sequence = String(100_000 + index * 1000 + cycle)
       const unreadable = index === 1 && cycle === 3
       const missingCode = index === 0 && cycle === 2

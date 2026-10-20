@@ -20,10 +20,9 @@ const latest = (...dates: (Date | null | undefined)[]) =>
     null,
   )
 
-const loadSummaries = (workspaceId?: string) =>
+const loadSummaries = (workspaceId?: string, now = new Date()) =>
   Effect.gen(function* () {
     const db = yield* Db
-    const now = new Date()
 
     const of = (column: AnyColumn) =>
       workspaceId === undefined ? undefined : eq(column, workspaceId)
@@ -105,6 +104,7 @@ export const createWorkspace = (input: Effect.Effect<WorkspaceInput, ValidationE
     const { name, seed } = yield* input
     const db = yield* Db
     const { secrets } = yield* ChannelEnvironment
+    const now = new Date()
 
     // The lock keeps two Operators from creating the same name at once.
     const created = yield* Effect.promise(() =>
@@ -126,7 +126,7 @@ export const createWorkspace = (input: Effect.Effect<WorkspaceInput, ValidationE
           .returning({ id: workspaces.id })
 
         if (workspace !== undefined && seed) {
-          await seedWorkspace(tx, workspace.id, { secrets })
+          await seedWorkspace(tx, workspace.id, { secrets, now })
         }
 
         return workspace
@@ -137,5 +137,5 @@ export const createWorkspace = (input: Effect.Effect<WorkspaceInput, ValidationE
       return yield* duplicateName
     }
 
-    return yield* Effect.flatMap(loadSummaries(created.id), exactlyOne)
+    return yield* Effect.flatMap(loadSummaries(created.id, now), exactlyOne)
   })

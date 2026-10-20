@@ -219,9 +219,12 @@ describe('POST /operator/workspaces with seed', () => {
 
   const restricted = /^02\d{11}$/
 
-  it('marks the Workspace as seeded and gives it a GLN of its own', () => {
+  it('marks the Workspace as seeded, with a GLN from the restricted prefixes', () => {
     expect(created).toMatchObject({ seeded: true, kind: 'standard', memberCount: 0 })
     expect(created.gln).toMatch(restricted)
+  })
+
+  it('counts a seeded Document of today, whatever the time of day', () => {
     expect(created.documentsToday).toBeGreaterThan(0)
   })
 
