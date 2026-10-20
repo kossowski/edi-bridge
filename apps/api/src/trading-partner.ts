@@ -89,7 +89,11 @@ const groupedByTradingPartner = <Grouped extends { tradingPartnerId: string | nu
 const sumOf = (rows: ReadonlyArray<{ count: number }>) =>
   rows.reduce((sum, row) => sum + row.count, 0)
 
-const selectConnections = async (db: Database, workspaceId: string, tradingPartnerId?: string) => {
+const selectChannelsAndFlows = async (
+  db: Database,
+  workspaceId: string,
+  tradingPartnerId?: string,
+) => {
   const [channelRows, flowRows] = await Promise.all([
     db
       .select({
@@ -134,7 +138,7 @@ export const listTradingPartnerActivities = Effect.gen(function* () {
   const db = yield* Db
   const workspace = yield* CurrentWorkspace
 
-  const [rows, connectionsOf] = yield* Effect.promise(() =>
+  const [rows, channelsAndFlowsOf] = yield* Effect.promise(() =>
     Promise.all([
       db
         .select({
@@ -144,13 +148,13 @@ export const listTradingPartnerActivities = Effect.gen(function* () {
         })
         .from(tradingPartners)
         .where(inWorkspace(tradingPartners, workspace.id)),
-      selectConnections(db, workspace.id),
+      selectChannelsAndFlows(db, workspace.id),
     ]),
   )
 
   return rows
     .toSorted(byName)
-    .map((row): TradingPartnerActivity => ({ ...noRuns(row.id), ...connectionsOf(row) }))
+    .map((row): TradingPartnerActivity => ({ ...noRuns(row.id), ...channelsAndFlowsOf(row) }))
 })
 
 const rejectingDuplicateGln = <A>(query: () => Promise<A>) =>
@@ -160,7 +164,7 @@ const rejectingDuplicateGln = <A>(query: () => Promise<A>) =>
     'Another Trading Partner already uses this GLN',
   )
 
-export const loadTradingPartner = (id: string) =>
+const loadTradingPartnerRow = (id: string) =>
   Effect.gen(function* () {
     yield* rejectingInvalidId(id)
 
@@ -174,10 +178,11 @@ export const loadTradingPartner = (id: string) =>
         .where(inWorkspace(tradingPartners, workspace.id, byId(id))),
     )
 
-    const row = rows[0]
-
-    return row ? toTradingPartner(row) : yield* new NotFound()
+    return rows[0] ?? (yield* new NotFound())
   })
+
+export const loadTradingPartner = (id: string) =>
+  Effect.map(loadTradingPartnerRow(id), toTradingPartner)
 
 const selectTradingPartnerId = (
   db: Database | Transaction,
@@ -245,15 +250,16 @@ const lastUtcDays = (now: number) =>
 
 export const loadTradingPartnerActivity = (id: string) =>
   Effect.gen(function* () {
-    const { id: tradingPartnerId, messageTypes = null } = yield* loadTradingPartner(id)
+    const row = yield* loadTradingPartnerRow(id)
+    const tradingPartnerId = row.id
     const now = yield* Effect.sync(() => Date.now())
 
     const db = yield* Db
     const workspace = yield* CurrentWorkspace
 
-    const [connectionsOf, flowsOfPartner] = yield* Effect.promise(() =>
+    const [channelsAndFlowsOf, flowsOfPartner] = yield* Effect.promise(() =>
       Promise.all([
-        selectConnections(db, workspace.id, tradingPartnerId),
+        selectChannelsAndFlows(db, workspace.id, tradingPartnerId),
         db
           .select({ id: flows.id, name: flows.name })
           .from(flows)
@@ -263,7 +269,7 @@ export const loadTradingPartnerActivity = (id: string) =>
 
     return {
       ...noRuns(tradingPartnerId),
-      ...connectionsOf({ id: tradingPartnerId, messageTypes }),
+      ...channelsAndFlowsOf(row),
       days: lastUtcDays(now),
       flows: flowsOfPartner.toSorted(byName).map((flow) => ({ flow, runs: 0 })),
       problems: [],

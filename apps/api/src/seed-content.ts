@@ -110,7 +110,7 @@ export const seedTradingPartners: SeedTradingPartner[] = [
 ]
 
 // Still in setup: it has no Channel for the INVOIC it was created for.
-export const seedOnboardingPartner = {
+export const seedOnboardingTradingPartner = {
   name: 'Kaiserstein Warenhaus KG',
   slug: 'kaiserstein-warenhaus',
   gln: withCheckDigit('023300400000'),

@@ -54,7 +54,7 @@ import {
   seedArticles,
   seedChannelDomain,
   seedCompany,
-  seedOnboardingPartner,
+  seedOnboardingTradingPartner,
   type SeedOrder,
   type SeedTradingPartner,
   seedTradingPartners,
@@ -380,9 +380,9 @@ async function seedSetup(
         .returning(),
     )
 
-  type ChannelOwner = { name: string; slug: string }
+  type TradingPartnerSeed = Pick<SeedTradingPartner, 'name' | 'slug'>
 
-  const sftpOf = ({ slug }: ChannelOwner, tradingPartnerId: string) => ({
+  const sftpOf = ({ slug }: TradingPartnerSeed, tradingPartnerId: string) => ({
     type: 'sftp' as const,
     tradingPartnerId,
     host: `sftp.${slug}.${seedChannelDomain}`,
@@ -391,20 +391,24 @@ async function seedSetup(
     authentication: 'password' as const,
   })
 
-  const sftpOutbox = (owner: ChannelOwner, tradingPartnerId: string) =>
+  const sftpOutbox = (tradingPartner: TradingPartnerSeed, tradingPartnerId: string) =>
     channel({
-      ...sftpOf(owner, tradingPartnerId),
+      ...sftpOf(tradingPartner, tradingPartnerId),
       direction: 'inbound',
-      name: `${owner.name} outbox`,
+      name: `${tradingPartner.name} outbox`,
       remotePath: '/outbox',
       pollingIntervalMinutes: 5,
     })
 
-  const ordersFlowOf = (owner: ChannelOwner, tradingPartnerId: string, inboundChannelId: string) =>
+  const ordersFlowOf = (
+    tradingPartner: TradingPartnerSeed,
+    tradingPartnerId: string,
+    inboundChannelId: string,
+  ) =>
     flow({
       tradingPartnerId,
       messageType: 'ORDERS',
-      name: `Orders from ${owner.name}`,
+      name: `Orders from ${tradingPartner.name}`,
       inboundChannelId,
       destinationChannelId: erpInbox.id,
       mappingVersionId: ordersMapping.versionId,
@@ -470,19 +474,19 @@ async function seedSetup(
       .insert(tradingPartners)
       .values({
         workspaceId,
-        name: seedOnboardingPartner.name,
-        gln: seedOnboardingPartner.gln,
+        name: seedOnboardingTradingPartner.name,
+        gln: seedOnboardingTradingPartner.gln,
         characterSet: 'UNOC',
-        acknowledgementTimeLimitHours: seedOnboardingPartner.acknowledgementTimeLimitHours,
-        messageTypes: seedOnboardingPartner.messageTypes,
+        acknowledgementTimeLimitHours: seedOnboardingTradingPartner.acknowledgementTimeLimitHours,
+        messageTypes: seedOnboardingTradingPartner.messageTypes,
         testMode: true,
       })
       .returning(),
   )
 
-  const onboardingOutbox = await sftpOutbox(seedOnboardingPartner, onboarding.id)
+  const onboardingOutbox = await sftpOutbox(seedOnboardingTradingPartner, onboarding.id)
 
-  await ordersFlowOf(seedOnboardingPartner, onboarding.id, onboardingOutbox.id)
+  await ordersFlowOf(seedOnboardingTradingPartner, onboarding.id, onboardingOutbox.id)
 
   return {
     partners,

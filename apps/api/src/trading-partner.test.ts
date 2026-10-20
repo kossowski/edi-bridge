@@ -457,7 +457,7 @@ describe('GET /trading-partners/activity', () => {
   })
 })
 
-describe('the connection directions of a Trading Partner', () => {
+describe('the Channel directions of a Trading Partner', () => {
   let seeded: string | undefined
 
   afterEach(async () => {
