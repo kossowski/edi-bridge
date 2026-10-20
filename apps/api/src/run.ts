@@ -19,6 +19,8 @@ import { Effect } from 'effect'
 import {
   directionOf,
   type FailureStage,
+  type MessageType,
+  type ParsedMessage,
   type ProblemReason,
   type ReprocessRunBody,
   type RunDetail,
@@ -27,10 +29,14 @@ import {
   type RunStatus,
   runStatuses,
   type RunSummary,
+  segmentDefinition,
   whoFixes,
 } from '@edi-bridge/contracts'
-import { flows, mappingVersions, runs, runSteps, tradingPartners } from '@edi-bridge/db'
+import { documents, flows, mappingVersions, runs, runSteps, tradingPartners } from '@edi-bridge/db'
+import { isBrokenMessage, readInterchange } from '@edi-bridge/edifact'
 import {
+  interchangeFields,
+  interchangeOf,
   isFixedByReprocess,
   Database as PipelineDatabase,
   publishRunChanges,
@@ -43,6 +49,7 @@ import { Db, type Database } from './db.js'
 import { Conflict, NotFound, Unprocessable } from './errors.js'
 import { selectVersions, toHeader } from './mapping-version.js'
 import { inWorkspace, rejectingInvalidId } from './rows.js'
+import { readableTextOf } from './stored-document.js'
 import { CurrentWorkspace } from './workspace.js'
 
 // A Duplicate is never mapped, so it shows the Business Reference of its original Run.
@@ -65,6 +72,7 @@ const summaryFields = {
   flowId: flows.id,
   flowName: flows.name,
   messageType: flows.messageType,
+  ...interchangeFields,
 }
 
 // Drizzle types the joins only with a known field; the list and its counts both select the status.
@@ -77,7 +85,10 @@ export const fromRuns = <Fields extends SelectedFields>(db: Database, fields: Fi
     .leftJoin(originalRuns, eq(originalRuns.id, runs.duplicateOfRunId))
 
 const selectRuns = <Fields extends SelectedFields>(db: Database, fields: Fields) =>
-  fromRuns(db, { ...summaryFields, ...fields })
+  fromRuns(db, { ...summaryFields, ...fields }).leftJoin(
+    documents,
+    eq(documents.id, runs.documentId),
+  )
 
 type SummaryRow = Awaited<ReturnType<typeof selectRuns<Record<never, never>>>>[number]
 
@@ -128,8 +139,7 @@ const toSummary = (row: SummaryRow): RunSummary => ({
   flow: { id: row.flowId, name: row.flowName },
   manualSubmission: row.manualSubmission,
   businessReference: row.businessReference,
-  // Interchanges are recorded once inbound Runs are processed.
-  interchange: null,
+  interchange: interchangeOf(row.id, row),
   ...outcomeOf(row),
 })
 
@@ -248,6 +258,10 @@ export const loadRun = (id: string) =>
         replacesRunId: runs.replacesRunId,
         duplicateOfRunId: runs.duplicateOfRunId,
         documentDeletedAt: runs.documentDeletedAt,
+        messageIndex: runs.messageIndex,
+        output: runs.output,
+        content: documents.content,
+        bytes: documents.bytes,
       }).where(inWorkspace(runs, workspace.id, eq(runs.id, id))),
     )
 
@@ -283,20 +297,66 @@ type DetailRow = SummaryRow & {
   waitingForTradingPartnerSince: Date | null
   duplicateOfRunId: string | null
   documentDeletedAt: Date | null
+  messageIndex: number | null
+  output: string | null
+  content: string | null
+  bytes: Buffer | null
 }
+
+const rawOf = (row: DetailRow) =>
+  directionOf(row) === 'outbound'
+    ? row.output
+    : row.documentId === null
+      ? null
+      : readableTextOf({ ...row, id: row.documentId })
+
+const parsedMessageOf = (
+  raw: string,
+  messageType: MessageType,
+  messageIndex: number,
+): ParsedMessage | null => {
+  const read = readInterchange(raw).messages[messageIndex - 1]?.message
+  const reference = read?.header.elements[0]?.[0]
+
+  if (read === undefined || isBrokenMessage(read) || reference === undefined || reference === '') {
+    return null
+  }
+
+  return {
+    reference,
+    messageType,
+    segments: [read.header, ...read.segments, read.trailer].map(({ tag, elements }) => ({
+      tag,
+      name: segmentDefinition(tag)?.name.en ?? null,
+      elements,
+    })),
+  }
+}
+
+// An outbound Run's Interchange holds its one Message, which mapping wrote.
+const onlyMessage = 1
+
+const parsedStageOf = { inbound: 'parse', outbound: 'mapping' } as const
 
 const toDetail = (
   row: DetailRow,
   loaded: Pick<RunDetail, 'steps' | 'mappingVersion' | 'replaces' | 'replacedBy'>,
 ): RunDetail => {
   const summary = toSummary(row)
+  const raw = rawOf(row)
+
+  const parsed = loaded.steps.some(
+    ({ stage, status }) => stage === parsedStageOf[summary.direction] && status === 'succeeded',
+  )
 
   const shared = {
     ...summary,
     ...loaded,
-    // Interchanges and parsed Messages come with inbound processing.
-    interchange: null,
-    message: null,
+    interchange: summary.interchange && raw ? { ...summary.interchange, raw } : null,
+    message:
+      raw && parsed
+        ? parsedMessageOf(raw, summary.messageType, row.messageIndex ?? onlyMessage)
+        : null,
     documentDeletedAt: row.documentDeletedAt?.toISOString() ?? null,
   }
 

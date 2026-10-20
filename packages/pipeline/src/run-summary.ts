@@ -1,11 +1,45 @@
 import { eq, inArray, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 
-import { directionOf, runSummarySchema } from '@edi-bridge/contracts'
-import { type Connection, flows, runs, tradingPartners } from '@edi-bridge/db'
+import {
+  directionOf,
+  type InterchangeReference,
+  type MessageType,
+  runSummarySchema,
+} from '@edi-bridge/contracts'
+import { type Connection, documents, flows, runs, tradingPartners } from '@edi-bridge/db'
 
 // A Duplicate is never mapped, so it shows the Business Reference of its original Run.
 const originalRuns = alias(runs, 'original_runs')
+
+// Selected with the Run's Document joined.
+export const interchangeFields = {
+  documentId: runs.documentId,
+  interchangeControlReference: documents.interchangeControlReference,
+  controlReference: runs.controlReference,
+  handedOver: sql<boolean>`${runs.handedOverAt} is not null and ${runs.output} is not null`,
+}
+
+type InterchangeRow = {
+  messageType: MessageType
+  documentId: string | null
+  interchangeControlReference: string | null
+  controlReference: number | null
+  handedOver: boolean
+}
+
+// A received Interchange is its Document; an outbound Run the Channel took is its own Interchange.
+export const interchangeOf = (id: string, row: InterchangeRow): InterchangeReference | null => {
+  if (directionOf(row) === 'inbound') {
+    return row.documentId === null || row.interchangeControlReference === null
+      ? null
+      : { id: row.documentId, controlReference: row.interchangeControlReference }
+  }
+
+  return row.handedOver && row.controlReference !== null
+    ? { id, controlReference: String(row.controlReference) }
+    : null
+}
 
 export const runSummariesOf = async (db: Connection['db'], ids: readonly string[]) => {
   const rows = await db
@@ -23,11 +57,13 @@ export const runSummariesOf = async (db: Connection['db'], ids: readonly string[
       tradingPartner: { id: tradingPartners.id, name: tradingPartners.name },
       flow: { id: flows.id, name: flows.name },
       messageType: flows.messageType,
+      ...interchangeFields,
     })
     .from(runs)
     .innerJoin(flows, eq(flows.id, runs.flowId))
     .innerJoin(tradingPartners, eq(tradingPartners.id, runs.tradingPartnerId))
     .leftJoin(originalRuns, eq(originalRuns.id, runs.duplicateOfRunId))
+    .leftJoin(documents, eq(documents.id, runs.documentId))
     .where(inArray(runs.id, [...ids]))
 
   // The schema holds the database to a problem and Failure Stage exactly on a failed Run.
@@ -38,8 +74,7 @@ export const runSummariesOf = async (db: Connection['db'], ids: readonly string[
       receivedAt: receivedAt.toISOString(),
       direction: directionOf(row),
       problem: problem && { reason: problem.reason },
-      // Interchanges are recorded once inbound Runs are processed.
-      interchange: null,
+      interchange: interchangeOf(row.id, row),
     }),
   }))
 }

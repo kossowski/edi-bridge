@@ -235,12 +235,23 @@ describe('GET /runs/:id', () => {
       },
       error: null,
       problem: null,
-      interchange: null,
-      message: null,
+      interchange: {
+        id: processed,
+        controlReference: '1',
+        raw: expect.stringMatching(
+          /^UNB\+UNOC:3\+4389876511114:14\+4071615111111:14\+.*'UNZ\+1\+1'$/u,
+        ),
+      },
+      message: { reference: '1', messageType: 'INVOIC' },
       replaces: null,
       replacedBy: null,
       duplicateOf: null,
       documentDeletedAt: null,
+    })
+    expect(run.message?.segments[1]).toEqual({
+      tag: 'BGM',
+      name: 'Beginning of message',
+      elements: [['380'], ['87441'], ['9']],
     })
     expect(run.steps.map(({ stage, status }) => [stage, status])).toEqual([
       ['receipt', 'succeeded'],
@@ -268,6 +279,9 @@ describe('GET /runs/:id', () => {
         fixTarget: { kind: 'mapping', mappingId: workspace.mappingId, fieldPath: 'BGM/1004' },
       },
       waitingForTradingPartnerSince: null,
+      // Validation stopped the Run before it had an Interchange to hand over.
+      interchange: null,
+      message: null,
     })
     expect(run.steps.map(({ status }) => status)).toEqual([
       'succeeded',
