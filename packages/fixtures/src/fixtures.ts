@@ -1,11 +1,11 @@
-import type { DocumentEncoding, MessageType } from '@edi-bridge/contracts'
+import type { CharacterEncoding, MessageType } from '@edi-bridge/contracts'
 import type { ParseErrorCode, ValidationErrorCode } from '@edi-bridge/edifact'
 import type { DocumentReadErrorCode, MappingErrorCode } from '@edi-bridge/mapping'
 
 export type FixtureFormat = 'edifact' | 'json' | 'csv'
 
 // A fixture can be sent as a Manual Submission only in an encoding the contract allows.
-export type FixtureEncoding = DocumentEncoding
+export type FixtureEncoding = CharacterEncoding
 
 export type FixtureFailure =
   | { stage: 'parse'; code: ParseErrorCode }
@@ -28,7 +28,7 @@ export const fixtures: readonly Fixture[] = [
   {
     path: 'documents/valid/orders-nordlicht-markt.edi',
     format: 'edifact',
-    encoding: 'iso-8859-1',
+    encoding: 'windows-1252',
     messageType: 'ORDERS',
     description:
       'Nordlicht Markt AG orders three articles for its central warehouse in Hamburg. One Message, no UNA.',
@@ -37,7 +37,7 @@ export const fixtures: readonly Fixture[] = [
   {
     path: 'documents/valid/orders-nordlicht-markt-two-orders.edi',
     format: 'edifact',
-    encoding: 'iso-8859-1',
+    encoding: 'windows-1252',
     messageType: 'ORDERS',
     description:
       'One Interchange with two ORDERS of Nordlicht Markt AG, for the central warehouse and for the store in Lüneburg. It produces two Runs.',
@@ -46,7 +46,7 @@ export const fixtures: readonly Fixture[] = [
   {
     path: 'documents/valid/orders-rheinwiese-handel.edi',
     format: 'edifact',
-    encoding: 'iso-8859-1',
+    encoding: 'windows-1252',
     messageType: 'ORDERS',
     description:
       'Rheinwiese Handel GmbH orders one article for its warehouse in Köln-Porz. It starts with a UNA and escapes the + in the warehouse name with the release character.',
@@ -55,7 +55,7 @@ export const fixtures: readonly Fixture[] = [
   {
     path: 'documents/broken/orders-segment-count-mismatch.edi',
     format: 'edifact',
-    encoding: 'iso-8859-1',
+    encoding: 'windows-1252',
     messageType: 'ORDERS',
     description: 'The UNT of the Message counts one segment less than the Message holds.',
     valid: false,
@@ -64,7 +64,7 @@ export const fixtures: readonly Fixture[] = [
   {
     path: 'documents/broken/orders-cut-off-transfer.edi',
     format: 'edifact',
-    encoding: 'iso-8859-1',
+    encoding: 'windows-1252',
     messageType: 'ORDERS',
     description:
       'The transfer broke off after the last line item: the UNS, CNT, UNT and UNZ are missing.',
@@ -74,7 +74,7 @@ export const fixtures: readonly Fixture[] = [
   {
     path: 'documents/broken/orders-unknown-date-format.edi',
     format: 'edifact',
-    encoding: 'iso-8859-1',
+    encoding: 'windows-1252',
     messageType: 'ORDERS',
     description:
       'The order date is written as 16.10.2026 with the date format code 999, which the Code List does not hold.',
@@ -84,7 +84,7 @@ export const fixtures: readonly Fixture[] = [
   {
     path: 'documents/broken/orders-too-long-order-number.edi',
     format: 'edifact',
-    encoding: 'iso-8859-1',
+    encoding: 'windows-1252',
     messageType: 'ORDERS',
     description: 'The order number in BGM has 47 characters; the element allows 35.',
     valid: false,
@@ -93,7 +93,7 @@ export const fixtures: readonly Fixture[] = [
   {
     path: 'documents/broken/orders-without-beginning-of-message.edi',
     format: 'edifact',
-    encoding: 'iso-8859-1',
+    encoding: 'windows-1252',
     messageType: 'ORDERS',
     description: 'The Message lacks its mandatory BGM, so it carries no order number.',
     valid: false,

@@ -60,6 +60,7 @@ import {
   maxLookupTableCsvLength,
   mappingVersionEndpoint,
   mappingVersionsEndpoint,
+  maxDocumentBase64Length,
   maxDocumentBytes,
   messageTypeStructureEndpoint,
   moveFlowMappingVersionEndpoint,
@@ -330,8 +331,8 @@ const lookupTableImportBodyLimit = 6 * maxLookupTableCsvLength + 1024
 // Base64 takes 4 characters per 3 bytes; 1 MiB covers the name, labels and JSON around the Document.
 const documentStructureBodyLimit = Math.ceil(maxEncodedFileBytes / 3) * 4 + 1024 * 1024
 
-// Base64 takes 4 characters per 3 bytes; 4 KiB covers the file name, escaped, and the JSON around.
-const manualSubmissionBodyLimit = Math.ceil(maxDocumentBytes / 3) * 4 + 4096
+// 4 KiB covers the file name, escaped, and the JSON around the Document.
+const manualSubmissionBodyLimit = maxDocumentBase64Length + 4096
 
 // Fastify buffers the body before the token check.
 const webhookBodyLimit = maxDocumentBytes

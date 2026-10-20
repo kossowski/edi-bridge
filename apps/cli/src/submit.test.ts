@@ -136,14 +136,14 @@ describe('submit', () => {
 
   it.each([
     [
-      'the file is not valid in the default encoding utf-8',
+      'no encoding is named and the file is not valid UTF-8',
       ['--channel', 'ERP webhook', dispatchFile],
       'is not valid utf-8. Choose another encoding, such as Windows-1252 for a typical German CSV.',
     ],
     [
       'the encoding is unknown',
       ['--channel', 'ERP webhook', '--encoding', 'latin-9000', 'invoice.json'],
-      'Unknown encoding "latin-9000"; name one of utf-8, iso-8859-1, windows-1252',
+      'Unknown encoding "latin-9000"; name one of utf-8, windows-1252',
     ],
     [
       'the Channel name is unknown',

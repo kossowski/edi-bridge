@@ -94,7 +94,7 @@ const processed = async (fileName: string, content: string, delivery = delivered
       document: submittedDocument(
         fileName,
         sentAnew(content),
-        fileName.endsWith('.edi') ? 'iso-8859-1' : 'utf-8',
+        fileName.endsWith('.edi') ? 'windows-1252' : 'utf-8',
       ),
     },
   })

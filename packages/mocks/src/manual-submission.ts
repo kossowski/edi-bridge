@@ -3,7 +3,7 @@ import { http, HttpResponse } from 'msw'
 import {
   decodeBase64,
   directionOf,
-  type DocumentEncoding,
+  type CharacterEncoding,
   documentUndecodableProblem,
   documentUndecodableStatus,
   submitDocumentEndpoint,
@@ -31,9 +31,8 @@ export function messageTypesOf(content: string): string[] | null {
   return [...content.matchAll(messageHeader)].flatMap(([, type]) => (type ? [type] : []))
 }
 
-// The rule of the api: an Interchange in the character set its UNB names, any other Document in
-// the encoding it names.
-function decodedContent(content: string, encoding: DocumentEncoding) {
+// Mirrors decodeDocument of the pipeline, which the mocks cannot import.
+function decodedContent(content: string, encoding: CharacterEncoding = 'utf-8') {
   const bytes = decodeBase64(content)
   const interchange = decodeInterchange(bytes)
 

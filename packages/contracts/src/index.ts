@@ -292,9 +292,6 @@ export {
 } from './interchange'
 
 export {
-  type DocumentEncoding,
-  documentEncodings,
-  documentEncodingSchema,
   documentSchema,
   documentUndecodableProblem,
   type DocumentUndecodableProblem,
@@ -304,6 +301,7 @@ export {
   type ManualSubmissionInput,
   manualSubmissionInputSchema,
   manualSubmissionSchema,
+  maxDocumentBase64Length,
   maxDocumentBytes,
   submitDocumentEndpoint,
   type SubmittedDocument,

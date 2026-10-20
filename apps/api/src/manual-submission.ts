@@ -1,7 +1,7 @@
 import { Effect } from 'effect'
 
 import {
-  type DocumentEncoding,
+  type CharacterEncoding,
   documentUndecodableProblem,
   type ManualSubmission,
   type ManualSubmissionInput,
@@ -20,9 +20,12 @@ import { DocumentUndecodable } from './errors.js'
 import { listRunSummaries } from './run.js'
 import { CurrentWorkspace } from './workspace.js'
 
-// The person sees the refusal in the sheet and can choose another encoding, so nothing undecodable
-// is stored.
-const decodedContent = (channelId: string, content: string, encoding: DocumentEncoding) =>
+// Refused rather than stored, since the person can submit again in another encoding.
+const decodedContent = (
+  channelId: string,
+  content: string,
+  encoding: CharacterEncoding | undefined,
+) =>
   Effect.gen(function* () {
     const decoded = decodeDocument(Buffer.from(content, 'base64'), encoding)
     const { characterSet } = decoded
@@ -31,12 +34,16 @@ const decodedContent = (channelId: string, content: string, encoding: DocumentEn
       return yield* new DocumentUndecodable({
         problem: documentUndecodableProblem(
           decoded.undecodable.message,
-          characterSet === undefined ? encoding : null,
+          characterSet === undefined ? (encoding ?? 'utf-8') : null,
         ),
       })
     }
 
-    if (characterSet !== undefined && namesOtherEncoding(characterSet, encoding)) {
+    if (
+      encoding !== undefined &&
+      characterSet !== undefined &&
+      namesOtherEncoding(characterSet, encoding)
+    ) {
       yield* Effect.logWarning(
         `A Manual Submission on Channel ${channelId} names the encoding ${encoding}, its UNB ${characterSet}; it is decoded in ${characterSet}`,
       )

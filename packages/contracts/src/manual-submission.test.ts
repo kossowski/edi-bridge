@@ -17,7 +17,7 @@ const input: ManualSubmissionInput = {
   document: {
     fileName: 'orders.edi',
     content: btoa("UNB+UNOC:3+4012345000016:14'"),
-    encoding: 'iso-8859-1',
+    encoding: 'windows-1252',
   },
 }
 
@@ -46,20 +46,20 @@ describe('manualSubmissionInputSchema', () => {
     expect(manualSubmissionInputSchema.parse(input)).toEqual(input)
   })
 
-  it.each(['utf-8', 'iso-8859-1', 'windows-1252'])('accepts the encoding %s', (encoding) => {
+  it.each(['utf-8', 'windows-1252'])('accepts the encoding %s', (encoding) => {
     expect(manualSubmissionInputSchema.safeParse(withDocument({ encoding })).success).toBe(true)
   })
 
-  it.each(['latin1', 'utf-16le', ''])('rejects the encoding "%s"', (encoding) => {
+  it.each(['latin1', 'iso-8859-1', 'utf-16le', ''])('rejects the encoding "%s"', (encoding) => {
     expect(manualSubmissionInputSchema.safeParse(withDocument({ encoding })).success).toBe(false)
   })
 
-  it('requires the encoding', () => {
+  it('accepts a Document without an encoding', () => {
     const { fileName, content } = input.document
 
     expect(
       manualSubmissionInputSchema.safeParse({ ...input, document: { fileName, content } }).success,
-    ).toBe(false)
+    ).toBe(true)
   })
 
   it('rejects content that is not base64', () => {

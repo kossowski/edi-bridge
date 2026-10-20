@@ -7,7 +7,9 @@ import type { FastifyServerOptions, InjectOptions, LightMyRequestResponse } from
 
 import { secretKeyBytes } from '@edi-bridge/channels'
 import {
-  type DocumentEncoding,
+  type CharacterEncoding,
+  encodeBase64,
+  encodeText,
   signInEndpoint,
   type SubmittedDocument,
   type WorkspaceRole,
@@ -52,14 +54,13 @@ export const otherWorkspace = {
 
 export const today = () => utcDay(Date.now())
 
-// A Manual Submission sends the bytes of the text in the encoding it names.
 export const submittedDocument = (
   fileName: string,
   text: string,
-  encoding: DocumentEncoding = 'utf-8',
+  encoding?: CharacterEncoding,
 ): SubmittedDocument => ({
   fileName,
-  content: Buffer.from(text, encoding === 'utf-8' ? 'utf8' : 'latin1').toString('base64'),
+  content: encodeBase64(encodeText(text, encoding ?? 'utf-8')),
   encoding,
 })
 

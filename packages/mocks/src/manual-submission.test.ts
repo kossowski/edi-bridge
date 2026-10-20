@@ -2,9 +2,10 @@ import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
 import {
-  type DocumentEncoding,
+  type CharacterEncoding,
   documentUndecodableProblemSchema,
   encodeBase64,
+  encodeText,
   type ManualSubmissionInput,
   submitDocumentEndpoint,
 } from '@edi-bridge/contracts'
@@ -49,9 +50,8 @@ const mixed = [
   "UNZ+3+4712'",
 ].join('\n')
 
-// btoa takes each character as one byte, its ISO 8859-1 code point.
-function documentOf(fileName: string, text: string, encoding: DocumentEncoding = 'utf-8') {
-  const content = encoding === 'utf-8' ? encodeBase64(new TextEncoder().encode(text)) : btoa(text)
+function documentOf(fileName: string, text: string, encoding?: CharacterEncoding) {
+  const content = encodeBase64(encodeText(text, encoding ?? 'utf-8'))
 
   return { fileName, content, encoding }
 }
@@ -232,7 +232,7 @@ describe('manualSubmissionHandler', () => {
 
     const { runs: created } = await submitted({
       channelId: inbox.id,
-      document: documentOf('orders.edi', twoOrders.replace('PO-1', 'Lüneburg'), 'iso-8859-1'),
+      document: documentOf('orders.edi', twoOrders.replace('PO-1', 'Lüneburg'), 'windows-1252'),
     })
 
     expect(created).toEqual([
@@ -262,6 +262,19 @@ describe('manualSubmissionHandler', () => {
     expect(runs.all()).toHaveLength(0)
   })
 
+  it('refuses a Document without an encoding that is not valid UTF-8', async () => {
+    use()
+
+    const { fileName, content } = documentOf('dispatch.csv', 'Käufer;Menge\n', 'windows-1252')
+    const response = await submit({ channelId: erpWebhook.id, document: { fileName, content } })
+
+    expect(response.status).toBe(422)
+    expect(documentUndecodableProblemSchema.parse(await response.json())).toMatchObject({
+      code: 'documentUndecodable',
+      encoding: 'utf-8',
+    })
+  })
+
   it('refuses an Interchange not valid in its character set without suggesting an encoding', async () => {
     use()
 
@@ -270,7 +283,7 @@ describe('manualSubmissionHandler', () => {
       document: documentOf(
         'orders.edi',
         twoOrders.replace('UNOC', 'UNOA').replace('PO-1', 'Lüneburg'),
-        'iso-8859-1',
+        'windows-1252',
       ),
     })
 

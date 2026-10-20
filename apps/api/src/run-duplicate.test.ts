@@ -42,7 +42,7 @@ const submitted = async (content: string) => {
     url: submitDocumentEndpoint.path,
     body: {
       channelId: workspace.inboundChannelId,
-      document: submittedDocument('orders.edi', content, 'iso-8859-1'),
+      document: submittedDocument('orders.edi', content, 'windows-1252'),
     },
   })
 

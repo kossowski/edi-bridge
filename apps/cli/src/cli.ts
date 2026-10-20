@@ -4,8 +4,8 @@ import { parseArgs } from 'node:util'
 import { z } from 'zod'
 
 import {
-  documentEncodings,
-  documentEncodingSchema,
+  characterEncodings,
+  characterEncodingSchema,
   type ManualSubmission,
 } from '@edi-bridge/contracts'
 
@@ -37,7 +37,7 @@ function parseOptions(args: string[]) {
       args,
       options: {
         channel: { type: 'string' },
-        encoding: { type: 'string', default: 'utf-8' },
+        encoding: { type: 'string' },
       },
       allowPositionals: true,
     })
@@ -62,11 +62,15 @@ function parseSubmitArgs(args: string[]) {
     throw new CliError(usage)
   }
 
-  const named = documentEncodingSchema.safeParse(encoding)
+  if (encoding === undefined) {
+    return { channel, file }
+  }
+
+  const named = characterEncodingSchema.safeParse(encoding)
 
   if (!named.success) {
     throw new CliError(
-      `Unknown encoding "${encoding}"; name one of ${documentEncodings.join(', ')}`,
+      `Unknown encoding "${encoding}"; name one of ${characterEncodings.join(', ')}`,
     )
   }
 
@@ -96,7 +100,7 @@ function formatSubmission({ runs, notRouted }: ManualSubmission) {
 }
 
 async function submit(args: string[], context: CliContext) {
-  const { channel: channelName, encoding, file } = parseSubmitArgs(args)
+  const { channel: channelName, file, ...encoding } = parseSubmitArgs(args)
   const env = envSchema.safeParse(context.env)
 
   if (!env.success) {
@@ -131,7 +135,7 @@ async function submit(args: string[], context: CliContext) {
 
   const submission = await api.submitDocument({
     channelId: channel.id,
-    document: { fileName: basename(path), content: bytes.toString('base64'), encoding },
+    document: { fileName: basename(path), content: bytes.toString('base64'), ...encoding },
   })
 
   context.stdout(formatSubmission(submission))

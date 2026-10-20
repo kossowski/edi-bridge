@@ -1,8 +1,8 @@
 import { eq } from 'drizzle-orm'
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
-  type DocumentEncoding,
+  type CharacterEncoding,
   documentUndecodableProblemSchema,
   manualSubmissionSchema,
   runListSchema,
@@ -60,8 +60,8 @@ const submit = (
   {
     channelId = workspace.inboundChannelId,
     as = admin,
-    encoding = 'utf-8',
-  }: { channelId?: string | undefined; as?: Client; encoding?: DocumentEncoding } = {},
+    encoding,
+  }: { channelId?: string | undefined; as?: Client; encoding?: CharacterEncoding | undefined } = {},
 ) =>
   as.inject({
     method: submitDocumentEndpoint.method,
@@ -142,7 +142,7 @@ describe('POST /manual-submissions', () => {
     expect(await storedContent(response)).toBe(dispatchCsv)
   })
 
-  it('answers 422 with a problem that suggests another encoding when the bytes are not valid in the named one', async () => {
+  it('answers 422 with a problem that suggests another encoding when the bytes are not valid UTF-8 and none is named', async () => {
     const before = await receivedRuns()
 
     const response = await submit(Buffer.from(dispatchCsv, 'latin1'))
@@ -281,6 +281,27 @@ describe('POST /manual-submissions', () => {
         expect(await storedContent(response)).toBe(ordersInterchange)
         expect(ordersInterchange).toContain('Claus Früh')
       } finally {
+        await removeFlow(flowId)
+      }
+    })
+
+    it('logs only a named encoding that disagrees with the UNB of an Interchange', async () => {
+      const flowId = await addFlow('ORDERS', 'Orders from Hanse Retail')
+      const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+
+      try {
+        const named = await submit(ordersBytes, { encoding: 'utf-8' })
+        const agreeing = await submit(ordersBytes, { encoding: 'windows-1252' })
+        const unnamed = await submit(ordersBytes)
+
+        expect([named, agreeing, unnamed].map(({ statusCode }) => statusCode)).toEqual([
+          201, 201, 201,
+        ])
+        expect(
+          log.mock.calls.flat().filter((line) => /names the encoding/.test(String(line))),
+        ).toEqual([expect.stringContaining('names the encoding utf-8, its UNB UNOC')])
+      } finally {
+        log.mockRestore()
         await removeFlow(flowId)
       }
     })
