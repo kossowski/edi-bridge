@@ -121,6 +121,22 @@ export const loadLookupTableEntries = (ids: ReadonlyArray<string>) =>
     )
   })
 
+export const loadFirstLookupTableEntries = (id: string, limit: number) =>
+  Effect.gen(function* () {
+    const db = yield* Db
+    const workspace = yield* CurrentWorkspace
+
+    return yield* Effect.promise(() =>
+      db
+        .select(entryColumns)
+        .from(lookupTableEntries)
+        .innerJoin(lookupTables, eq(lookupTables.id, lookupTableEntries.lookupTableId))
+        .where(inWorkspace(lookupTables, workspace.id, eq(lookupTables.id, id)))
+        .orderBy(asc(lookupTableEntries.position))
+        .limit(limit),
+    )
+  })
+
 export const listLookupTables = Effect.gen(function* () {
   const db = yield* Db
   const workspace = yield* CurrentWorkspace
