@@ -3,9 +3,11 @@ import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
 import {
+  type CharacterEncoding,
   documentStructureOrigins,
   encodeBase64,
   mappingVersionSummarySchema,
+  submitDocumentEndpoint,
 } from '@edi-bridge/contracts'
 import {
   aiDraftHandlers,
@@ -614,7 +616,7 @@ describe('Manual Submission refusals', () => {
   // "Käufer" in Windows-1252: the ä is the byte E4, which UTF-8 never holds alone.
   const windows1252 = new Uint8Array([0x4b, 0xe4, 0x75, 0x66, 0x65, 0x72, 0x0a])
 
-  const submitted = (encoding?: 'utf-8' | 'windows-1252') =>
+  const submitted = (encoding?: CharacterEncoding) =>
     submitDocument({
       channelId: erpWebhook.id,
       document: { fileName: 'dispatch.csv', content: encodeBase64(windows1252), encoding },
@@ -634,7 +636,7 @@ describe('Manual Submission refusals', () => {
 
   it('has no refusal for another unprocessable submission', async () => {
     server.use(
-      http.post(`${apiUrl}/manual-submissions`, () =>
+      http.post(`${apiUrl}${submitDocumentEndpoint.path}`, () =>
         HttpResponse.json(
           { message: 'No Flow routes Documents from this Channel' },
           { status: 422 },
