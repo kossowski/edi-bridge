@@ -9,6 +9,7 @@ import { type SecretBox, secretBox, secretContext, secretKeyBytes } from '@edi-b
 import {
   adjustDocumentStructure,
   type DocumentStructureOrigin,
+  type HostKeyFingerprint,
   inferDocumentStructure,
   mappingVersionSchema,
   toEncodedFile,
@@ -526,17 +527,19 @@ export async function addContrlFlow(db: Db, workspace: InvoiceWorkspace, { url }
   return { flowId: flow.id, erpChannelId: erp.id }
 }
 
+export interface SftpLogin {
+  host: string
+  port: number
+  username: string
+  password: string
+  remotePath: string
+  hostKeyFingerprint?: HostKeyFingerprint | null
+}
+
 export async function deliverOverSftp(
   db: Db,
   workspace: InvoiceWorkspace,
-  login: {
-    host: string
-    port: number
-    username: string
-    password: string
-    remotePath: string
-    hostKeyFingerprint?: string | null
-  },
+  login: SftpLogin,
   secrets: SecretBox = testSecrets,
 ) {
   const id = randomUUID()
@@ -592,14 +595,7 @@ export async function readRun(db: Db, id: string) {
 export async function receiveOverSftp(
   db: Db,
   workspace: InvoiceWorkspace,
-  login: {
-    host: string
-    port: number
-    username: string
-    password: string
-    remotePath: string
-    hostKeyFingerprint?: string | null
-  },
+  login: SftpLogin,
   {
     flowId,
     pollingIntervalMinutes = 1,
