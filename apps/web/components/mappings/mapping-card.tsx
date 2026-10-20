@@ -17,7 +17,7 @@ import { cn } from '@edi-bridge/ui/lib/utils'
 
 import type { MappingSummary } from '@edi-bridge/contracts'
 
-function useMappingTitle(mapping: MappingSummary) {
+export function useMappingTitle(mapping: MappingSummary) {
   const t = useTranslations('Mappings.title')
   const documents = usePlainNames().messageTypeName(mapping.messageType, true)
   const [first, ...others] = mapping.partners

@@ -648,6 +648,7 @@
       "allTradingPartners": "Alle Handelspartner",
       "messageType": "Belegart",
       "allMessageTypes": "Alle Belegarten",
+      "mapping": "Mapping: <name></name><hidden>, Filter entfernen</hidden>",
       "clear": "Filter zurücksetzen",
       "searchInterchanges": "Datei-, Bestellnummer oder Partner suchen"
     },

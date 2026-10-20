@@ -20,6 +20,7 @@ export type DocumentFilters = {
   q: string
   tradingPartnerId: string
   messageType: MessageType | ''
+  mappingId: string
   page: number
 }
 
@@ -33,6 +34,7 @@ export const clearedSearchFilters = {
   q: '',
   tradingPartnerId: '',
   messageType: '',
+  mappingId: '',
 } satisfies Partial<DocumentFilters>
 
 export const emptyDocumentFilters: DocumentFilters = {
@@ -49,6 +51,8 @@ export function parseDocumentFilters(params: SearchParamsReader): DocumentFilter
   const status = statusGroups.find((group) => group === params.get('status'))
   const tradingPartnerId = params.get('partner') ?? ''
   const messageType = messageTypeSchema.safeParse(params.get('type'))
+  // The transmissions of an Interchange can't be narrowed to one Mapping.
+  const mappingId = view === 'transmissions' ? '' : (params.get('mapping') ?? '')
 
   return {
     view: view ?? 'documents',
@@ -56,6 +60,7 @@ export function parseDocumentFilters(params: SearchParamsReader): DocumentFilter
     q: params.get('q') ?? '',
     tradingPartnerId: uuidPattern.test(tradingPartnerId) ? tradingPartnerId : '',
     messageType: messageType.success ? messageType.data : '',
+    mappingId: uuidPattern.test(mappingId) ? mappingId : '',
     page: parsePage(params),
   }
 }
@@ -83,6 +88,10 @@ export function documentFiltersSearch(filters: DocumentFilters) {
     params.set('type', filters.messageType)
   }
 
+  if (filters.view === 'documents' && filters.mappingId !== '') {
+    params.set('mapping', filters.mappingId)
+  }
+
   setPage(params, filters.page)
 
   return params.toString()
@@ -93,7 +102,12 @@ export function documentsHref(filters: Partial<DocumentFilters> = {}) {
 }
 
 export function hasSearchFilters(filters: DocumentFilters) {
-  return filters.q.trim() !== '' || filters.tradingPartnerId !== '' || filters.messageType !== ''
+  return (
+    filters.q.trim() !== '' ||
+    filters.tradingPartnerId !== '' ||
+    filters.messageType !== '' ||
+    filters.mappingId !== ''
+  )
 }
 
 export function toInterchangeListQuery(filters: DocumentFilters): InterchangeListQuery {
@@ -111,6 +125,7 @@ export function toInterchangeListQuery(filters: DocumentFilters): InterchangeLis
 export function toRunListQuery(filters: DocumentFilters): RunListQuery {
   return {
     status: filters.status === 'all' ? undefined : [...groupStatuses[filters.status]],
+    mappingId: filters.mappingId === '' ? undefined : [filters.mappingId],
     ...toInterchangeListQuery(filters),
   }
 }

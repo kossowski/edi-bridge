@@ -1,6 +1,7 @@
 'use client'
 
 import {
+  Cancel01Icon,
   CheckmarkCircle02Icon,
   File02Icon,
   FilterRemoveIcon,
@@ -25,15 +26,38 @@ import { useEmptyActions } from '@/components/documents/list-parts'
 import { RunRow, RunRowSkeleton } from '@/components/documents/run-row'
 import { useDocumentFilters } from '@/components/documents/use-document-filters'
 import { type EmptyAction, ListEmpty, ListResults, SearchField } from '@/components/list-parts'
+import { useMappingTitle } from '@/components/mappings/mapping-card'
 import { usePlainNames } from '@/components/plain-names'
-import { runsQuery, tradingPartnersQuery } from '@/lib/api/queries'
+import { mappingsQuery, runsQuery, tradingPartnersQuery } from '@/lib/api/queries'
 import { type DocumentView, documentViews } from '@/lib/navigation'
 import { type StatusGroup, statusGroups } from '@/lib/status-groups'
-import { messageTypes, type RunList } from '@edi-bridge/contracts'
+import { type MappingSummary, messageTypes, type RunList } from '@edi-bridge/contracts'
 import { Badge } from '@edi-bridge/ui/components/badge'
 import { Button } from '@edi-bridge/ui/components/button'
 import { NativeSelect, NativeSelectOption } from '@edi-bridge/ui/components/native-select'
 import { ToggleGroup, ToggleGroupItem } from '@edi-bridge/ui/components/toggle-group'
+
+function MappingTitle({ mapping }: { mapping: MappingSummary }) {
+  return useMappingTitle(mapping)
+}
+
+function MappingFilter({ mappingId, onRemove }: { mappingId: string; onRemove: () => void }) {
+  const t = useTranslations('Documents.filters')
+  const { data: mappings } = useQuery(mappingsQuery)
+  const mapping = mappings?.find(({ id }) => id === mappingId)
+
+  return (
+    <Button variant="secondary" onClick={onRemove}>
+      <span className="max-w-64 truncate">
+        {t.rich('mapping', {
+          name: () => (mapping ? <MappingTitle mapping={mapping} /> : '…'),
+          hidden: (chunks) => <span className="sr-only">{chunks}</span>,
+        })}
+      </span>
+      <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} aria-hidden data-icon="inline-end" />
+    </Button>
+  )
+}
 
 function Filters({
   filters,
@@ -84,6 +108,9 @@ function Filters({
           </NativeSelectOption>
         ))}
       </NativeSelect>
+      {filters.mappingId !== '' && (
+        <MappingFilter mappingId={filters.mappingId} onRemove={() => onChange({ mappingId: '' })} />
+      )}
       {hasSearchFilters(filters) && (
         <Button variant="ghost" onClick={onClear}>
           <HugeiconsIcon icon={FilterRemoveIcon} strokeWidth={2} data-icon="inline-start" />

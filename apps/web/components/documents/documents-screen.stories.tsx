@@ -14,7 +14,7 @@ import {
 } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import { runsEndpoint } from '@edi-bridge/contracts'
-import { createRuns, runsHandler, seedRuns } from '@edi-bridge/mocks'
+import { createHandlers, createRuns, runsHandler, seedMappings, seedRuns } from '@edi-bridge/mocks'
 
 import preview from '../../.storybook/preview'
 
@@ -68,6 +68,62 @@ export const BackUndoesStatusFilter = meta.story({
 
     await expect(
       await canvas.findByRole('button', { name: /^Needs attention\b/, pressed: true }),
+    ).toBeVisible()
+  },
+})
+
+const narrowedToMapping = {
+  nextjs: {
+    navigation: {
+      pathname: '/documents',
+      query: { status: 'attention', mapping: seedMappings[0]!.mappingId },
+    },
+  },
+}
+
+export const NarrowedToMapping = meta.story({
+  parameters: narrowedToMapping,
+  decorators: [withMemoryHistory],
+  beforeEach({ msw }) {
+    msw.use(...createHandlers(apiUrl))
+  },
+  async play({ canvas }) {
+    const mapping = await canvas.findByRole('button', {
+      name: /^Mapping: Purchase orders from .+, remove filter$/,
+    })
+
+    await expect(mapping).toBeVisible()
+    await expect(
+      canvas.getByRole('button', { name: /^Needs attention\b/, pressed: true }),
+    ).toBeVisible()
+    await expect(
+      (await canvas.findAllByRole('link', { name: /^What to do/ })).length,
+    ).toBeGreaterThan(0)
+    const narrowed = (await canvas.findByText(/^[\d,]+ documents?$/)).textContent
+
+    await userEvent.click(mapping)
+    await waitFor(() => expect(canvas.queryByRole('button', { name: /^Mapping:/ })).toBeNull())
+    await waitFor(() =>
+      expect(canvas.getByText(/^[\d,]+ documents?$/).textContent).not.toBe(narrowed),
+    )
+
+    goBack()
+
+    await expect(await canvas.findByRole('button', { name: /^Mapping:/ })).toBeVisible()
+  },
+})
+
+export const NarrowedToMappingGerman = meta.story({
+  parameters: narrowedToMapping,
+  decorators: [german],
+  beforeEach({ msw }) {
+    msw.use(...createHandlers(apiUrl))
+  },
+  async play({ canvas }) {
+    await expect(
+      await canvas.findByRole('button', {
+        name: /^Mapping: Bestellungen von .+, Filter entfernen$/,
+      }),
     ).toBeVisible()
   },
 })

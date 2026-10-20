@@ -648,6 +648,7 @@
       "allTradingPartners": "All trading partners",
       "messageType": "Document type",
       "allMessageTypes": "All document types",
+      "mapping": "Mapping: <name></name><hidden>, remove filter</hidden>",
       "clear": "Clear filters",
       "searchInterchanges": "Search file number, order number or partner"
     },
