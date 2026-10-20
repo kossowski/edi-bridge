@@ -473,11 +473,12 @@ describe('the polling of inbound SFTP Channels', () => {
         .orderBy(runs.messageIndex)
 
     const originals = await runsOf(first?.id ?? '')
+    const anyId: unknown = expect.any(String)
 
     expect(originals.map(({ status }) => status)).toEqual(['received', 'received', 'received'])
     expect(await runsOf(second?.id ?? '')).toEqual(
       originals.map(({ id }) => ({
-        id: expect.any(String),
+        id: anyId,
         status: 'duplicate',
         duplicateOfRunId: id,
       })),
