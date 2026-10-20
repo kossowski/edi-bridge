@@ -472,6 +472,45 @@ export const GermanUndecodableInterchange = meta.story({
   },
 })
 
+export const AnotherFileResetsEncoding = meta.story({
+  async play() {
+    const file = await fixtureFile(dispatchUrl, 'dispatch-nordlicht-markt.csv')
+    const content = await sheet()
+
+    await chooseChannel(content, 'ERP webhook')
+    await userEvent.upload(content.getByLabelText('File'), file)
+    await chooseEncoding(content, 'Windows-1252')
+    await userEvent.upload(
+      content.getByLabelText('File'),
+      new File(['Artikel;Menge\n'], 'another.csv', { type: 'text/csv' }),
+    )
+
+    await expect(content.getByText('Chosen: another.csv')).toBeVisible()
+    await expect(await content.findByRole('combobox', { name: encodingLabel })).toHaveTextContent(
+      'UTF-8',
+    )
+  },
+})
+
+// A file whose bytes never arrive, as a large file still being read.
+const unread = Object.assign(new File(['UNB'], 'unread.edi'), {
+  arrayBuffer: () => new Promise<ArrayBuffer>(() => {}),
+})
+
+export const FileBeingRead = meta.story({
+  args: { defaultChannelId: inbox.id },
+  async play() {
+    const content = await sheet()
+
+    await loaded(content)
+    await expect(content.getByRole('button', { name: 'Upload' })).toBeEnabled()
+    await userEvent.upload(content.getByLabelText('File'), unread)
+
+    await expect(content.getByText('Chosen: unread.edi')).toBeVisible()
+    await expect(content.getByRole('button', { name: 'Upload' })).toBeDisabled()
+  },
+})
+
 export const ChannelChangeClearsFailure = meta.story({
   args: { defaultChannelId: inbox.id },
   beforeEach({ msw }) {

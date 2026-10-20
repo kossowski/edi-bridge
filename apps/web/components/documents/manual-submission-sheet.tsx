@@ -368,6 +368,7 @@ function ManualSubmissionForm({
   function choose(next: File | null) {
     latestFile.current = next
     setFile(next)
+    setEncoding('utf-8')
     setFileProblem(null)
     submission.reset()
 
@@ -380,21 +381,20 @@ function ManualSubmissionForm({
     }
   }
 
-  async function submit() {
-    const submitted = read ?? (file === null ? null : await readFile(file))
-    const problem = documentProblem(submitted?.bytes ?? null)
+  function submit() {
+    const problem = documentProblem(read?.bytes ?? null)
     const channel = channels.find(channelId)
 
     setChannelError(channel === undefined)
     setFileProblem(problem)
 
-    if (channel !== undefined && submitted !== null && problem === null) {
+    if (channel !== undefined && read !== null && problem === null) {
       submission.mutate({
         channel,
         document: {
-          fileName: submitted.file.name,
-          content: encodeBase64(submitted.bytes),
-          encoding: submitted.namesItsCharacterSet ? undefined : encoding,
+          fileName: read.file.name,
+          content: encodeBase64(read.bytes),
+          encoding: read.namesItsCharacterSet ? undefined : encoding,
         },
       })
     } else {
@@ -426,7 +426,7 @@ function ManualSubmissionForm({
       className="flex min-h-0 flex-1 flex-col"
       onSubmit={(event) => {
         event.preventDefault()
-        void submit()
+        submit()
       }}>
       <div className="flex flex-1 flex-col gap-5 overflow-y-auto px-4 pb-4">
         {channels.isError ? (
@@ -464,12 +464,18 @@ function ManualSubmissionForm({
           />
         )}
         {submission.isError && (
-          <ManualSubmissionFailure error={submission.error} onRetry={() => void submit()} />
+          <ManualSubmissionFailure error={submission.error} onRetry={submit} />
         )}
       </div>
       <FormFooter>
         <Button
-          disabled={submission.isPending || channels.isPending || channels.isError}
+          // Until the chosen file is read, Upload would send no bytes or the previous file's.
+          disabled={
+            submission.isPending ||
+            channels.isPending ||
+            channels.isError ||
+            (file !== null && read === null)
+          }
           type="submit">
           {submission.isPending && <Spinner aria-hidden data-icon="inline-start" />}
           {submission.isPending ? t('submitting') : t('submit')}
