@@ -1,11 +1,18 @@
 import { Context, Data, Effect } from 'effect'
+import { createHash } from 'node:crypto'
 import { Client, type SFTPWrapper } from 'ssh2'
 import { z } from 'zod'
 
-import type { ChannelTestFailureReason } from '@edi-bridge/contracts'
+import type {
+  ChannelTestFailureReason,
+  HostKeyFingerprint,
+  HostKeyState,
+  TestedHostKey,
+} from '@edi-bridge/contracts'
 
 export class ChannelUnreachable extends Data.TaggedError('ChannelUnreachable')<{
   readonly reason: ChannelTestFailureReason
+  readonly hostKey?: TestedHostKey
 }> {}
 
 export type SftpCredential = { password: string } | { privateKey: string }
@@ -16,6 +23,7 @@ export interface SftpLogin {
   username: string
   credential: SftpCredential
   remotePath: string
+  hostKeyFingerprint?: HostKeyFingerprint | null
 }
 
 export interface HttpDestination {
@@ -26,7 +34,7 @@ export interface HttpDestination {
 export class ChannelReach extends Context.Service<
   ChannelReach,
   {
-    readonly sftp: (login: SftpLogin) => Effect.Effect<void, ChannelUnreachable>
+    readonly sftp: (login: SftpLogin) => Effect.Effect<TestedHostKey, ChannelUnreachable>
     readonly http: (destination: HttpDestination) => Effect.Effect<void, ChannelUnreachable>
   }
 >()('ChannelReach') {}
@@ -99,6 +107,21 @@ export const sftpReason = (error: Error): ChannelTestFailureReason => {
   return code === undefined ? 'unexpectedResponse' : sftpStatusReasons[code]
 }
 
+// OpenSSH prints the same form, so an Admin can compare it with `ssh-keygen -l`.
+const fingerprintOf = (hostKey: Buffer) =>
+  `SHA256:${createHash('sha256').update(hostKey).digest('base64').replace(/=+$/, '')}`
+
+const hostKeyState = (
+  fingerprint: HostKeyFingerprint,
+  stored: HostKeyFingerprint | null | undefined,
+): HostKeyState => {
+  if (stored === null || stored === undefined) {
+    return 'unchecked'
+  }
+
+  return fingerprint === stored ? 'matches' : 'mismatch'
+}
+
 // Opening the directory proves the user may read it without transferring a Document.
 const statAndOpenDirectory = (
   sftp: SFTPWrapper,
@@ -132,15 +155,20 @@ const statAndOpenDirectory = (
   })
 }
 
-// The host key is not pinned yet, so any key the server presents is accepted.
+// Unchecked without a fingerprint, so Channels set up before host key checks keep working.
 export const sftpSession = <A>(
   login: SftpLogin,
   timeoutMs: number,
-  use: (sftp: SFTPWrapper, done: (outcome: Effect.Effect<A, ChannelUnreachable>) => void) => void,
+  use: (
+    sftp: SFTPWrapper,
+    done: (outcome: Effect.Effect<A, ChannelUnreachable>) => void,
+    hostKey: TestedHostKey,
+  ) => void,
 ) =>
   Effect.callback<A, ChannelUnreachable>((resume) => {
     const client = new Client()
     let settled = false
+    let hostKey: TestedHostKey | undefined
 
     const settle = (outcome: Effect.Effect<A, ChannelUnreachable>) => {
       if (settled) {
@@ -149,24 +177,38 @@ export const sftpSession = <A>(
 
       settled = true
       client.end()
-      resume(outcome)
+      resume(
+        Effect.mapError(outcome, (error) =>
+          hostKey === undefined ? error : new ChannelUnreachable({ reason: error.reason, hostKey }),
+        ),
+      )
+    }
+
+    const fail = (reason: ChannelTestFailureReason) => {
+      settle(Effect.fail(unreachable(hostKey?.state === 'mismatch' ? 'hostKeyMismatch' : reason)))
     }
 
     client.on('error', (error) => {
-      settle(Effect.fail(unreachable(sshReason(error))))
+      fail(sshReason(error))
     })
     client.on('close', () => {
-      settle(Effect.fail(unreachable('unexpectedResponse')))
+      fail('unexpectedResponse')
     })
     client.on('ready', () => {
       client.sftp((error, sftp) => {
         if (error) {
-          settle(Effect.fail(unreachable('unexpectedResponse')))
+          fail('unexpectedResponse')
 
           return
         }
 
-        use(sftp, settle)
+        if (hostKey === undefined) {
+          settle(Effect.die(new Error('ssh2 opened a session without checking the host key')))
+
+          return
+        }
+
+        use(sftp, settle, hostKey)
       })
     })
 
@@ -176,10 +218,16 @@ export const sftpSession = <A>(
         port: login.port,
         username: login.username,
         readyTimeout: timeoutMs,
+        hostVerifier: (key: Buffer) => {
+          const fingerprint = fingerprintOf(key)
+          hostKey = { fingerprint, state: hostKeyState(fingerprint, login.hostKeyFingerprint) }
+
+          return hostKey.state !== 'mismatch'
+        },
         ...login.credential,
       })
     } catch {
-      settle(Effect.fail(unreachable('loginRejected')))
+      fail('loginRejected')
     }
 
     return Effect.sync(() => {
@@ -189,8 +237,10 @@ export const sftpSession = <A>(
   })
 
 const reachSftp = (login: SftpLogin, timeoutMs: number) =>
-  sftpSession(login, timeoutMs, (sftp, done) => {
-    statAndOpenDirectory(sftp, login.remotePath, done)
+  sftpSession<TestedHostKey>(login, timeoutMs, (sftp, done, hostKey) => {
+    statAndOpenDirectory(sftp, login.remotePath, (outcome) => {
+      done(Effect.as(outcome, hostKey))
+    })
   })
 
 export const rejectedLoginReason = (status: number): ChannelTestFailureReason | undefined =>

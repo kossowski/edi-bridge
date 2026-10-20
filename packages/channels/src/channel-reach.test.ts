@@ -2,9 +2,17 @@ import { Effect } from 'effect'
 import { createServer as createTcpServer, type Server, type Socket } from 'node:net'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
-import { channelReach, type HttpDestination, type SftpLogin } from './index'
+import type { TestedHostKey } from '@edi-bridge/contracts'
+
+import {
+  channelReach,
+  type ChannelUnreachable,
+  type HttpDestination,
+  type SftpLogin,
+} from './index'
 import {
   listening,
+  mismatchingHostKeyFingerprint,
   startTestErp,
   startTestSftpServer,
   type TestErp,
@@ -60,6 +68,14 @@ const outcome = (effect: Effect.Effect<void, { reason: string }>) =>
     effect.pipe(
       Effect.as({ outcome: 'succeeded' }),
       Effect.catch((error) => Effect.succeed({ outcome: 'failed', reason: error.reason })),
+    ),
+  )
+
+const hostKeyOutcome = (effect: Effect.Effect<TestedHostKey, ChannelUnreachable>) =>
+  Effect.runPromise(
+    effect.pipe(
+      Effect.map((hostKey) => ({ outcome: 'succeeded', hostKey })),
+      Effect.catch(({ reason, hostKey }) => Effect.succeed({ outcome: 'failed', reason, hostKey })),
     ),
   )
 
@@ -128,6 +144,76 @@ describe('channelReach for an SFTP Channel', () => {
     expect(
       await outcome(reach.sftp({ ...sftpOutbox(), host: '127.0.0.1', port: silentPort })),
     ).toEqual({ outcome: 'failed', reason: 'timedOut' })
+  })
+})
+
+describe('channelReach for the host key of an SFTP Channel', () => {
+  it('reports the fingerprint of the server as unchecked when the Channel stores none', async () => {
+    expect(await hostKeyOutcome(reach.sftp(sftpOutbox()))).toEqual({
+      outcome: 'succeeded',
+      hostKey: { fingerprint: sftp.hostKeyFingerprint, state: 'unchecked' },
+    })
+  })
+
+  it('reports a fingerprint that matches the stored one', async () => {
+    expect(
+      await hostKeyOutcome(
+        reach.sftp({ ...sftpOutbox(), hostKeyFingerprint: sftp.hostKeyFingerprint }),
+      ),
+    ).toEqual({
+      outcome: 'succeeded',
+      hostKey: { fingerprint: sftp.hostKeyFingerprint, state: 'matches' },
+    })
+  })
+
+  it('refuses a server whose fingerprint does not match the stored one', async () => {
+    expect(
+      await hostKeyOutcome(
+        reach.sftp({ ...sftpOutbox(), hostKeyFingerprint: mismatchingHostKeyFingerprint }),
+      ),
+    ).toEqual({
+      outcome: 'failed',
+      reason: 'hostKeyMismatch',
+      hostKey: { fingerprint: sftp.hostKeyFingerprint, state: 'mismatch' },
+    })
+  })
+
+  it('refuses a mismatching server before it logs in', async () => {
+    expect(
+      await hostKeyOutcome(
+        reach.sftp({
+          ...sftpOutbox(),
+          credential: { password: 'wrong-password' },
+          hostKeyFingerprint: mismatchingHostKeyFingerprint,
+        }),
+      ),
+    ).toMatchObject({ outcome: 'failed', reason: 'hostKeyMismatch' })
+  })
+
+  it('reports the fingerprint along with a failure after the host key check', async () => {
+    expect(
+      await hostKeyOutcome(
+        reach.sftp({
+          ...sftpOutbox(),
+          credential: { password: 'wrong-password' },
+          hostKeyFingerprint: sftp.hostKeyFingerprint,
+        }),
+      ),
+    ).toEqual({
+      outcome: 'failed',
+      reason: 'loginRejected',
+      hostKey: { fingerprint: sftp.hostKeyFingerprint, state: 'matches' },
+    })
+  })
+
+  it('reports no fingerprint when the server is not reached', async () => {
+    const port = await refusedPort()
+
+    expect(await hostKeyOutcome(reach.sftp({ ...sftpOutbox(), host: '127.0.0.1', port }))).toEqual({
+      outcome: 'failed',
+      reason: 'hostUnreachable',
+      hostKey: undefined,
+    })
   })
 })
 
