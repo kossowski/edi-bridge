@@ -4281,6 +4281,23 @@ describe('the CONTRL answering a received Interchange', () => {
     expect(sent?.deliveryError).toBeNull()
   })
 
+  it('refuses to send a CONTRL to an SFTP server that shows another host key', async () => {
+    const into = await answeringWorkspace('Impostor Orders')
+
+    await deliverOverSftp(connection.db, into, {
+      ...sftpLogin(),
+      hostKeyFingerprint: mismatchingHostKeyFingerprint,
+    })
+
+    const { receipt } = await receiveInterchange(into, interchangeOf([ordersMessage]))
+    await sendWith(sftpDelivery)
+
+    await expect(acknowledgementOf(receipt.document.id)).resolves.toMatchObject({
+      handedOverAt: null,
+      deliveryError: 'hostKeyMismatch',
+    })
+  })
+
   it('sends a CONTRL whose attempt a worker restart cut off once the bound passed', async () => {
     const into = await answeringWorkspace('Restarted Orders')
     const delivery = recordingDelivery()
