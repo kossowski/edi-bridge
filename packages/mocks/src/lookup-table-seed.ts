@@ -57,7 +57,7 @@ function entries(...pairs: ReadonlyArray<readonly [string, string]>): LookupTabl
   return pairs.map(([sourceCode, targetCode]) => ({ sourceCode, targetCode }))
 }
 
-const [hansemarkt, alpenfrisch] = seedTradingPartners
+const [hansemarkt, alpenfrisch, , elbtal] = seedTradingPartners
 
 const hansemarktStore = (store: number) => `${seedGln(hansemarkt!.id).slice(0, 9)}${store}`
 
@@ -112,6 +112,13 @@ const seeds: ReadonlyArray<Omit<LookupTableRecord, 'id'>> = [
       [hansemarktStore(1002), 'DA-1002'],
       [hansemarktStore(1003), 'DA-1003'],
     ),
+  },
+  {
+    name: 'Elbtal order units',
+    kind: 'units',
+    scope: partnerScope(elbtal!),
+    updatedAt: '2026-10-06T10:15:00.000Z',
+    entries: entries(['PCE', 'ST'], ['CT', 'KAR']),
   },
 ]
 

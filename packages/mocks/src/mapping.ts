@@ -386,9 +386,10 @@ export function templateGraph(
   messageType: MessageType,
   share: number,
   idKey = 'transform',
+  extra: ReadonlyArray<TransformTemplate> = [],
 ): TransformGraph {
   const template = transformTemplates[messageType]
-  const chosen = template.slice(0, Math.round(template.length * share))
+  const chosen = [...template.slice(0, Math.round(template.length * share)), ...extra]
   const ids = chosen.map((_, index) => stableUuid(`${mappingId}:${idKey}:${index}`))
 
   const transformLinks = chosen.flatMap(
@@ -449,9 +450,12 @@ function templateDraftGraph(
   mappingId: string,
   messageType: MessageType,
   share: number,
-  { publishable = false } = {},
+  {
+    publishable = false,
+    extra = [],
+  }: { publishable?: boolean; extra?: ReadonlyArray<TransformTemplate> | undefined } = {},
 ) {
-  const template = templateGraph(mappingId, messageType, share)
+  const template = templateGraph(mappingId, messageType, share, 'transform', extra)
   const graph = publishable ? withoutInvalidTransforms(template) : template
   const filled = new Set(transformLinkTargets(graph.transformLinks))
 
@@ -486,6 +490,20 @@ function seedDraftStageOf(index: number) {
   return seedDraftStages[sameTypeBefore % seedDraftStages.length]!
 }
 
+// Elbtal orders in its own units, which only its Mapping translates.
+const partnerTransforms = new Map<string, ReadonlyArray<TransformTemplate>>([
+  [
+    'Elbtal: ORDERS to ERP JSON',
+    [
+      transformTemplate(
+        'lookupTable',
+        { lookupTableId: seedLookupTableNamed('Elbtal order units').id, fallback: 'fail' },
+        { inputs: { value: 'SG25/QTY+21/C186/6411' }, outputs: { value: 'lines[].unit' } },
+      ),
+    ],
+  ],
+])
+
 // Only this half-done Draft keeps its invalid transform, so publishing it answers 422.
 export const incompleteDraftId = seedMappings.find(
   ({ messageType }, index) =>
@@ -506,6 +524,7 @@ export const seedMappingDrafts: ReadonlyArray<MappingDraftRecord> = [
       unpublishedChanges,
       ...templateDraftGraph(mapping.mappingId, mapping.messageType, linkShare, {
         publishable: unpublishedChanges && mapping.mappingId !== incompleteDraftId,
+        extra: partnerTransforms.get(newest.mappingName),
       }),
       updatedAt: seedUpdatedAt(index),
     }

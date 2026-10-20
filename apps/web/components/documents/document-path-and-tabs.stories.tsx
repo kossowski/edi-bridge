@@ -18,6 +18,7 @@ import {
   controlReferenceOf,
   runDetailHandlers,
   seedMappingVersions,
+  seedTradingPartners,
   serializeSegment,
   toMappingVersionSummary,
 } from '@edi-bridge/mocks'
@@ -48,6 +49,10 @@ const replacing = storyRun(10, 'ORDERS', 'delivered')
 
 const invoice = storyRun(11, 'INVOIC', 'delivered')
 
+const elbtal = seedTradingPartners.find(({ name }) => name.startsWith('Elbtal'))!
+
+const missingUnit = storyRun(12, 'ORDERS', 'mapping', { tradingPartner: elbtal })
+
 const runs = [
   delivered,
   unreadable,
@@ -60,6 +65,7 @@ const runs = [
   replaced,
   replacing,
   invoice,
+  missingUnit,
 ]
 
 const largeLineCount = 600
@@ -337,6 +343,25 @@ export const ContentWithAmounts = meta.story({
   async play({ canvas }) {
     const table = await canvas.findByRole('region', { name: 'Lines of the document' })
     await expect(within(table).getByRole('columnheader', { name: 'Amount' })).toBeVisible()
+  },
+})
+
+export const ContentWithoutTranslation = meta.story({
+  ...contentTab,
+  args: { id: missingUnit.id },
+  async play({ canvas }) {
+    const table = await canvas.findByRole('region', { name: 'Lines of the document' })
+    await expect(within(table).getByText('KGM (no translation)')).toBeVisible()
+  },
+})
+
+export const GermanContentWithoutTranslation = meta.story({
+  ...contentTab,
+  args: { id: missingUnit.id },
+  decorators: [german],
+  async play({ canvas }) {
+    const table = await canvas.findByRole('region', { name: 'Positionen des Belegs' })
+    await expect(within(table).getByText('KGM (keine Übersetzung)')).toBeVisible()
   },
 })
 
