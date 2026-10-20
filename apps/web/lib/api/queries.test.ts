@@ -1,8 +1,15 @@
-import { MutationObserver, QueryClient } from '@tanstack/react-query'
+import {
+  focusManager,
+  MutationObserver,
+  onlineManager,
+  QueryClient,
+  QueryObserver,
+} from '@tanstack/react-query'
+import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
-import { type Task } from '@edi-bridge/contracts'
+import { lookupTableSuggestionsEndpoint, type Task } from '@edi-bridge/contracts'
 import {
   aiDraftHandlers,
   aiProposalFor,
@@ -19,6 +26,7 @@ import {
   withAiProposal,
 } from '@edi-bridge/mocks'
 
+import { retriesQuery } from './client'
 import { apiUrl } from './config'
 import {
   acceptAiProposedPartsMutation,
@@ -219,6 +227,49 @@ describe('lookupTableSuggestionsQuery', () => {
     const units = lookupTableSuggestionsQuery({ kind: 'units', language: 'en' })
 
     expect(units).toMatchObject({ staleTime: Infinity, gcTime: Infinity, retry: false })
+  })
+
+  describe('when the AI budget is used up', () => {
+    const server = setupServer()
+
+    beforeAll(() => server.listen({ onUnhandledFrame: 'error' }))
+
+    afterEach(() => {
+      server.resetHandlers()
+      server.events.removeAllListeners()
+      focusManager.setFocused(undefined)
+      onlineManager.setOnline(true)
+    })
+
+    afterAll(() => server.close())
+
+    it('fetches the suggestions once, also after a remount, a focus or a reconnect', async () => {
+      let requests = 0
+      server.use(
+        http.get(`${apiUrl}${lookupTableSuggestionsEndpoint.path}`, () =>
+          HttpResponse.json({ message: 'AI budget used up for today' }, { status: 429 }),
+        ),
+      )
+      server.events.on('request:start', () => requests++)
+
+      const queryClient = new QueryClient({ defaultOptions: { queries: { retry: retriesQuery } } })
+      const units = lookupTableSuggestionsQuery({ kind: 'units', language: 'en' })
+      const mounted = new QueryObserver(queryClient, units)
+      const unmount = mounted.subscribe(() => {})
+      await expect.poll(() => mounted.getCurrentResult().status).toBe('error')
+      unmount()
+
+      const remounted = new QueryObserver(queryClient, units)
+      remounted.subscribe(() => {})
+      focusManager.setFocused(false)
+      focusManager.setFocused(true)
+      onlineManager.setOnline(false)
+      onlineManager.setOnline(true)
+      await new Promise((resolve) => setTimeout(resolve, 20))
+
+      expect(requests).toBe(1)
+      expect(remounted.getCurrentResult().status).toBe('error')
+    })
   })
 })
 

@@ -547,6 +547,8 @@ export function lookupTableMissingCodesQuery(id: string, language: Language) {
 }
 
 // Each fetch spends AI budget, so the suggestions are fetched once and never again on their own.
+// An error leaves the query without data, so it is stale: no retry, mount, focus or reconnect
+// fetches it again.
 export function lookupTableSuggestionsQuery(query: LookupTableSuggestionsQuery) {
   return queryOptions({
     queryKey: lookupTableKeys.suggestions(query),
@@ -554,6 +556,9 @@ export function lookupTableSuggestionsQuery(query: LookupTableSuggestionsQuery) 
     staleTime: Infinity,
     gcTime: Infinity,
     retry: false,
+    retryOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   })
 }
 
