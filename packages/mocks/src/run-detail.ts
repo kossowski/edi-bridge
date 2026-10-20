@@ -174,8 +174,7 @@ function isReprocessable(
     run.problem !== null &&
     run.problem.whoFixes !== 'tradingPartner' &&
     run.mappingVersion !== null &&
-    run.replacedBy === null &&
-    run.documentDeletedAt === null
+    run.replacedBy === null
   )
 }
 
@@ -493,13 +492,13 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
         return problem(404, 'Not Found')
       }
 
-      // The api refuses a Defect without Document; a delivery failure keeps what it delivers.
-      if (run.problem?.reason === 'defect' && run.documentDeletedAt !== null) {
-        return problem(409, documentExpired)
-      }
-
       // Before delivery there is no finished Document to send again, so the Defect is reprocessed.
+      // A Retry at delivery keeps what it delivers and does not read the Document.
       if (run.problem?.reason === 'defect' && isReprocessable(run)) {
+        if (run.documentDeletedAt !== null) {
+          return problem(409, documentExpired)
+        }
+
         reprocess(run, run.mappingVersion)
 
         return HttpResponse.json(detail(run.id))

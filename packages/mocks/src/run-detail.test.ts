@@ -1062,14 +1062,18 @@ describe('a Run whose Document expired', () => {
     return { status: response.status, body: await response.json() }
   }
 
-  it('serves when retention deleted its Document', async () => {
-    const run = inboundOrders('00000000-0000-4000-8000-000000000001', { failureStage: 'mapping' })
+  function serveExpired(run: RunSummary) {
     server.use(
       ...runDetailHandlers(apiUrl, {
         runs: [run],
         documentDeletedAt: new Map([[run.id, deletedAt]]),
       }),
     )
+  }
+
+  it('serves when retention deleted its Document', async () => {
+    const run = inboundOrders('00000000-0000-4000-8000-000000000001', { failureStage: 'mapping' })
+    serveExpired(run)
 
     const { body } = await getRun(run.id)
 
@@ -1078,12 +1082,7 @@ describe('a Run whose Document expired', () => {
 
   it('refuses a Reprocess with a Conflict that names the expired Document', async () => {
     const run = inboundOrders('00000000-0000-4000-8000-000000000001', { failureStage: 'mapping' })
-    server.use(
-      ...runDetailHandlers(apiUrl, {
-        runs: [run],
-        documentDeletedAt: new Map([[run.id, deletedAt]]),
-      }),
-    )
+    serveExpired(run)
     const { body: before } = await getRun(run.id)
     const [latest] = await versionsOf(before!.mappingVersion!.mappingId)
 
@@ -1098,16 +1097,28 @@ describe('a Run whose Document expired', () => {
 
   it('refuses to try a Defect again with a Conflict that names the expired Document', async () => {
     const run = defectRun()
-    server.use(
-      ...runDetailHandlers(apiUrl, {
-        runs: [run],
-        documentDeletedAt: new Map([[run.id, deletedAt]]),
-      }),
-    )
+    serveExpired(run)
 
     const answer = await refusal(toPath(retryRunEndpoint.path, { id: run.id }))
 
     expect(answer).toEqual({ status: 409, body: { message: documentExpired } })
+  })
+
+  it('retries a Defect at delivery, which sends again what it delivers', async () => {
+    const run: RunSummary = {
+      ...inboundOrders('00000000-0000-4000-8000-0000000000d2', { failureStage: 'delivery' }),
+      status: 'failed',
+      failureStage: 'delivery',
+      problem: { reason: 'defect' },
+    }
+
+    serveExpired(run)
+    expect((await getRun(run.id)).body?.problem?.reason).toBe('defect')
+
+    const { status, body } = await post(toPath(retryRunEndpoint.path, { id: run.id }))
+
+    expect(status).toBe(200)
+    expect(body).toMatchObject({ id: run.id, status: 'received', replacedBy: null })
   })
 
   it('seeds a failed mapping Run that the Workspace would reprocess, deleted after its receipt', async () => {
