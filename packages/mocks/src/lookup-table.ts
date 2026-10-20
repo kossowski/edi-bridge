@@ -46,7 +46,7 @@ import { aiBudgetOf } from './ai-budget'
 import { type ChannelRecord, type ChannelStore, seedChannels, toChannelStore } from './channel'
 import { type FlowRecord, type FlowStore, seedFlows, toFlowStore } from './flow'
 import { lookupTableFailureOf } from './interchange'
-import { aiHintFor, firstValuesOf, hintFor, knownMeaningOf } from './lookup-table-codes'
+import { aiHintOf, firstValuesOf, knownMeaningOf, ownCodeHintOf } from './lookup-table-codes'
 import {
   type LookupTableRecord,
   type LookupTableStore,
@@ -329,7 +329,7 @@ export function createLookupTableUsage(
       .map(([code, references]) => ({
         urgency: 'blocking' as const,
         code,
-        ...hintFor(table.kind, code, language),
+        ...ownCodeHintOf(table.kind, code, language),
         failedRuns: references.toSorted(newestFirst),
       }))
       .toSorted((a, b) => newestFirst(a.failedRuns[0]!, b.failedRuns[0]!))
@@ -339,7 +339,14 @@ export function createLookupTableUsage(
       .flatMap(({ code, itemCount }): MissingCode[] =>
         translated.has(code) || failedRuns.has(code)
           ? []
-          : [{ urgency: 'upcoming', code, ...hintFor(table.kind, code, language), itemCount }],
+          : [
+              {
+                urgency: 'upcoming',
+                code,
+                ...ownCodeHintOf(table.kind, code, language),
+                itemCount,
+              },
+            ],
       )
 
     return [...blocking, ...upcoming]
@@ -570,14 +577,17 @@ export function lookupTableHandlers(
         }
 
         const { language } = query.data
-        const hintOf = missingCodeHintsNotice ? knownMeaningOf : aiHintFor
+
+        const { hintOf, notice } = missingCodeHintsNotice
+          ? { hintOf: knownMeaningOf, notice: missingCodeHintsNotices[missingCodeHintsNotice] }
+          : { hintOf: aiHintOf, notice: null }
 
         return HttpResponse.json({
           hints: usageOf(table, language).missingCodes.map(({ code }) => ({
             code,
             ...hintOf(table.kind, code, language),
           })),
-          notice: missingCodeHintsNotice ? missingCodeHintsNotices[missingCodeHintsNotice] : null,
+          notice,
         })
       }),
     ),

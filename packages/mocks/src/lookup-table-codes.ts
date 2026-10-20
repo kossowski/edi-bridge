@@ -44,7 +44,7 @@ export function knownMeaningOf(kind: LookupTableKind, code: string, language: La
   return { meaning, suggestions: meaning === null ? [] : [{ code, meaning }] }
 }
 
-function ownCodeHintOf(kind: LookupTableKind, code: string, language: Language) {
+function findOwnCodeHint(kind: LookupTableKind, code: string, language: Language) {
   const hint = ownCodeHints[kind].get(code)
 
   if (!hint) {
@@ -57,13 +57,12 @@ function ownCodeHintOf(kind: LookupTableKind, code: string, language: Language) 
   }
 }
 
-// The missing codes read keeps the own-code hints until the screen asks the AI for them.
-export function hintFor(kind: LookupTableKind, code: string, language: Language) {
-  return ownCodeHintOf(kind, code, language) ?? { meaning: null, suggestions: [] }
+export function ownCodeHintOf(kind: LookupTableKind, code: string, language: Language) {
+  return findOwnCodeHint(kind, code, language) ?? { meaning: null, suggestions: [] }
 }
 
-export function aiHintFor(kind: LookupTableKind, code: string, language: Language) {
-  return ownCodeHintOf(kind, code, language) ?? knownMeaningOf(kind, code, language)
+export function aiHintOf(kind: LookupTableKind, code: string, language: Language) {
+  return findOwnCodeHint(kind, code, language) ?? knownMeaningOf(kind, code, language)
 }
 
 export function firstValuesOf(kind: LookupTableKind, language: Language): SuggestedEntry[] {
