@@ -1513,48 +1513,6 @@
         "sftp": "SFTP",
         "webhook": "Webhook",
         "http": "HTTP"
-      },
-      "test": {
-        "button": "Test connection",
-        "pending": "Testing…",
-        "pendingStatus": "Testing {name}…",
-        "succeeded": "The connection works.",
-        "testedAt": "Tested <when>{time}</when>.",
-        "requestFailed": "The test could not run. Try again.",
-        "failed": {
-          "hostKeyMismatch": {
-            "title": "The server showed a different key.",
-            "hint": "The server's key is not the one you confirmed, so EDI Bridge did not log in. Ask the other side's IT team whether they replaced their server or its key before you accept the new one."
-          },
-          "loginRejected": {
-            "title": "Login was rejected.",
-            "hint": "Check the username and the password or key. The other side's IT team can confirm them."
-          },
-          "hostUnreachable": {
-            "title": "The server could not be reached.",
-            "hint": "Check the server address, and ask the other side's IT team whether their firewall lets EDI Bridge in."
-          },
-          "timedOut": {
-            "title": "The server did not answer in time.",
-            "hint": "Try again in a few minutes. If it keeps happening, ask the other side's IT team whether the server is running."
-          },
-          "remotePathMissing": {
-            "title": "The folder does not exist.",
-            "hint": "Check the folder path. The other side's IT team can tell you the right one."
-          },
-          "permissionDenied": {
-            "title": "EDI Bridge may not use the folder.",
-            "hint": "Ask the other side's IT team to allow this user to read and write in the folder."
-          },
-          "unexpectedResponse": {
-            "title": "The server answered in an unexpected way.",
-            "hint": "Check the address. If it is right, ask the other side's IT team to look at their server's log."
-          },
-          "seededChannel": {
-            "title": "This is a demo connection.",
-            "hint": "A demo connection never sends, so there is nothing to test."
-          }
-        }
       }
     },
     "addDocument": {
@@ -1966,6 +1924,67 @@
       "set": "Set",
       "notSet": "None",
       "endsIn": "Ends in {lastFour}"
+    },
+    "hostKey": {
+      "title": "Host key",
+      "confirmed": "EDI Bridge connects only to a server that shows this key.",
+      "unchecked": {
+        "title": "The server's key is not checked yet.",
+        "description": "Until a key is confirmed, EDI Bridge connects to whichever server answers at this address. Test the connection to see the server's key and accept it, or paste the key when you edit the Channel."
+      }
+    },
+    "test": {
+      "button": "Test connection",
+      "pending": "Testing…",
+      "pendingStatus": "Testing {name}…",
+      "succeeded": "The connection works.",
+      "testedAt": "Tested <when>{time}</when>.",
+      "requestFailed": "The test could not run. Try again.",
+      "failed": {
+        "hostKeyMismatch": {
+          "title": "The server showed a different key.",
+          "hint": "The server's key is not the one you confirmed, so EDI Bridge did not log in. Ask the other side's IT team whether they replaced their server or its key before you accept the new one."
+        },
+        "loginRejected": {
+          "title": "Login was rejected.",
+          "hint": "Check the username and the password or key. The other side's IT team can confirm them."
+        },
+        "hostUnreachable": {
+          "title": "The server could not be reached.",
+          "hint": "Check the server address, and ask the other side's IT team whether their firewall lets EDI Bridge in."
+        },
+        "timedOut": {
+          "title": "The server did not answer in time.",
+          "hint": "Try again in a few minutes. If it keeps happening, ask the other side's IT team whether the server is running."
+        },
+        "remotePathMissing": {
+          "title": "The folder does not exist.",
+          "hint": "Check the folder path. The other side's IT team can tell you the right one."
+        },
+        "permissionDenied": {
+          "title": "EDI Bridge may not use the folder.",
+          "hint": "Ask the other side's IT team to allow this user to read and write in the folder."
+        },
+        "unexpectedResponse": {
+          "title": "The server answered in an unexpected way.",
+          "hint": "Check the address. If it is right, ask the other side's IT team to look at their server's log."
+        },
+        "seededChannel": {
+          "title": "This is a demo connection.",
+          "hint": "A demo connection never sends, so there is nothing to test."
+        }
+      },
+      "hostKey": {
+        "matches": "The server showed the confirmed key.",
+        "unchecked": "Compare this key with the fingerprint the other side's IT team gives you before you accept it.",
+        "shown": "Key the server showed",
+        "confirmed": "Confirmed key",
+        "accept": "Accept this key",
+        "acceptNew": "Accept the new key",
+        "accepting": "Accepting…",
+        "accepted": "Key accepted. EDI Bridge checks it on every connection.",
+        "acceptFailed": "The key could not be accepted. Try again."
+      }
     },
     "webhook": {
       "title": "Webhook",
