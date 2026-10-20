@@ -404,27 +404,59 @@ describe('POST /document-structures', () => {
     return post(createDocumentStructureEndpoint.path, body)
   }
 
-  it('saves the confirmed and renamed plain names, none of them unsure', async () => {
+  it('saves the chosen names with their reasons, none of them unsure', async () => {
     useHandlers()
 
     const response = await create(documentStructureOrigins.invoiceCsvDocument, 'Invoices', [
-      { path: 'rows[].EPreis', label: 'Unit price' },
+      {
+        path: 'rows[].EPreis',
+        label: 'Net unit price',
+        labelReason: 'EPreis is short for Einzelpreis, the price of one unit.',
+      },
       { path: 'rows[].ME', label: 'Unit of measure' },
     ])
 
     const created = createDocumentStructureEndpoint.response.parse(await response.json())
 
     expect(nodeAt(created.children, 'rows[].EPreis')).toMatchObject({
-      label: 'Unit price',
+      label: 'Net unit price',
+      labelReason: 'EPreis is short for Einzelpreis, the price of one unit.',
       labelUnsure: false,
     })
-    expect(nodeAt(created.children, 'rows[].EPreis')?.labelReason).toContain('Einzelpreis')
     expect(nodeAt(created.children, 'rows[].ME')).toMatchObject({
       label: 'Unit of measure',
       labelReason: null,
       labelUnsure: false,
     })
     expect(created.sample).toMatchObject({ fileName: 'Rechnungsexport_2026-10-08.csv' })
+  })
+
+  it('keeps the plain name and reason of a node it was given no name for', async () => {
+    useHandlers()
+
+    const response = await create(documentStructureOrigins.invoiceCsvDocument, 'Invoices', [
+      { path: 'rows[].ME', label: 'Unit of measure', labelReason: null },
+    ])
+
+    const created = createDocumentStructureEndpoint.response.parse(await response.json())
+
+    expect(nodeAt(created.children, 'rows[].RechNr')).toMatchObject({
+      label: 'Invoice number',
+      labelUnsure: false,
+    })
+    expect(nodeAt(created.children, 'rows[].RechNr')?.labelReason).toContain('Rechnungsnummer')
+  })
+
+  it('answers 400 for an empty reason of a chosen name', async () => {
+    useHandlers()
+
+    const response = await post(createDocumentStructureEndpoint.path, {
+      name: 'Invoices',
+      origin: documentStructureOrigins.invoiceCsvDocument,
+      labels: [{ path: 'rows[].ME', label: 'Unit of measure', labelReason: ' ' }],
+    })
+
+    expect(response.status).toBe(400)
   })
 
   it('answers unknownPath for a plain name of a node it does not have', async () => {

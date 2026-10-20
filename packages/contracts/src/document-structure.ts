@@ -383,11 +383,14 @@ function onePerPath(entries: ReadonlyArray<{ path: string }>) {
   return new Set(entries.map(({ path }) => path)).size === entries.length
 }
 
-// A plain name the same as the inferred one confirms it and keeps its reason; another one renames
-// the field by hand and has no reason. Either way the name is no longer unsure.
-export const fieldLabelChoiceSchema = z.object({ path: z.string().min(1), label: fieldLabelSchema })
+// A null reason marks a name chosen by hand. A chosen name is never unsure.
+export const fieldLabelChoiceSchema = z.object({
+  path: z.string().min(1),
+  label: fieldLabelSchema,
+  labelReason: z.string().trim().min(1).nullable().default(null),
+})
 
-export type FieldLabelChoice = z.infer<typeof fieldLabelChoiceSchema>
+export type FieldLabelChoice = z.input<typeof fieldLabelChoiceSchema>
 
 export const createDocumentStructureBodySchema = z.object({
   name: structureName,
@@ -398,7 +401,7 @@ export const createDocumentStructureBodySchema = z.object({
     .optional(),
 })
 
-export type CreateDocumentStructureBody = z.infer<typeof createDocumentStructureBodySchema>
+export type CreateDocumentStructureBody = z.input<typeof createDocumentStructureBodySchema>
 
 export const createDocumentStructureEndpoint: Endpoint<
   DocumentStructure,

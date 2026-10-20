@@ -461,6 +461,34 @@ describe('createDocumentStructureBodySchema', () => {
     expect(createDocumentStructureBodySchema.safeParse(body).success).toBe(true)
   })
 
+  it('takes a chosen name with the reason it was given', () => {
+    const body = createDocumentStructureBodySchema.parse({
+      name: 'ERP dispatch export',
+      origin: { kind: 'jsonDocument', document },
+      labels: [
+        { path: 'rows[].Menge', label: 'Quantity', labelReason: 'Menge is German for quantity.' },
+        { path: 'rows[].ME', label: 'Unit of measure', labelReason: null },
+        { path: 'rows[].EPreis', label: 'Unit price' },
+      ],
+    })
+
+    expect(body.labels?.map(({ labelReason }) => labelReason)).toEqual([
+      'Menge is German for quantity.',
+      null,
+      null,
+    ])
+  })
+
+  it('rejects an empty reason for a chosen name', () => {
+    const body = {
+      name: 'ERP dispatch export',
+      origin: { kind: 'jsonDocument', document },
+      labels: [{ path: 'rows[].ME', label: 'Unit of measure', labelReason: '' }],
+    }
+
+    expect(createDocumentStructureBodySchema.safeParse(body).success).toBe(false)
+  })
+
   it('rejects two plain names for the same path', () => {
     const body = {
       name: 'ERP dispatch export',

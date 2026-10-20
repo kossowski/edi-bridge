@@ -11,6 +11,7 @@ import {
 } from './document-structure'
 import {
   adjustDocumentStructure,
+  applyLabels,
   decodeText,
   DocumentStructureProblemError,
   findNode,
@@ -212,6 +213,56 @@ describe('plain names', () => {
       label: 'Article number',
       labelUnsure: false,
     })
+  })
+})
+
+describe('applyLabels', () => {
+  const invoices = inferDocumentStructure(documentStructureOrigins.invoiceCsvDocument)
+
+  it('stores a chosen name with its reason, no longer unsure', () => {
+    const named = applyLabels(invoices, [
+      {
+        path: 'rows[].ME',
+        label: 'Unit of measure',
+        labelReason: 'Values KRT and ST are UN/ECE unit codes.',
+      },
+    ])
+
+    expect(at(named, 'rows[].ME')).toMatchObject({
+      label: 'Unit of measure',
+      labelReason: 'Values KRT and ST are UN/ECE unit codes.',
+      labelUnsure: false,
+    })
+  })
+
+  it('stores a name chosen without a reason as named by hand', () => {
+    const named = applyLabels(invoices, [
+      { path: 'rows[].EPreis', label: 'Unit price' },
+      { path: 'rows[].ME', label: 'Unit', labelReason: null },
+    ])
+
+    expect(at(named, 'rows[].EPreis')).toMatchObject({
+      label: 'Unit price',
+      labelReason: null,
+      labelUnsure: false,
+    })
+    expect(at(named, 'rows[].ME')).toMatchObject({
+      label: 'Unit',
+      labelReason: null,
+      labelUnsure: false,
+    })
+  })
+
+  it('keeps the plain name of a node it was given no name for', () => {
+    const named = applyLabels(invoices, [{ path: 'rows[].ME', label: 'Unit of measure' }])
+
+    expect(at(named, 'rows[].EPreis')).toEqual(at(invoices, 'rows[].EPreis'))
+  })
+
+  it('answers unknownPath for a name of a node the structure does not have', () => {
+    expect(
+      problemOf(() => applyLabels(invoices, [{ path: 'rows[].Rabatt', label: 'Discount' }])),
+    ).toMatchObject({ code: 'unknownPath', path: 'rows[].Rabatt' })
   })
 })
 
