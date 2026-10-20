@@ -203,6 +203,20 @@ describe('GET /events', () => {
     await expect(framesOf(response)(isEvent)).rejects.toThrow('The stream ended')
   })
 
+  it('ends the stream of a client that stops reading', async () => {
+    const listening = api.liveEvents.listening()
+    const response = await openStream(api.admin)
+
+    for (let index = 0; index < 3000; index += 1) {
+      await publish(ownWorkspace.id, changed(`PO${String(index).padStart(6, '0')}`))
+    }
+
+    await vi.waitFor(() => {
+      expect(api.liveEvents.listening()).toBe(listening)
+    })
+    await expect(framesOf(response)(() => false)).rejects.toThrow()
+  })
+
   it('ends its open streams when the api closes', async () => {
     const liveEvents = memoryLiveEvents()
 

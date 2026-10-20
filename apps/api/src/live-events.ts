@@ -27,6 +27,9 @@ const eventStreamHeaders = {
   'x-accel-buffering': 'no',
 }
 
+// A client that stops reading reconnects and refetches instead of growing the buffer without bound.
+const maxBufferedBytes = 1024 * 1024
+
 const frame = (event: LiveEvent) => `data:${JSON.stringify(event)}\n\n`
 
 export function liveEventStreams(hub: LiveEventHub, heartbeatMs: number) {
@@ -38,6 +41,11 @@ export function liveEventStreams(hub: LiveEventHub, heartbeatMs: number) {
 
       const unsubscribe = hub.subscribe(workspaceId, (event) => {
         stream.write(frame(event))
+
+        // Ending the stream would queue behind the unread bytes, so the response goes at once.
+        if (stream.writableLength > maxBufferedBytes) {
+          reply.raw.destroy()
+        }
       })
 
       let checking = false
