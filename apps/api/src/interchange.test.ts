@@ -517,6 +517,43 @@ describe('GET /interchanges/:id', () => {
     })
   })
 
+  it('shows a received Interchange whose UNB no longer reads, without its parties', async () => {
+    const partner = await addTradingPartner(workspace, 'Moselgut AG', '4012345000115')
+
+    const document = await partner.storeDocument({
+      // As read from bytes whose first character is not valid in the named character set.
+      content: `\uFFFD${interchangeOf('4012345000115', workspaceGln, 'MOS1', [
+        { reference: 'PO-1', messageType: 'ORDERS' },
+      ]).slice(1)}`,
+      interchangeSender: '4012345000115',
+      interchangeControlReference: 'MOS1',
+    })
+
+    const run = await partner.addRun({
+      documentId: document.id,
+      flowId: partner.orders.id,
+      status: 'failed',
+      failureStage: 'parse',
+      problem: { reason: 'unreadable', fixTarget: null },
+      error: {
+        code: 'missing-interchange-trailer',
+        message: 'No UNZ',
+        position: null,
+        details: null,
+      },
+      messageIndex: 1,
+    })
+
+    const response = await loaded(document.id)
+
+    expect(response.statusCode, response.body).toBe(200)
+    expect(interchangeSchema.parse(response.json())).toMatchObject({
+      sender: { identification: null, name: 'Moselgut AG' },
+      receiver: { identification: null, name: 'Nordwind Foods' },
+      runs: [{ id: run.id, messageReference: null }],
+    })
+  })
+
   it('answers 404 for a Run without an Interchange, an unknown id and another Workspace', async () => {
     const partner = await addTradingPartner(workspace, 'Harzgold KG', '4012345000078')
 

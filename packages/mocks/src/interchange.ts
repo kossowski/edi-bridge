@@ -266,14 +266,15 @@ const messageVersions: Readonly<Record<MessageType, string>> = {
   CONTRL: '',
 }
 
-export const ownCompany: InterchangeParty = {
+// Every seeded UNB is readable, so each party has its identification.
+type SeedParty = InterchangeParty & { identification: string }
+
+export const ownCompany: SeedParty = {
   identification: seedWorkspace.gln!,
   name: seedWorkspace.name,
 }
 
-export function tradingPartnerParty(
-  tradingPartner: RunSummary['tradingPartner'],
-): InterchangeParty {
+export function tradingPartnerParty(tradingPartner: RunSummary['tradingPartner']): SeedParty {
   return {
     identification: seedGln(tradingPartner.id),
     name: tradingPartner.name,
@@ -596,7 +597,7 @@ function failureOf(run: RunSummary, faker: Faker, { fault, broken }: FaultyMessa
   }
 }
 
-type Parties = { sender: InterchangeParty; receiver: InterchangeParty }
+type Parties = { sender: SeedParty; receiver: SeedParty }
 
 export function partiesOf(run: RunSummary): Parties {
   const tradingPartner = tradingPartnerParty(run.tradingPartner)

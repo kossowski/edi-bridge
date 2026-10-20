@@ -9,8 +9,8 @@ import { tradingPartnerSummarySchema } from './trading-partner'
 import type { Endpoint } from './endpoint'
 
 export const interchangePartySchema = z.object({
-  // UNB 0004 and 0010 name a party by any identification, a GLN for EANCOM.
-  identification: z.string().min(1).max(35),
+  // Any UNB 0004 or 0010 identification, a GLN in EANCOM; null when the UNB can't be read.
+  identification: z.string().min(1).max(35).nullable(),
   name: z.string().min(1),
 })
 

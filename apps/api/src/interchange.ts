@@ -215,13 +215,8 @@ const rawOf = async (db: Database, { id, direction }: InterchangeRow) => {
   return run?.output ?? undefined
 }
 
-const presentOrThrow = (value: string | undefined, missing: string) => {
-  if (value === undefined || value === '') {
-    throw new Error(missing)
-  }
-
-  return value
-}
+const presentOrNull = (value: string | undefined) =>
+  value === undefined || value === '' ? null : value
 
 export const loadInterchange = (id: string) =>
   Effect.gen(function* () {
@@ -252,18 +247,12 @@ export const loadInterchange = (id: string) =>
       throw new Error(`Interchange ${id} has no raw text`)
     }
 
-    // Receipt read the keys from this header, so it reads again though a later segment breaks.
+    // Receipt accepted this header, so a later broken segment must not fail the read.
     const { header, messages } = readInterchange(raw)
     const tradingPartner = { name: row.tradingPartnerName }
     const ownCompany = { name: own.name }
-
-    const sender = {
-      identification: presentOrThrow(header?.elements[1]?.[0], `Interchange ${id} has no sender`),
-    }
-
-    const receiver = {
-      identification: presentOrThrow(header?.elements[2]?.[0], `Interchange ${id} has no receiver`),
-    }
+    const sender = { identification: presentOrNull(header?.elements[1]?.[0]) }
+    const receiver = { identification: presentOrNull(header?.elements[2]?.[0]) }
 
     // An outbound Run, a test send too, has no Message Index: its Interchange holds one Message.
     const onlyMessage = 1
