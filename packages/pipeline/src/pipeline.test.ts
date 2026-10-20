@@ -3234,6 +3234,148 @@ describe('the Acknowledgement of a sent Interchange', () => {
     })
   })
 
+  describe('the onboarding of a Trading Partner in Test Mode', () => {
+    const setTestMode = (into: InvoiceWorkspace, testMode: boolean) =>
+      connection.db
+        .update(tradingPartners)
+        .set({ testMode })
+        .where(eq(tradingPartners.id, into.tradingPartnerId))
+
+    const testingWorkspace = async (name: string) => {
+      const into = await acknowledgingWorkspace(name)
+
+      await setTestMode(into, true)
+
+      return into
+    }
+
+    const onboardingOf = async (into: InvoiceWorkspace) => {
+      const [onboarding] = await connection.db
+        .select({
+          testInterchangeSentAt: tradingPartners.testInterchangeSentAt,
+          contrlReceivedAt: tradingPartners.contrlReceivedAt,
+        })
+        .from(tradingPartners)
+        .where(eq(tradingPartners.id, into.tradingPartnerId))
+
+      return onboarding
+    }
+
+    it('records the handover of the first test Interchange', async () => {
+      const into = await testingWorkspace('First Test Foods')
+      const sent = await sendInvoice(into)
+
+      expect(sent?.handedOverAt).toBeInstanceOf(Date)
+      await expect(onboardingOf(into)).resolves.toEqual({
+        testInterchangeSentAt: sent?.handedOverAt,
+        contrlReceivedAt: null,
+      })
+    })
+
+    it('keeps the handover of the first test Interchange', async () => {
+      const into = await testingWorkspace('Second Test Foods')
+      const first = await sendInvoice(into)
+
+      await sendInvoice(into)
+
+      await expect(onboardingOf(into)).resolves.toMatchObject({
+        testInterchangeSentAt: first?.handedOverAt,
+      })
+    })
+
+    it('records no test Interchange that the Channel did not take', async () => {
+      const into = await testingWorkspace('Unreachable Test Foods')
+
+      await connection.db
+        .update(channels)
+        .set({ url: `${erp.url}?status=503` })
+        .where(eq(channels.id, into.outboundChannelId))
+      await sendInvoice(into)
+
+      await expect(onboardingOf(into)).resolves.toMatchObject({ testInterchangeSentAt: null })
+    })
+
+    it('records the receipt of the first accepting CONTRL to a test Interchange', async () => {
+      const into = await testingWorkspace('Confirmed Test Foods')
+      const sent = await sendInvoice(into)
+
+      const contrl = await receiveContrl(into, contrlOf(String(sent?.controlReference), '7'))
+
+      expect(contrl?.receivedAt).toBeInstanceOf(Date)
+      await expect(onboardingOf(into)).resolves.toMatchObject({
+        contrlReceivedAt: contrl?.receivedAt,
+      })
+    })
+
+    it('keeps the receipt of the first accepting CONTRL', async () => {
+      const into = await testingWorkspace('Twice Confirmed Test Foods')
+      const first = await sendInvoice(into)
+      const second = await sendInvoice(into)
+
+      const contrl = await receiveContrl(into, contrlOf(String(first?.controlReference), '7'))
+
+      await receiveContrl(into, contrlOf(String(second?.controlReference), '7'))
+
+      await expect(onboardingOf(into)).resolves.toMatchObject({
+        contrlReceivedAt: contrl?.receivedAt,
+      })
+    })
+
+    it.each([
+      ['rejects the test Interchange', (reference: number) => contrlOf(String(reference), '4')],
+      [
+        'acknowledges another Interchange',
+        (reference: number) => contrlOf(String(reference + 1), '7'),
+      ],
+      [
+        'comes from another sender',
+        (reference: number) => contrlOf(String(reference), '7', { sender: '4012345000016' }),
+      ],
+    ])('records no receipt of a CONTRL that %s', async (description, contrlFor) => {
+      const into = await testingWorkspace(`Unconfirmed Test Foods ${description}`)
+      const sent = await sendInvoice(into)
+
+      await receiveContrl(into, contrlFor(sent?.controlReference ?? 0))
+
+      await expect(onboardingOf(into)).resolves.toMatchObject({ contrlReceivedAt: null })
+    })
+
+    it('records no receipt of an accepting CONTRL after an earlier rejecting one', async () => {
+      const into = await testingWorkspace('Rejected Test Foods')
+      const sent = await sendInvoice(into)
+
+      await receiveContrl(into, contrlOf(String(sent?.controlReference), '4'))
+      await receiveContrl(into, contrlOf(String(sent?.controlReference), '7'))
+
+      await expect(onboardingOf(into)).resolves.toMatchObject({ contrlReceivedAt: null })
+    })
+
+    it('records no onboarding step once the Trading Partner is in production', async () => {
+      const into = await testingWorkspace('Live Test Foods')
+
+      await setTestMode(into, false)
+
+      const sent = await sendInvoice(into)
+
+      await receiveContrl(into, contrlOf(String(sent?.controlReference), '7'))
+
+      await expect(onboardingOf(into)).resolves.toEqual({
+        testInterchangeSentAt: null,
+        contrlReceivedAt: null,
+      })
+    })
+
+    it('records no receipt of a CONTRL that arrives after the switch to production', async () => {
+      const into = await testingWorkspace('Switched Test Foods')
+      const sent = await sendInvoice(into)
+
+      await setTestMode(into, false)
+      await receiveContrl(into, contrlOf(String(sent?.controlReference), '7'))
+
+      await expect(onboardingOf(into)).resolves.toMatchObject({ contrlReceivedAt: null })
+    })
+  })
+
   describe('the Overdue check', () => {
     const limitHours = 24
 

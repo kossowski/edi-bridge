@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, exists, gt, inArray, lt, notExists } from 'drizzle-orm'
+import { and, asc, desc, eq, exists, gt, inArray, isNull, lt, notExists } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import { Data, DateTime, Effect, Match, Predicate, Ref, Result } from 'effect'
 import { z } from 'zod'
@@ -490,13 +490,35 @@ type Destination = Effect.Success<ReturnType<typeof loadDestination>>
 
 type ClaimedRun = typeof runs.$inferSelect
 
+type OnboardingStep = 'testInterchangeSentAt' | 'contrlReceivedAt'
+
+// Traffic completes an onboarding step only in Test Mode, and only the first time.
+const recordOnboardingStep = (
+  tx: Transaction,
+  workspaceId: string,
+  tradingPartnerIds: ReadonlyArray<string | null>,
+  step: OnboardingStep,
+  at: Date,
+) =>
+  tx
+    .update(tradingPartners)
+    .set({ [step]: at })
+    .where(
+      and(
+        eq(tradingPartners.workspaceId, workspaceId),
+        inArray(tradingPartners.id, tradingPartnerIds.filter(Predicate.isNotNull)),
+        eq(tradingPartners.testMode, true),
+        isNull(tradingPartners[step]),
+      ),
+    )
+
 // A defect after the hand-over leaves the Run failed at delivery, and its Retry must not deliver again.
 const handOver = (
   run: ClaimedRun,
   lease: StepLease,
   channel: Destination['channel'],
   document: OutboundDocument,
-  acknowledgementState?: 'pending',
+  { isInterchange = false }: { isInterchange?: boolean } = {},
 ) =>
   Effect.gen(function* () {
     if (run.handedOverAt !== null) {
@@ -516,7 +538,22 @@ const handOver = (
 
     // Recorded even when the sweep failed the Run meanwhile, so its Retry does not hand it over again.
     yield* Effect.promise(() =>
-      db.update(runs).set({ acknowledgementState, handedOverAt }).where(eq(runs.id, run.id)),
+      db.transaction(async (tx) => {
+        await tx
+          .update(runs)
+          .set({ acknowledgementState: isInterchange ? 'pending' : undefined, handedOverAt })
+          .where(eq(runs.id, run.id))
+
+        if (isInterchange) {
+          await recordOnboardingStep(
+            tx,
+            run.workspaceId,
+            [run.tradingPartnerId],
+            'testInterchangeSentAt',
+            handedOverAt,
+          )
+        }
+      }),
     )
   })
 
@@ -609,7 +646,7 @@ const deliverInterchange =
           mediaType: 'application/edifact',
           isRetry,
         },
-        'pending',
+        { isInterchange: true },
       )
     })
 
@@ -1308,8 +1345,9 @@ const acknowledge = async (
   tx: Transaction,
   workspaceId: string,
   { sender, controlReference, state }: Acknowledgement,
+  receivedAt: Date,
 ) => {
-  await tx
+  const acknowledged = await tx
     .update(runs)
     .set({ acknowledgementState: state })
     .where(
@@ -1329,6 +1367,20 @@ const acknowledge = async (
         ),
       ),
     )
+    .returning({ tradingPartnerId: runs.tradingPartnerId })
+
+  // The Trading Partner's system could read the test only when its CONTRL accepts the Interchange.
+  if (state !== 'accepted' || acknowledged.length === 0) {
+    return
+  }
+
+  await recordOnboardingStep(
+    tx,
+    workspaceId,
+    acknowledged.map(({ tradingPartnerId }) => tradingPartnerId),
+    'contrlReceivedAt',
+    receivedAt,
+  )
 }
 
 const processInbound = ({
@@ -1365,7 +1417,7 @@ const processInbound = ({
       async (tx) => {
         // An invalid CONTRL acknowledges nothing.
         if (acknowledgement !== undefined) {
-          await acknowledge(tx, queued.workspaceId, acknowledgement)
+          await acknowledge(tx, queued.workspaceId, acknowledgement, run.receivedAt)
         }
       },
     )
