@@ -5,19 +5,23 @@ import {
   applyLookupTableImport,
   type BlockingMissingCode,
   classifyLookupTableImport,
+  codeMeaningOf,
+  codeMeaningsOf,
+  defaultLanguage,
+  type Language,
   type LookupTable,
   type LookupTableEntry,
   type LookupTableImportBody,
   type LookupTableImportPreview,
   type LookupTableInput,
   type LookupTableScope,
+  type LookupTableKind,
   type LookupTableScopeInput,
   type LookupTableSuggestions,
   type LookupTableSuggestionsQuery,
   lookupTableInUseMessage,
   type LookupTableSummary,
   type LookupTableUse,
-  type MissingCode,
 } from '@edi-bridge/contracts'
 import {
   lookupTableEntries,
@@ -30,7 +34,7 @@ import {
 import { Db, type Database, type Transaction } from './db.js'
 import { Conflict, NotFound } from './errors.js'
 import { lookupTableUnused, selectLookupTableUses, selectUsesOfLookupTable } from './mapping-use.js'
-import { selectBlockingCodes } from './missing-code.js'
+import { type BlockingCodeRuns, selectBlockingCodes } from './missing-code.js'
 import {
   byName,
   foundOrNotFound,
@@ -68,7 +72,7 @@ const scopeOf = ({ tradingPartnerId, tradingPartnerName }: Row): LookupTableScop
 const toSummary = (
   row: Row,
   uses: LookupTableUse[],
-  blocking: BlockingMissingCode[],
+  blocking: BlockingCodeRuns[],
 ): LookupTableSummary => ({
   id: row.id,
   name: row.name,
@@ -138,6 +142,7 @@ const selectLookupTable = async (
   db: Database | Transaction,
   workspaceId: string,
   id: string,
+  language: Language = defaultLanguage,
 ): Promise<LookupTable | undefined> => {
   const [row] = await selectRows(
     db,
@@ -153,15 +158,20 @@ const selectLookupTable = async (
     selectBlockingCodes(db, workspaceId, row.id),
   ])
 
+  const entries = await selectEntries(db, row.id)
+
   return {
     ...toSummary(row, uses, blockingOf(row.id)),
-    entries: await selectEntries(db, row.id),
-    // Until code meanings are served (#228).
-    codeMeanings: [],
+    entries,
+    codeMeanings: codeMeaningsOf(
+      row.kind,
+      entries.map(({ targetCode }) => targetCode),
+      language,
+    ),
   }
 }
 
-export const loadLookupTable = (id: string) =>
+export const loadLookupTable = (id: string, language: Language = defaultLanguage) =>
   Effect.gen(function* () {
     yield* rejectingInvalidId(id)
 
@@ -169,7 +179,7 @@ export const loadLookupTable = (id: string) =>
     const workspace = yield* CurrentWorkspace
 
     return yield* foundOrNotFound(
-      yield* Effect.promise(() => selectLookupTable(db, workspace.id, id)),
+      yield* Effect.promise(() => selectLookupTable(db, workspace.id, id, language)),
     )
   })
 
@@ -182,7 +192,7 @@ const rejectingUnknownLookupTable = (id: string) =>
 
     const [found] = yield* Effect.promise(() =>
       db
-        .select({ id: lookupTables.id })
+        .select({ kind: lookupTables.kind })
         .from(lookupTables)
         .where(inWorkspace(lookupTables, workspace.id, eq(lookupTables.id, id))),
     )
@@ -190,17 +200,32 @@ const rejectingUnknownLookupTable = (id: string) =>
     if (!found) {
       return yield* new NotFound()
     }
+
+    return found.kind
   })
 
-export const listLookupTableMissingCodes = (id: string) =>
+// A partner code that is itself a known code likely means that code.
+const withMeaning =
+  (kind: LookupTableKind, language: Language) =>
+  (missing: BlockingCodeRuns): BlockingMissingCode => {
+    const meaning = codeMeaningOf(kind, missing.code, language)
+
+    return {
+      ...missing,
+      meaning,
+      suggestions: meaning === null ? [] : [{ code: missing.code, meaning }],
+    }
+  }
+
+export const listLookupTableMissingCodes = (id: string, language: Language) =>
   Effect.gen(function* () {
-    yield* rejectingUnknownLookupTable(id)
+    const kind = yield* rejectingUnknownLookupTable(id)
 
     const db = yield* Db
     const workspace = yield* CurrentWorkspace
     const blockingOf = yield* Effect.promise(() => selectBlockingCodes(db, workspace.id, id))
 
-    return blockingOf(id) satisfies MissingCode[]
+    return blockingOf(id).map(withMeaning(kind, language))
   })
 
 export const suggestLookupTableEntries = ({ tradingPartnerId }: LookupTableSuggestionsQuery) =>

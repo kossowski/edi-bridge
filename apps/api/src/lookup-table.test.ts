@@ -110,7 +110,6 @@ const unused = {
   uses: [],
   missingCodeCounts: { blocking: 0, upcoming: 0 },
   blockingCodes: [],
-  codeMeanings: [],
 }
 
 describe('POST /lookup-tables', () => {
@@ -124,6 +123,10 @@ describe('POST /lookup-tables', () => {
     expect(created).toEqual({
       ...units,
       ...unused,
+      codeMeanings: [
+        { code: 'PCE', meaning: 'Piece' },
+        { code: 'CT', meaning: 'Carton' },
+      ],
       id: created.id,
       entryCount: 2,
       updatedAt: created.updatedAt,
@@ -259,6 +262,37 @@ describe('GET /lookup-tables', () => {
 })
 
 describe('GET /lookup-tables/:id', () => {
+  it('gives the meanings of the known target codes in the requested language', async () => {
+    const { id } = await posted({
+      ...units,
+      entries: [...units.entries, { sourceCode: 'KRT', targetCode: 'KRT' }],
+    })
+
+    const response = await admin.inject({
+      method: 'GET',
+      url: lookupTableEndpoint.path.replace(':id', id),
+      query: { language: 'de' },
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(lookupTableSchema.parse(response.json()).codeMeanings).toEqual([
+      { code: 'PCE', meaning: 'Stück' },
+      { code: 'CT', meaning: 'Karton' },
+    ])
+  })
+
+  it('answers 400 for an unknown language', async () => {
+    const { id } = await posted(units)
+
+    const response = await admin.inject({
+      method: 'GET',
+      url: lookupTableEndpoint.path.replace(':id', id),
+      query: { language: 'fr' },
+    })
+
+    expect(response.statusCode).toBe(400)
+  })
+
   it.each([
     ['an unknown id', () => Promise.resolve(unknownId)],
     ['an id that is no uuid', () => Promise.resolve('units')],
@@ -325,6 +359,7 @@ describe('GET /lookup-table-suggestions', () => {
     ['without a kind', {}],
     ['for an unknown kind', { kind: 'currencies' }],
     ['for a Trading Partner id that is no uuid', { kind: 'units', tradingPartnerId: 'nord' }],
+    ['for an unknown language', { kind: 'units', language: 'fr' }],
   ])('answers 400 %s', async (_case, query) => {
     const response = await suggestions(query)
 
@@ -379,6 +414,7 @@ describe('PUT /lookup-tables/:id', () => {
         tradingPartner: { id: hansemarkt.id, name: 'Hansemarkt GmbH' },
       },
       entryCount: 3,
+      codeMeanings: [],
       updatedAt: updated.updatedAt,
     })
     expect(Date.parse(updated.updatedAt)).toBeGreaterThan(Date.parse(created.updatedAt))
@@ -603,6 +639,12 @@ describe('POST /lookup-tables/:id/import', () => {
         { sourceCode: 'KAR', targetCode: 'BX' },
         { sourceCode: 'L', targetCode: 'LTR' },
         { sourceCode: 'KG', targetCode: 'KGM' },
+      ],
+      codeMeanings: [
+        { code: 'PCE', meaning: 'Piece' },
+        { code: 'BX', meaning: 'Box' },
+        { code: 'LTR', meaning: 'Litre' },
+        { code: 'KGM', meaning: 'Kilogram' },
       ],
       updatedAt: imported.updatedAt,
     })

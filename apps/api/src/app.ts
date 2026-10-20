@@ -49,6 +49,7 @@ import {
   lookupTableImportPreviewEndpoint,
   lookupTableMissingCodesEndpoint,
   lookupTableSuggestionsEndpoint,
+  languageQuerySchema,
   liveEventsEndpoint,
   lookupTablesEndpoint,
   maxEncodedFileBytes,
@@ -781,11 +782,23 @@ function registerRoutes(
   )
 
   app.get<{ Params: { id: string } }>(lookupTableEndpoint.path, (request, reply) =>
-    respond(request, reply, loadLookupTable(request.params.id)),
+    respond(
+      request,
+      reply,
+      Effect.flatMap(parse(languageQuerySchema, request.query), ({ language }) =>
+        loadLookupTable(request.params.id, language),
+      ),
+    ),
   )
 
   app.get<{ Params: { id: string } }>(lookupTableMissingCodesEndpoint.path, (request, reply) =>
-    respond(request, reply, listLookupTableMissingCodes(request.params.id)),
+    respond(
+      request,
+      reply,
+      Effect.flatMap(parse(languageQuerySchema, request.query), ({ language }) =>
+        listLookupTableMissingCodes(request.params.id, language),
+      ),
+    ),
   )
 
   app.post(createLookupTableEndpoint.path, (request, reply) =>

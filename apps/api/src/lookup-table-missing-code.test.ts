@@ -251,3 +251,29 @@ describe('the missing codes of a Lookup Table', () => {
     })
   })
 })
+
+describe('the meanings of the missing codes', () => {
+  it('gives the meaning of a known code and suggests it in the requested language', async () => {
+    await submitted(inUnit('SET'))
+    await processQueued()
+
+    const response = await admin.inject({
+      method: 'GET',
+      url: lookupTableMissingCodesEndpoint.path.replace(':id', workspace.lookupTableId),
+      query: { language: 'de' },
+    })
+
+    expect(response.statusCode, response.body).toBe(200)
+
+    const codes = lookupTableMissingCodesEndpoint.response.parse(response.json())
+
+    expect(codes.find(({ code }) => code === 'SET')).toMatchObject({
+      meaning: 'Satz',
+      suggestions: [{ code: 'SET', meaning: 'Satz' }],
+    })
+    expect(codes.find(({ code }) => code === 'KAR')).toMatchObject({
+      meaning: null,
+      suggestions: [],
+    })
+  })
+})
