@@ -256,7 +256,7 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
     const message = messages.get(messageOwner)!
     const direction = directionOf(run)
 
-    const recorded = recordedMappingVersionOf(run)
+    const recorded = recordedMappingVersionOf(run, runs().claimed(id))
     const mappingVersion = recorded && (chosenVersions.get(id) ?? recorded)
 
     const runError = run.status === 'failed' ? message.error : null

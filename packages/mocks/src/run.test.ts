@@ -4,6 +4,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import {
   type MappingVersionSummary,
   mappingVersionSummarySchema,
+  retryRunEndpoint,
   type RunListQuery,
   runDetailSchema,
   runEndpoint,
@@ -491,6 +492,49 @@ describe('GET /runs', () => {
 })
 
 describe('GET /runs with Run detail', () => {
+  it('keeps a retried Run with its Mapping Version after its Flow moves to another Mapping', async () => {
+    // SAFETY: the seed has a Flow for every Message Type, ORDERS among them.
+    const ordersFlow = seedFlows.find(({ messageType }) => messageType === 'ORDERS')!
+    const [recordedMapping] = mappingVersionsForFlow({ flow: ordersFlow, messageType: 'ORDERS' })
+    const otherMapping = seedMappings.find(
+      ({ mappingId }) => mappingId !== recordedMapping?.mappingId,
+    )
+
+    const failed = createRun({
+      id: '00000000-0000-4000-8000-000000000001',
+      flow: { id: ordersFlow.id, name: ordersFlow.name },
+      messageType: 'ORDERS',
+      receivedAt: '2026-10-01T08:00:00.000Z',
+      status: 'failed',
+      failureStage: 'delivery',
+    })
+
+    const runs = createRunStore([failed])
+
+    const flows = seedFlows.map((flow) =>
+      flow.id === ordersFlow.id
+        ? { ...flow, mappingVersionId: otherMapping?.versions[0]?.id ?? '' }
+        : flow,
+    )
+
+    server.use(runsHandler(apiUrl, runs, { flows }), ...runDetailHandlers(apiUrl, { runs }))
+    const before = await fetch(`${apiUrl}${toPath(runEndpoint.path, { id: failed.id })}`)
+    const { mappingVersion } = runDetailSchema.parse(await before.json())
+
+    await fetch(`${apiUrl}${toPath(retryRunEndpoint.path, { id: failed.id })}`, { method: 'POST' })
+
+    const byRecorded = await listRuns({ mappingId: [recordedMapping?.mappingId ?? ''] })
+    const byPinned = await listRuns({ mappingId: [otherMapping?.mappingId ?? ''] })
+    const after = await fetch(`${apiUrl}${toPath(runEndpoint.path, { id: failed.id })}`)
+
+    expect(byRecorded.body?.runs.map(({ id, status }) => ({ id, status }))).toEqual([
+      { id: failed.id, status: 'received' },
+    ])
+    expect(byPinned.body?.runs).toEqual([])
+    expect(mappingVersion?.mappingId).toBe(recordedMapping?.mappingId)
+    expect(runDetailSchema.parse(await after.json()).mappingVersion).toEqual(mappingVersion)
+  })
+
   it('lists each Run with the direction, Business Reference and Interchange that its detail shows', async () => {
     const seeded = createRuns({ count: 400 })
     const runs = createRunStore(seeded, seedReprocessed(seeded))

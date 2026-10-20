@@ -65,8 +65,11 @@ export function statusOf(run: StepRun, stage: RunStepStage) {
 }
 
 // Like the api, which records the version when it claims a Run, before parsing.
-export function recordedMappingVersionOf(run: RunSummary): MappingVersionSummary | null {
-  if (run.status === 'received') {
+export function recordedMappingVersionOf(
+  run: RunSummary,
+  claimed: boolean,
+): MappingVersionSummary | null {
+  if (!claimed) {
     return null
   }
 

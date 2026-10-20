@@ -305,7 +305,7 @@ export function runsHandler(
   {
     flows = seedFlows,
     mappings = seedMappings,
-    recordedMappingVersionOf = seededRecordedMappingVersionOf,
+    recordedMappingVersionOf,
   }: {
     flows?: ReadonlyArray<FlowRecord> | FlowStore
     mappings?: ReadonlyArray<MappingRecord> | MappingCatalogue
@@ -323,13 +323,15 @@ export function runsHandler(
       return badRequest(query.error.message)
     }
 
-    store ??= toRunStore(runs ?? seedRuns())
+    const runStore = (store ??= toRunStore(runs ?? seedRuns()))
     const { status } = query.data
     const text = query.data.q?.toLowerCase() ?? ''
 
     // Mirrors the api: a Run not yet claimed falls back to the version its Flow pins now.
     const mappingOfRun = (run: RunSummary) => {
-      const recorded = recordedMappingVersionOf(run)
+      const recorded = recordedMappingVersionOf
+        ? recordedMappingVersionOf(run)
+        : seededRecordedMappingVersionOf(run, runStore.claimed(run.id))
 
       if (recorded) {
         return recorded.mappingId
@@ -350,7 +352,7 @@ export function runsHandler(
 
     const filtered: RunSummary[] = []
 
-    for (const run of store.newestFirst()) {
+    for (const run of runStore.newestFirst()) {
       if (!matchesExceptStatus(run, query.data, text, mappingOfRun)) {
         continue
       }
