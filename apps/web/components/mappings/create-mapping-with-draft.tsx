@@ -20,10 +20,6 @@ function isMissingDocumentStructure(error: Error) {
   return error instanceof ApiError && error.status === 422
 }
 
-function namesDocumentStructure(body: CreateMappingBody | undefined) {
-  return body?.documentStructureId !== undefined
-}
-
 export function useCreateMappingWithDraft() {
   const router = useRouter()
   const queryClient = useQueryClient()
@@ -35,10 +31,10 @@ export function useCreateMappingWithDraft() {
       storeCreatedMapping(queryClient, created)
       router.push(aiDraftStartHref(created.id))
     },
-    onError: (error, body) => {
+    onError: (error) => {
       started.current = false
 
-      if (namesDocumentStructure(body) && isMissingDocumentStructure(error)) {
+      if (isMissingDocumentStructure(error)) {
         void queryClient.invalidateQueries({ queryKey: documentStructureKeys.all() })
       }
     },
@@ -58,24 +54,14 @@ export function useCreateMappingWithDraft() {
     locked: create.isPending || create.isSuccess,
     messageType: create.variables?.messageType,
     error: create.error,
-    withDocumentStructure: namesDocumentStructure(create.variables),
   }
 }
 
-export function NoDocumentStructure({
-  variant = 'default',
-  className,
-}: {
-  variant?: 'default' | 'destructive'
-  className?: string | undefined
-}) {
+export function NoDocumentStructure() {
   const t = useTranslations('Mappings.create')
 
   return (
-    <Alert
-      role={variant === 'destructive' ? 'alert' : 'note'}
-      variant={variant}
-      className={cn('text-left', className)}>
+    <Alert role="note" className="text-left">
       <AlertDescription className="flex flex-col items-start gap-2">
         {t('noDocumentStructure')}
         <Link
@@ -90,11 +76,9 @@ export function NoDocumentStructure({
 
 export function CreateMappingError({
   error,
-  withDocumentStructure = false,
   className,
 }: {
   error: Error | null
-  withDocumentStructure?: boolean
   className?: string
 }) {
   const t = useTranslations('Mappings.create')
@@ -103,16 +87,10 @@ export function CreateMappingError({
     return null
   }
 
-  const missingDocumentStructure = isMissingDocumentStructure(error)
-
-  if (missingDocumentStructure && !withDocumentStructure) {
-    return <NoDocumentStructure variant="destructive" className={className} />
-  }
-
   return (
     <Alert variant="destructive" className={cn('text-left', className)}>
       <AlertDescription>
-        {missingDocumentStructure ? t('documentStructureGone') : t('failed')}
+        {isMissingDocumentStructure(error) ? t('documentStructureGone') : t('failed')}
       </AlertDescription>
     </Alert>
   )

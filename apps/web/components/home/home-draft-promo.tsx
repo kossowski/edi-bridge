@@ -243,10 +243,7 @@ function DraftAction() {
       <p role="status" className="sr-only">
         {create.locked ? tCreate('creating') : ''}
       </p>
-      <CreateMappingError
-        error={create.error}
-        withDocumentStructure={create.withDocumentStructure}
-      />
+      <CreateMappingError error={create.error} />
     </>
   )
 }

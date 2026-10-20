@@ -228,10 +228,7 @@ export function NewMappingChoices({
           />
         ))}
       </ul>
-      <CreateMappingError
-        error={create.error}
-        withDocumentStructure={create.withDocumentStructure}
-      />
+      <CreateMappingError error={create.error} />
     </div>
   )
 }
