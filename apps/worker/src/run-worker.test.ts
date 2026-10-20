@@ -369,8 +369,8 @@ describe('the worker', () => {
       })
     })
 
-    afterAll(() => {
-      subscriber.close()
+    afterAll(async () => {
+      await subscriber.close()
     })
 
     it('publishes each change of a Run it processes', async () => {

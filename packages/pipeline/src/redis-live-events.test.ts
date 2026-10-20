@@ -65,7 +65,7 @@ describe('live events over Redis', () => {
       }, delivery)
     } finally {
       publisher.close()
-      subscriber.close()
+      await subscriber.close()
     }
   })
 
@@ -93,7 +93,7 @@ describe('live events over Redis', () => {
       expect(left).toEqual([])
     } finally {
       publisher.close()
-      subscriber.close()
+      await subscriber.close()
     }
   })
 
@@ -122,7 +122,7 @@ describe('live events over Redis', () => {
     } finally {
       warn.mockRestore()
       publisher.close()
-      subscriber.close()
+      await subscriber.close()
     }
   })
 
@@ -156,7 +156,7 @@ describe('live events over Redis', () => {
       warn.mockRestore()
       other.disconnect()
       publisher.close()
-      subscriber.close()
+      await subscriber.close()
     }
   })
 
