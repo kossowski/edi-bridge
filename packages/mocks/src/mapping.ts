@@ -1066,11 +1066,22 @@ export function mappingHandlers(
         return badRequest(body.error.message)
       }
 
-      const { messageType } = body.data
-      const documentStructure = documentStructureForNew(messageType, store.all(), structures.all())
+      const { messageType, documentStructureId } = body.data
+
+      // Until Document Structures carry a Message Type, every one of the Workspace fits.
+      const fitting = structures.all()
+
+      const documentStructure =
+        documentStructureId === undefined
+          ? documentStructureForNew(messageType, store.all(), fitting)
+          : fitting.find(({ id }) => id === documentStructureId)
 
       if (!documentStructure) {
-        return unprocessable('The Workspace has no Document Structure to map yet.')
+        return unprocessable(
+          documentStructureId === undefined
+            ? 'The Workspace has no Document Structure to map yet.'
+            : 'The Document Structure does not exist.',
+        )
       }
 
       const record = newMappingDraft(messageType, documentStructure, store.all())
