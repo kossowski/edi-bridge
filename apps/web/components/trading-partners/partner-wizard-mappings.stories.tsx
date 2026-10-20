@@ -1,11 +1,16 @@
 import { delay, http, HttpResponse } from 'msw'
 import { expect, screen, userEvent, waitFor, within } from 'storybook/test'
 
-import { darkMode, expectNoPageScroll, german, mobile } from '@/components/story-helpers'
+import {
+  closeSelectPopup,
+  darkMode,
+  expectNoPageScroll,
+  german,
+  mobile,
+} from '@/components/story-helpers'
 import { PartnerWizard } from '@/components/trading-partners/partner-wizard'
 import {
   chooseMapping,
-  closeSelectPopup,
   continueTo,
   findMappingGroup,
   mappingSelect,

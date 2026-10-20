@@ -3,7 +3,13 @@ import { delay, http, HttpResponse } from 'msw'
 import { expect, screen, userEvent, waitFor, within } from 'storybook/test'
 
 import { NewCodeTranslationScreen } from '@/components/code-translations/new-code-translation-screen'
-import { darkMode, expectNoPageScroll, german, mobile } from '@/components/story-helpers'
+import {
+  closeSelectPopup,
+  darkMode,
+  expectNoPageScroll,
+  german,
+  mobile,
+} from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import {
   createLookupTableEndpoint,
@@ -190,7 +196,8 @@ export const TradingPartnerChosen = meta.story({
     await expect(canvas.queryByRole('heading', { name: 'Suggested values' })).toBeNull()
 
     await userEvent.click(await canvas.findByRole('combobox', { name: 'Trading partner' }))
-    await userEvent.click(await screen.findByRole('option', { name: hansemarkt.name }))
+    const option = await screen.findByRole('option', { name: hansemarkt.name })
+    await closeSelectPopup(() => userEvent.click(option))
 
     await expect(await canvas.findByRole('heading', { name: /^Suggested values/ })).toBeVisible()
     await expect(canvas.getByText(/^Creates/)).toHaveTextContent(
@@ -328,7 +335,8 @@ export const ManyTradingPartners = meta.story({
     await userEvent.click(canvas.getByRole('radio', { name: startsWith('One trading partner') }))
     await userEvent.click(await canvas.findByRole('combobox', { name: 'Trading partner' }))
 
-    await userEvent.click(await screen.findByRole('option', { name: lastTradingPartner.name }))
+    const option = await screen.findByRole('option', { name: lastTradingPartner.name })
+    await closeSelectPopup(() => userEvent.click(option))
 
     await expect(await canvas.findByText(/^Creates/)).toHaveTextContent(
       `Creates Countries for ${lastTradingPartner.name} with no values.`,

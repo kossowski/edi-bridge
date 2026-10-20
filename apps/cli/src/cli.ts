@@ -1,9 +1,13 @@
 import { readFile } from 'node:fs/promises'
 import { basename, resolve } from 'node:path'
-import { parseArgs, TextDecoder } from 'node:util'
+import { parseArgs } from 'node:util'
 import { z } from 'zod'
 
-import type { ManualSubmission } from '@edi-bridge/contracts'
+import {
+  characterEncodings,
+  characterEncodingSchema,
+  type ManualSubmission,
+} from '@edi-bridge/contracts'
 
 import { ApiError, apiClient } from './api-client'
 
@@ -16,7 +20,7 @@ export interface CliContext {
 
 class CliError extends Error {}
 
-const usage = 'Usage: submit --channel <inbound Channel name> [--encoding <label>] <file>'
+const usage = 'Usage: submit --channel <inbound Channel name> [--encoding <encoding>] <file>'
 
 const envSchema = z.object({
   EDI_BRIDGE_API_URL: z.url().default('http://localhost:3001'),
@@ -33,7 +37,7 @@ function parseOptions(args: string[]) {
       args,
       options: {
         channel: { type: 'string' },
-        encoding: { type: 'string', default: 'utf-8' },
+        encoding: { type: 'string' },
       },
       allowPositionals: true,
     })
@@ -58,43 +62,26 @@ function parseSubmitArgs(args: string[]) {
     throw new CliError(usage)
   }
 
-  return { channel, encoding: decoderFor(encoding), file }
-}
-
-// fatal: a byte the encoding doesn't define fails instead of becoming U+FFFD.
-function decoderFor(encoding: string) {
-  try {
-    return new TextDecoder(encoding, { fatal: true })
-  } catch (error) {
-    if (error instanceof RangeError) {
-      throw new CliError(
-        `Unknown encoding "${encoding}"; name a WHATWG encoding label such as utf-8, iso-8859-1 or windows-1252`,
-      )
-    }
-
-    throw error
+  if (encoding === undefined) {
+    return { channel, file }
   }
+
+  const named = characterEncodingSchema.safeParse(encoding)
+
+  if (!named.success) {
+    throw new CliError(
+      `Unknown encoding "${encoding}"; name one of ${characterEncodings.join(', ')}`,
+    )
+  }
+
+  return { channel, encoding: named.data, file }
 }
 
-async function readDocument(path: string, file: string, decoder: TextDecoder) {
-  let bytes: Buffer
-
+async function readDocument(path: string, file: string) {
   try {
-    bytes = await readFile(path)
+    return await readFile(path)
   } catch (error) {
     throw new CliError(`Cannot read ${file}`, { cause: error })
-  }
-
-  try {
-    return decoder.decode(bytes)
-  } catch (error) {
-    if (error instanceof TypeError) {
-      throw new CliError(
-        `${file} is not valid ${decoder.encoding}; name its encoding with --encoding`,
-      )
-    }
-
-    throw error
   }
 }
 
@@ -113,7 +100,7 @@ function formatSubmission({ runs, notRouted }: ManualSubmission) {
 }
 
 async function submit(args: string[], context: CliContext) {
-  const { channel: channelName, encoding, file } = parseSubmitArgs(args)
+  const { channel: channelName, file, ...encoding } = parseSubmitArgs(args)
   const env = envSchema.safeParse(context.env)
 
   if (!env.success) {
@@ -121,7 +108,7 @@ async function submit(args: string[], context: CliContext) {
   }
 
   const path = resolve(env.data.INIT_CWD ?? context.cwd, file)
-  const content = await readDocument(path, file, encoding)
+  const bytes = await readDocument(path, file)
 
   const api = apiClient(
     env.data.EDI_BRIDGE_API_URL,
@@ -148,7 +135,7 @@ async function submit(args: string[], context: CliContext) {
 
   const submission = await api.submitDocument({
     channelId: channel.id,
-    document: { fileName: basename(path), content },
+    document: { fileName: basename(path), content: bytes.toString('base64'), ...encoding },
   })
 
   context.stdout(formatSubmission(submission))

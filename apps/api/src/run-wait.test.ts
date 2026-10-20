@@ -24,7 +24,14 @@ import {
 } from '@edi-bridge/pipeline/testing'
 
 import { markWaitingForTradingPartner } from './run.js'
-import { addMember, type Client, signIn, startTestApi, type TestApi } from './testing.js'
+import {
+  addMember,
+  type Client,
+  signIn,
+  startTestApi,
+  submittedDocument,
+  type TestApi,
+} from './testing.js'
 
 let api: TestApi
 
@@ -84,7 +91,11 @@ const processed = async (fileName: string, content: string, delivery = delivered
     url: submitDocumentEndpoint.path,
     body: {
       channelId: workspace.inboundChannelId,
-      document: { fileName, content: sentAnew(content) },
+      document: submittedDocument(
+        fileName,
+        sentAnew(content),
+        fileName.endsWith('.edi') ? 'windows-1252' : 'utf-8',
+      ),
     },
   })
 

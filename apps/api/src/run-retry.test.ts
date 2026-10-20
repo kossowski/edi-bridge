@@ -33,6 +33,7 @@ import {
   expireDocumentOf,
   signIn,
   startTestApi,
+  submittedDocument,
   type TestApi,
 } from './testing.js'
 
@@ -83,7 +84,7 @@ const processed = async (content: string, delivery: DeliveryService) => {
     url: submitDocumentEndpoint.path,
     body: {
       channelId: workspace.inboundChannelId,
-      document: { fileName: 'invoice.json', content },
+      document: submittedDocument('invoice.json', content),
     },
   })
 
@@ -101,7 +102,7 @@ const failedOnDefect = async () => {
     url: submitDocumentEndpoint.path,
     body: {
       channelId: workspace.inboundChannelId,
-      document: { fileName: 'invoice.json', content: goldenInvoice },
+      document: submittedDocument('invoice.json', goldenInvoice),
     },
   })
 

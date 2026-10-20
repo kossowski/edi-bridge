@@ -639,7 +639,11 @@ describe('createHandlers', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         channelId: inbox.id,
-        document: { fileName: 'notes.txt', content: 'Please ship by Friday.' },
+        document: {
+          fileName: 'notes.txt',
+          content: btoa('Please ship by Friday.'),
+          encoding: 'utf-8',
+        },
       }),
     })
 

@@ -1,16 +1,29 @@
 import { z } from 'zod'
 
+import { type CharacterEncoding, characterEncodingSchema } from './document-structure'
 import { notRoutedMessagesSchema } from './message-type'
 import { runSummarySchema } from './run'
 
 import type { Endpoint } from './endpoint'
 
-export const maxDocumentLength = 5_000_000
+export const maxDocumentBytes = 5_000_000
 
-// EDIFACT, JSON and CSV are all text, so the Document travels as a string inside the JSON body.
+export const maxDocumentBase64Length = Math.ceil(maxDocumentBytes / 3) * 4
+
+const byteLengthOf = (base64: string) =>
+  (base64.length / 4) * 3 - (base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0)
+
+// Without an encoding a Document is UTF-8, unless it is an Interchange whose UNB names another.
 export const documentSchema = z.object({
   fileName: z.string().trim().min(1).max(255),
-  content: z.string().min(1).max(maxDocumentLength),
+  content: z
+    .base64()
+    .min(1)
+    .max(maxDocumentBase64Length)
+    .refine((content) => byteLengthOf(content) <= maxDocumentBytes, {
+      message: `A Document holds at most ${String(maxDocumentBytes)} bytes`,
+    }),
+  encoding: characterEncodingSchema.optional(),
 })
 
 export type SubmittedDocument = z.infer<typeof documentSchema>
@@ -21,6 +34,32 @@ export const manualSubmissionInputSchema = z.object({
 })
 
 export type ManualSubmissionInput = z.infer<typeof manualSubmissionInputSchema>
+
+export const documentUndecodableStatus = 422
+
+export const documentUndecodableProblemSchema = z.object({
+  code: z.literal('documentUndecodable'),
+  // null when the Interchange names its character set, so another encoding would not help.
+  encoding: characterEncodingSchema.nullable(),
+  message: z.string().min(1),
+  // The decoder's reason without the advice of message, for a screen that gives its own advice.
+  reason: z.string().min(1),
+})
+
+export type DocumentUndecodableProblem = z.infer<typeof documentUndecodableProblemSchema>
+
+export const documentUndecodableProblem = (
+  reason: string,
+  encoding: CharacterEncoding | null,
+): DocumentUndecodableProblem => ({
+  code: 'documentUndecodable',
+  encoding,
+  message:
+    encoding === null
+      ? `${reason}.`
+      : `${reason}. Choose another encoding, such as Windows-1252 for a typical German CSV.`,
+  reason,
+})
 
 // One Run per Message: an Interchange with several Messages produces several Runs. A Message
 // without a Flow for its Message Type on the Channel gets no Run and is listed as not routed, by the

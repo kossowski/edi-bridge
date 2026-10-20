@@ -5,6 +5,7 @@ import { messageDefinitions } from './definitions/message-definitions'
 import {
   buildContrl,
   BuildContrlError,
+  decodeDocument,
   decodeInterchange,
   type Delimiters,
   type Interchange,
@@ -12,6 +13,7 @@ import {
   parse,
   ParseError,
   isBrokenMessage,
+  namesOtherEncoding,
   parseMessages,
   readAcknowledgedInterchange,
   ReadAcknowledgementError,
@@ -873,5 +875,79 @@ describe('decodeInterchange', () => {
     ],
   ])('decodes nothing for %s', (_case, bytes) => {
     expect(decodeInterchange(bytes)).toBeUndefined()
+  })
+})
+
+describe('decodeDocument', () => {
+  it('decodes an Interchange in the character set its UNB names, whatever the encoding', () => {
+    const decoded = decodeDocument(
+      syntaxInterchange('UNOW', Buffer.from('Fr\u00fch')),
+      'windows-1252',
+    )
+
+    const withName: unknown = expect.stringContaining("NAD+BY+Fr\u00fch'")
+
+    expect(decoded).toMatchObject({ characterSet: 'UNOW', text: withName })
+  })
+
+  it('gives the reason of the character set for an Interchange its UNB does not fit', () => {
+    const decoded = decodeDocument(syntaxInterchange('UNOW', Buffer.from([0x4b, 0x72, 0xe4])))
+
+    expect(decoded).toMatchObject({
+      characterSet: 'UNOW',
+      reason: 'Byte 98 (0xE4) is not valid in UNOW (UTF-8), at segment 3, element 2, component 1',
+      characterSetError: { byte: 98 },
+    })
+  })
+
+  it.each([
+    ['UTF-8 without an encoding', Buffer.from('Gr\u00fc\u00dfe'), undefined, 'Gr\u00fc\u00dfe'],
+    [
+      'Windows-1252',
+      Buffer.from([0x47, 0x72, 0xfc, 0xdf, 0x65]),
+      'windows-1252',
+      'Gr\u00fc\u00dfe',
+    ],
+    ['the label ISO-8859-1 as Windows-1252', Buffer.from([0x80]), 'ISO-8859-1', '\u20ac'],
+  ])('decodes a Document without a UNB in %s', (_case, bytes, encoding, text) => {
+    expect(decodeDocument(bytes, encoding)).toEqual({ characterSet: undefined, text })
+  })
+
+  it.each([
+    ['utf-8', Buffer.from([0x4b, 0xe4, 0x73, 0x65]), 'Byte 2 (0xE4) is not valid UTF-8'],
+    ['iso-8859-7', Buffer.from([0x4b, 0xae]), 'Byte 2 (0xAE) is not valid ISO 8859-7'],
+  ])(
+    'names the first byte not valid in %s as people read the encoding',
+    (encoding, bytes, reason) => {
+      const withReplacement: unknown = expect.stringContaining('\ufffd')
+
+      expect(decodeDocument(bytes, encoding)).toMatchObject({
+        characterSet: undefined,
+        readable: withReplacement,
+        reason,
+        characterSetError: undefined,
+      })
+    },
+  )
+
+  it('names an encoding that is unknown', () => {
+    expect(decodeDocument(Buffer.from('x'), 'klingon')).toEqual({
+      characterSet: undefined,
+      readable: '',
+      reason: 'The encoding klingon is unknown',
+      characterSetError: undefined,
+    })
+  })
+})
+
+describe('namesOtherEncoding', () => {
+  it.each([
+    ['UNOC', 'iso-8859-1', false],
+    ['UNOW', 'UTF-8', false],
+    ['UNOA', 'utf-8', false],
+    ['UNOW', 'windows-1252', true],
+    ['UNOD', 'klingon', true],
+  ] as const)('tells for %s whether %s names another encoding', (characterSet, label, other) => {
+    expect(namesOtherEncoding(characterSet, label)).toBe(other)
   })
 })

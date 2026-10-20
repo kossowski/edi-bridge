@@ -27,6 +27,7 @@ import {
   runKeys,
 } from '@/lib/api/queries'
 import { documentHref } from '@/lib/navigation'
+import { encodeBase64 } from '@edi-bridge/contracts'
 import { Alert, AlertDescription } from '@edi-bridge/ui/components/alert'
 import { Button, buttonVariants } from '@edi-bridge/ui/components/button'
 import {
@@ -272,9 +273,12 @@ function FormFooter({ children }: { children?: ReactNode }) {
 }
 
 async function readFile(file: File | null) {
-  const content = file === null ? null : await file.text()
+  const bytes = file === null ? null : new Uint8Array(await file.arrayBuffer())
 
-  return { content, problem: documentProblem(content) }
+  return {
+    content: bytes === null ? null : encodeBase64(bytes),
+    problem: documentProblem(bytes === null ? null : new TextDecoder().decode(bytes)),
+  }
 }
 
 function ManualSubmissionForm({
@@ -321,7 +325,13 @@ function ManualSubmissionForm({
     setFileProblem(problem)
 
     if (channel !== undefined && file !== null && content !== null && problem === null) {
-      submission.mutate({ channel, document: { fileName: file.name, content } })
+      submission.mutate({
+        channel,
+        document: {
+          fileName: file.name,
+          content,
+        },
+      })
     } else {
       document.getElementById(channel === undefined ? `${id}-channel` : `${id}-file`)?.focus()
     }

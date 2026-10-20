@@ -29,6 +29,7 @@ import {
   expireDocumentOf,
   signIn,
   startTestApi,
+  submittedDocument,
   type TestApi,
 } from './testing.js'
 
@@ -146,7 +147,7 @@ const processed = async (content: string, delivery = delivering) => {
     url: submitDocumentEndpoint.path,
     body: {
       channelId: workspace.inboundChannelId,
-      document: { fileName: 'invoice.json', content },
+      document: submittedDocument('invoice.json', content),
     },
   })
 

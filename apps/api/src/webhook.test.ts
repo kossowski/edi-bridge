@@ -4,7 +4,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import {
   createChannelEndpoint,
   createdChannelSchema,
-  maxDocumentLength,
+  maxDocumentBytes,
   receiveWebhookEndpoint,
   regeneratedWebhookTokenSchema,
   regenerateWebhookTokenEndpoint,
@@ -220,15 +220,8 @@ describe('POST /webhooks/:id', () => {
     expect(api.runQueue.queued).toEqual([])
   })
 
-  it('answers 400 for a body over the maximum Document length', async () => {
-    const response = await post('x'.repeat(maxDocumentLength + 1), { contentType: 'text/plain' })
-
-    expect(response.statusCode).toBe(400)
-    expect(api.runQueue.queued).toEqual([])
-  })
-
-  it('answers 413 for a body over the largest Document in UTF-8', async () => {
-    const response = await post(Buffer.alloc(3 * maxDocumentLength + 1, 'x'), {
+  it('answers 413 for a body over the maximum Document size', async () => {
+    const response = await post(Buffer.alloc(maxDocumentBytes + 1, 'x'), {
       contentType: 'text/plain',
     })
 
@@ -330,7 +323,7 @@ describe('POST /webhooks/:id with a Document in an encoding other than UTF-8', (
   })
 
   it.each([
-    ['without a charset', 'application/json', 'Byte 574 (0xFC) is not valid utf-8'],
+    ['without a charset', 'application/json', 'Byte 574 (0xFC) is not valid UTF-8'],
     [
       'with an unknown charset',
       'application/json; charset=klingon',

@@ -4,6 +4,7 @@ import {
   type AiBudget,
   type AiDraftFailureReason,
   type DocumentStructureProblem,
+  type DocumentUndecodableProblem,
   type InviteUnusableReason,
   inviteUnusableMessages,
 } from '@edi-bridge/contracts'
@@ -22,6 +23,14 @@ export class Unprocessable extends Data.TaggedError('Unprocessable')<{
 
 export class DocumentStructureRejected extends Data.TaggedError('DocumentStructureRejected')<{
   readonly problem: DocumentStructureProblem
+}> {
+  override get message() {
+    return this.problem.message
+  }
+}
+
+export class DocumentUndecodable extends Data.TaggedError('DocumentUndecodable')<{
+  readonly problem: DocumentUndecodableProblem
 }> {
   override get message() {
     return this.problem.message

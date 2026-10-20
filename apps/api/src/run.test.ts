@@ -22,7 +22,14 @@ import {
   seedInvoiceWorkspace,
 } from '@edi-bridge/pipeline/testing'
 
-import { addMember, type Client, signIn, startTestApi, type TestApi } from './testing.js'
+import {
+  addMember,
+  type Client,
+  signIn,
+  startTestApi,
+  submittedDocument,
+  type TestApi,
+} from './testing.js'
 
 let api: TestApi
 
@@ -52,7 +59,7 @@ const submitted = async (content: string, as = admin, channelId = workspace.inbo
     url: submitDocumentEndpoint.path,
     body: {
       channelId,
-      document: { fileName: 'invoice.json', content },
+      document: submittedDocument('invoice.json', content),
     },
   })
 

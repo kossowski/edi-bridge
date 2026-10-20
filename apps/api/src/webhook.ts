@@ -4,9 +4,8 @@ import { createHash, timingSafeEqual } from 'node:crypto'
 import { z } from 'zod'
 
 import { secretContext } from '@edi-bridge/channels'
-import { documentSchema, type WebhookSubmission } from '@edi-bridge/contracts'
+import { type WebhookSubmission } from '@edi-bridge/contracts'
 import { channels, postgresDocumentStorage } from '@edi-bridge/db'
-import { readableOf } from '@edi-bridge/edifact'
 import {
   Database,
   decodeDocument,
@@ -72,6 +71,9 @@ const authenticate = (channelId: string, presented: string | undefined) =>
     return { workspaceId: channel.workspaceId, rateLimitPerMinute }
   })
 
+// The body limit keeps a Document to its maximum size.
+const bodySchema = z.instanceof(Buffer).refine((body) => body.length > 0, 'The Document is empty')
+
 const charsetOf = (contentType: string | undefined) =>
   contentType?.match(/;\s*charset\s*=\s*"?([^";\s]+)"?/i)?.[1]
 
@@ -112,9 +114,9 @@ export const receiveOnWebhook = (
       return yield* new RateLimited({ retryAfterSeconds: decision.retryAfterSeconds })
     }
 
-    const decoded = yield* decodedBody(channelId, body, contentType)
+    yield* parse(bodySchema, body)
 
-    yield* parse(documentSchema.shape.content, readableOf(decoded))
+    const decoded = yield* decodedBody(channelId, body, contentType)
 
     const db = yield* Db
 

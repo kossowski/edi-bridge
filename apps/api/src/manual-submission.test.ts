@@ -1,7 +1,9 @@
 import { eq } from 'drizzle-orm'
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
+  type CharacterEncoding,
+  documentUndecodableProblemSchema,
   manualSubmissionSchema,
   runListSchema,
   runsEndpoint,
@@ -12,6 +14,7 @@ import {
   golden,
   goldenInvoice,
   type InvoiceWorkspace,
+  readRun,
   seedInvoiceWorkspace,
 } from '@edi-bridge/pipeline/testing'
 
@@ -52,12 +55,32 @@ beforeEach(() => {
   api.runQueue.redis.reachable = true
 })
 
-const submit = (content: string, { channelId = workspace.inboundChannelId, as = admin } = {}) =>
+const submit = (
+  content: string | Buffer,
+  {
+    channelId = workspace.inboundChannelId,
+    as = admin,
+    encoding,
+  }: { channelId?: string | undefined; as?: Client; encoding?: CharacterEncoding | undefined } = {},
+) =>
   as.inject({
     method: submitDocumentEndpoint.method,
     url: submitDocumentEndpoint.path,
-    body: { channelId, document: { fileName: 'invoice.json', content } },
+    body: {
+      channelId,
+      document: {
+        fileName: 'invoice.json',
+        content: Buffer.from(content).toString('base64'),
+        encoding,
+      },
+    },
   })
+
+const storedContent = async (response: Awaited<ReturnType<typeof submit>>) => {
+  const [run] = manualSubmissionSchema.parse(response.json()).runs
+
+  return (await readRun(api.connection.db, run?.id ?? ''))?.document?.content
+}
 
 const receivedRuns = async () => {
   const response = await admin.inject({ method: 'GET', url: runsEndpoint.path })
@@ -66,6 +89,10 @@ const receivedRuns = async () => {
 }
 
 const ordersInterchange = golden('orders-reference.edi', 'latin1')
+
+const ordersBytes = Buffer.from(ordersInterchange, 'latin1')
+
+const dispatchCsv = 'Käufer;Warenempfänger;Menge\n4012345000016;4098765000013;12\n'
 
 describe('POST /manual-submissions', () => {
   it('announces the new Run to its Workspace', async () => {
@@ -106,6 +133,46 @@ describe('POST /manual-submissions', () => {
     ])
   })
 
+  it('decodes a Document in the encoding it names', async () => {
+    const response = await submit(Buffer.from(dispatchCsv, 'latin1'), {
+      encoding: 'windows-1252',
+    })
+
+    expect(response.statusCode, response.body).toBe(201)
+    expect(await storedContent(response)).toBe(dispatchCsv)
+  })
+
+  it('answers 422 with a problem that suggests another encoding when the bytes are not valid UTF-8 and none is named', async () => {
+    const before = await receivedRuns()
+
+    const response = await submit(Buffer.from(dispatchCsv, 'latin1'))
+
+    expect(response.statusCode).toBe(422)
+    expect(documentUndecodableProblemSchema.parse(response.json())).toEqual({
+      code: 'documentUndecodable',
+      encoding: 'utf-8',
+      message:
+        'Byte 2 (0xE4) is not valid UTF-8. Choose another encoding, such as Windows-1252 for a typical German CSV.',
+      reason: 'Byte 2 (0xE4) is not valid UTF-8',
+    })
+    expect(await receivedRuns()).toBe(before)
+  })
+
+  it('answers 422 with a problem that suggests no encoding when an Interchange is not valid in its character set', async () => {
+    const response = await submit(Buffer.from(ordersInterchange.replace('UNOC', 'UNOA'), 'latin1'))
+
+    const notValidInUnoa: unknown = expect.stringMatching(
+      /^Byte \d+ \(0xFC\) is not valid in UNOA \(ASCII\), at .+\.$/,
+    )
+
+    expect(response.statusCode).toBe(422)
+    expect(documentUndecodableProblemSchema.parse(response.json())).toMatchObject({
+      code: 'documentUndecodable',
+      encoding: null,
+      message: notValidInUnoa,
+    })
+  })
+
   it.each([
     ['the Channel does not exist', () => crypto.randomUUID(), 'The Channel does not exist'],
     [
@@ -141,7 +208,7 @@ describe('POST /manual-submissions', () => {
   })
 
   it('answers 422 when no Flow on the Channel routes a Message of the Document', async () => {
-    const response = await submit(ordersInterchange)
+    const response = await submit(ordersBytes)
 
     expect(response.statusCode).toBe(422)
     expect(response.json()).toEqual({
@@ -191,7 +258,7 @@ describe('POST /manual-submissions', () => {
       const flowId = await addFlow('ORDERS', 'Orders from Hanse Retail')
 
       try {
-        const response = await submit(ordersInterchange)
+        const response = await submit(ordersBytes)
 
         expect(response.statusCode, response.body).toBe(201)
 
@@ -205,6 +272,41 @@ describe('POST /manual-submissions', () => {
           { workspaceId: workspace.id, runId: submission.runs[0]?.id },
         ])
       } finally {
+        await removeFlow(flowId)
+      }
+    })
+
+    it('decodes an Interchange in the character set its UNB names, whatever encoding is named', async () => {
+      const flowId = await addFlow('ORDERS', 'Orders from Hanse Retail')
+
+      try {
+        const response = await submit(ordersBytes, { encoding: 'utf-8' })
+
+        expect(response.statusCode, response.body).toBe(201)
+        expect(await storedContent(response)).toBe(ordersInterchange)
+        expect(ordersInterchange).toContain('Claus Früh')
+      } finally {
+        await removeFlow(flowId)
+      }
+    })
+
+    it('logs only a named encoding that disagrees with the UNB of an Interchange', async () => {
+      const flowId = await addFlow('ORDERS', 'Orders from Hanse Retail')
+      const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+
+      try {
+        const named = await submit(ordersBytes, { encoding: 'utf-8' })
+        const agreeing = await submit(ordersBytes, { encoding: 'windows-1252' })
+        const unnamed = await submit(ordersBytes)
+
+        expect([named, agreeing, unnamed].map(({ statusCode }) => statusCode)).toEqual([
+          201, 201, 201,
+        ])
+        expect(
+          log.mock.calls.flat().filter((line) => /names the encoding/.test(String(line))),
+        ).toEqual([expect.stringContaining('names the encoding utf-8, its UNB UNOC')])
+      } finally {
+        log.mockRestore()
         await removeFlow(flowId)
       }
     })

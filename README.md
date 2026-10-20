@@ -47,18 +47,18 @@ Stop the infrastructure with `docker compose down`; add `-v` to also delete its 
 The `cli` script submits a Document file to an inbound Channel of the running API, for example of `pnpm dev`:
 
 ```sh
-pnpm cli submit --channel "<inbound Channel name>" [--encoding <label>] <file>
+pnpm cli submit --channel "<inbound Channel name>" [--encoding <encoding>] <file>
 ```
 
-The command signs in, looks up the Channel by its name and sends the file as a Manual Submission, so the pipeline processes it exactly like a Manual Submission from web, and its Runs are marked as manual. It prints one line per Run and one per Message Type that no Flow on the Channel routes. It exits with a non-zero code when the file is not valid in its encoding, the Channel is unknown or outbound, the sign-in fails or the API rejects the Document.
+The command signs in, looks up the Channel by its name and sends the file as a Manual Submission, so the pipeline processes it exactly like a Manual Submission from web, and its Runs are marked as manual. It prints one line per Run and one per Message Type that no Flow on the Channel routes. It exits with a non-zero code when the encoding is unknown, the Channel is unknown or outbound, the sign-in fails or the API rejects the Document.
 
-`--encoding` names the character encoding of the file with a WHATWG label, such as `utf-8` (the default), `iso-8859-1` or `windows-1252`. The command stops before it signs in when a byte of the file is not valid in that encoding, so it never submits a damaged Document. The fixture Documents of `packages/fixtures` need these encodings:
+`--encoding` names the character encoding of the file: `utf-8` or `windows-1252`. The command sends the bytes of the file, with the encoding when one is named, and the API decodes them: an Interchange in the character set its UNB syntax identifier names, any other Document in the named encoding, or UTF-8 when none is named. The API refuses a file that is not valid in its encoding, so a damaged Document is never stored. The fixture Documents of `packages/fixtures` need these encodings:
 
-| Fixture          | Encoding       |
-| ---------------- | -------------- |
-| `orders-*.edi`   | `iso-8859-1`   |
-| `invoice-*.json` | `utf-8`        |
-| `dispatch-*.csv` | `windows-1252` |
+| Fixture          | Encoding               |
+| ---------------- | ---------------------- |
+| `orders-*.edi`   | none, the UNB names it |
+| `invoice-*.json` | `utf-8`                |
+| `dispatch-*.csv` | `windows-1252`         |
 
 For example:
 

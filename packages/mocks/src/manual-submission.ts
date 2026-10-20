@@ -1,6 +1,15 @@
 import { http, HttpResponse } from 'msw'
 
-import { directionOf, submitDocumentEndpoint, type TradingPartner } from '@edi-bridge/contracts'
+import {
+  decodeBase64,
+  directionOf,
+  type CharacterEncoding,
+  documentUndecodableProblem,
+  documentUndecodableStatus,
+  submitDocumentEndpoint,
+  type TradingPartner,
+} from '@edi-bridge/contracts'
+import { decodeDocument } from '@edi-bridge/edifact'
 
 import { type ChannelRecord, type ChannelStore, toChannelStore } from './channel'
 import { type FlowRecord, type FlowStore, toFlowStore } from './flow'
@@ -20,6 +29,19 @@ export function messageTypesOf(content: string): string[] | null {
   }
 
   return [...content.matchAll(messageHeader)].flatMap(([, type]) => (type ? [type] : []))
+}
+
+function decodedContent(content: string, encoding: CharacterEncoding = 'utf-8') {
+  const decoded = decodeDocument(decodeBase64(content), encoding)
+
+  return 'text' in decoded
+    ? { text: decoded.text }
+    : {
+        problem: documentUndecodableProblem(
+          decoded.reason,
+          decoded.characterSet === undefined ? encoding : null,
+        ),
+      }
 }
 
 type Outcome = { flow: FlowRecord; failed: boolean }
@@ -76,6 +98,12 @@ export function manualSubmissionHandler(
       return badRequest(body.error.message)
     }
 
+    const decoded = decodedContent(body.data.document.content, body.data.document.encoding)
+
+    if ('problem' in decoded) {
+      return HttpResponse.json(decoded.problem, { status: documentUndecodableStatus })
+    }
+
     const channel = channelStore.get(body.data.channelId)
 
     if (!channel) {
@@ -97,10 +125,7 @@ export function manualSubmissionHandler(
       return unprocessable('No Flow routes Documents from this Channel')
     }
 
-    const { outcomes: routedOutcomes, notRouted } = routingOf(body.data.document.content, [
-      first,
-      ...rest,
-    ])
+    const { outcomes: routedOutcomes, notRouted } = routingOf(decoded.text, [first, ...rest])
 
     if (routedOutcomes.length === 0) {
       return unprocessable('No Flow on this Channel routes a Message of this Document')

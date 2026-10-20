@@ -6,7 +6,14 @@ import type { LanguageModel } from 'ai'
 import type { FastifyServerOptions, InjectOptions, LightMyRequestResponse } from 'fastify'
 
 import { secretKeyBytes } from '@edi-bridge/channels'
-import { signInEndpoint, type WorkspaceRole } from '@edi-bridge/contracts'
+import {
+  type CharacterEncoding,
+  encodeBase64,
+  encodeText,
+  signInEndpoint,
+  type SubmittedDocument,
+  type WorkspaceRole,
+} from '@edi-bridge/contracts'
 import {
   connect,
   documents,
@@ -46,6 +53,16 @@ export const otherWorkspace = {
 }
 
 export const today = () => utcDay(Date.now())
+
+export const submittedDocument = (
+  fileName: string,
+  text: string,
+  encoding?: CharacterEncoding,
+): SubmittedDocument => ({
+  fileName,
+  content: encodeBase64(encodeText(text, encoding ?? 'utf-8')),
+  encoding,
+})
 
 export const webOrigin = 'http://localhost:3000'
 

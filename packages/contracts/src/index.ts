@@ -191,6 +191,7 @@ export {
   adjustDocumentStructure,
   applyLabels,
   documentStructureLeaves,
+  decodeBase64,
   DocumentStructureProblemError,
   encodeBase64,
   findNode,
@@ -292,11 +293,16 @@ export {
 
 export {
   documentSchema,
+  documentUndecodableProblem,
+  type DocumentUndecodableProblem,
+  documentUndecodableProblemSchema,
+  documentUndecodableStatus,
   type ManualSubmission,
   type ManualSubmissionInput,
   manualSubmissionInputSchema,
   manualSubmissionSchema,
-  maxDocumentLength,
+  maxDocumentBase64Length,
+  maxDocumentBytes,
   submitDocumentEndpoint,
   type SubmittedDocument,
 } from './manual-submission'
