@@ -13,6 +13,7 @@ import {
 } from '@/components/mappings/create-mapping-with-draft'
 import { useCanChange } from '@/hooks/use-session'
 import { documentStructuresQuery } from '@/lib/api/queries'
+import { onlyDocumentStructureId } from '@/lib/document-structures'
 import { newMappingHref } from '@/lib/navigation'
 import { Button, buttonVariants } from '@edi-bridge/ui/components/button'
 import { Spinner } from '@edi-bridge/ui/components/spinner'
@@ -202,16 +203,6 @@ function MiniMapping({ sketch, className }: { sketch: Sketch; className: string 
   )
 }
 
-function onlyDocumentStructureId(
-  documentStructures: ReadonlyArray<{ id: string }> | undefined,
-): string | null {
-  const [only, ...others] = documentStructures ?? []
-
-  return only !== undefined && others.length === 0 ? only.id : null
-}
-
-// The promo drafts right away only when the Workspace has exactly one Document Structure; otherwise
-// the create step lets the Admin choose it.
 function DraftAction() {
   const t = useTranslations('Home.promo')
   const tCreate = useTranslations('Mappings.create')

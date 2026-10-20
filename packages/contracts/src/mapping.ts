@@ -235,6 +235,8 @@ export const mappingsEndpoint: Endpoint<MappingSummary[]> = {
 
 export const newMappingMessageTypes = ['ORDERS', 'DESADV', 'INVOIC'] as const
 
+export type NewMappingMessageType = (typeof newMappingMessageTypes)[number]
+
 export const createMappingBodySchema = z.strictObject({
   messageType: messageTypeSchema.extract(newMappingMessageTypes),
   documentStructureId: z.uuid().optional(),

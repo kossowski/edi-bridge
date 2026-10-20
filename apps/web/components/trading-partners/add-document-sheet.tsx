@@ -32,6 +32,7 @@ import {
   directionOf,
   type Flow,
   type MappingSummary,
+  type NewMappingMessageType,
   newMappingMessageTypes,
 } from '@edi-bridge/contracts'
 import { Button, buttonVariants } from '@edi-bridge/ui/components/button'
@@ -44,8 +45,6 @@ import {
 } from '@edi-bridge/ui/components/sheet'
 
 import type { TradingPartner } from '@edi-bridge/contracts'
-
-type NewMappingMessageType = (typeof newMappingMessageTypes)[number]
 
 type Drafting = { mapping: MappingSummary; document: string }
 

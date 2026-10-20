@@ -24,18 +24,14 @@ import {
   mappingFilters,
   matchesFilter,
 } from '@/components/mappings/mapping-state'
-import {
-  NewMappingChoices,
-  NewMappingSheet,
-  type NewMessageType,
-} from '@/components/mappings/new-mapping'
+import { NewMappingChoices, NewMappingSheet } from '@/components/mappings/new-mapping'
 import { useCanChange } from '@/hooks/use-session'
 import { mappingsQuery } from '@/lib/api/queries'
 import { navigationItems } from '@/lib/navigation'
 import { Button } from '@edi-bridge/ui/components/button'
 import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 
-import type { Direction, MappingSummary } from '@edi-bridge/contracts'
+import type { Direction, MappingSummary, NewMappingMessageType } from '@edi-bridge/contracts'
 
 const directions = ['inbound', 'outbound'] as const satisfies ReadonlyArray<Direction>
 
@@ -112,7 +108,7 @@ function FirstMapping({
   messageType,
 }: {
   canChange: boolean
-  messageType: NewMessageType | null
+  messageType: NewMappingMessageType | null
 }) {
   const t = useTranslations('Mappings')
   const titleId = useId()
@@ -151,7 +147,7 @@ function FirstMapping({
 export function MappingsScreen({
   newMessageType = null,
 }: {
-  newMessageType?: NewMessageType | null
+  newMessageType?: NewMappingMessageType | null
 }) {
   const t = useTranslations()
   const tMappings = useTranslations('Mappings')

@@ -14,11 +14,12 @@ import {
 import { DirectionHint } from '@/components/mappings/direction-path'
 import { usePlainNames } from '@/components/plain-names'
 import { documentStructuresQuery } from '@/lib/api/queries'
+import { onlyDocumentStructureId } from '@/lib/document-structures'
 import {
-  type CreateMappingBody,
   type Direction,
   directionOf,
   type DocumentStructureSummary,
+  type NewMappingMessageType,
   newMappingMessageTypes,
 } from '@edi-bridge/contracts'
 import { Alert, AlertDescription } from '@edi-bridge/ui/components/alert'
@@ -37,15 +38,13 @@ import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 import { Spinner } from '@edi-bridge/ui/components/spinner'
 import { cn } from '@edi-bridge/ui/lib/utils'
 
-export type NewMessageType = CreateMappingBody['messageType']
-
 function Choice({
   messageType,
   locked,
   chosen,
   onChoose,
 }: {
-  messageType: NewMessageType
+  messageType: NewMappingMessageType
   locked: boolean
   chosen: boolean
   onChoose: () => void
@@ -153,7 +152,7 @@ export function NewMappingChoices({
   className,
 }: {
   direction: Direction | null
-  messageType?: NewMessageType | null
+  messageType?: NewMappingMessageType | null
   className?: string
 }) {
   const t = useTranslations('Mappings.new.documentStructure')
@@ -165,7 +164,7 @@ export function NewMappingChoices({
 
   const available = documentStructures.data ?? []
   const chosen = available.some(({ id }) => id === chosenId) ? chosenId : ''
-  const documentStructureId = available.length === 1 ? (available[0]?.id ?? '') : chosen
+  const documentStructureId = onlyDocumentStructureId(available) ?? chosen
 
   if (documentStructures.isError) {
     return <DocumentStructuresUnavailable onRetry={() => void documentStructures.refetch()} />
@@ -181,7 +180,7 @@ export function NewMappingChoices({
       : !direction || directionOf({ messageType: candidate }) === direction,
   )
 
-  function choose(messageType: NewMessageType) {
+  function choose(messageType: NewMappingMessageType) {
     if (documentStructures.isPending) {
       return
     }
@@ -245,7 +244,7 @@ export function NewMappingSheet({
 }: {
   open: boolean
   direction: Direction | null
-  messageType: NewMessageType | null
+  messageType: NewMappingMessageType | null
   onOpenChange: (open: boolean) => void
 }) {
   const t = useTranslations('Mappings.new')
