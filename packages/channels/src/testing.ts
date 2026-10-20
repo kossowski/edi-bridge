@@ -5,6 +5,8 @@ import { z } from 'zod'
 
 import type { Server } from 'node:net'
 
+import { hostKeyFingerprintSchema } from '@edi-bridge/contracts'
+
 const sftpImage =
   'atmoz/sftp:alpine@sha256:7e439fabeae536fa254340724c042e11999924d906417dbb5c73602ad518813f'
 
@@ -29,12 +31,22 @@ export async function startTestSftpServer() {
     .withWaitStrategy(Wait.forLogMessage(/Server listening on/))
     .start()
 
+  // ssh2 prefers an Ed25519 host key, so that is the one the server presents.
+  const { output } = await container.exec([
+    'ssh-keygen',
+    '-lf',
+    '/etc/ssh/ssh_host_ed25519_key.pub',
+  ])
+
+  const hostKeyFingerprint = hostKeyFingerprintSchema.parse(/SHA256:\S+/.exec(output)?.[0])
+
   return {
     host: container.getHost(),
     port: container.getMappedPort(22),
     username,
     password,
     privateKey: keyPair.private,
+    hostKeyFingerprint,
     home: `/home/${username}`,
     exec: async (command: string) => container.exec(['sh', '-c', command]),
     stop: async () => {

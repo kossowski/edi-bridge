@@ -1,4 +1,4 @@
-import type { SftpAuthentication } from '@edi-bridge/contracts'
+import type { HostKeyFingerprint, SftpAuthentication } from '@edi-bridge/contracts'
 
 import { type SecretBox, secretContext } from './secret'
 
@@ -12,11 +12,21 @@ export interface SftpChannel {
   remotePath: string | null
   authentication: SftpAuthentication | null
   encryptedCredential: string | null
+  hostKeyFingerprint?: HostKeyFingerprint | null
 }
 
 // The database checks that an SFTP Channel has all its settings, so a missing one is a defect.
 export const sftpLogin = (secrets: SecretBox, channel: SftpChannel): SftpLogin => {
-  const { id, host, port, username, remotePath, authentication, encryptedCredential } = channel
+  const {
+    id,
+    host,
+    port,
+    username,
+    remotePath,
+    authentication,
+    encryptedCredential,
+    hostKeyFingerprint,
+  } = channel
 
   if (
     host === null ||
@@ -36,6 +46,7 @@ export const sftpLogin = (secrets: SecretBox, channel: SftpChannel): SftpLogin =
     port,
     username,
     remotePath,
+    hostKeyFingerprint: hostKeyFingerprint ?? null,
     credential:
       authentication === 'password' ? { password: credential } : { privateKey: credential },
   }

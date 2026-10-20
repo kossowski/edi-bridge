@@ -140,6 +140,32 @@ describe('uploadSftp', () => {
     ).toEqual(new DeliveryFailed({ reason: 'permissionDenied' }))
   })
 
+  it('uploads to a server whose host key matches the stored fingerprint', async () => {
+    await Effect.runPromise(
+      uploadSftp(
+        { ...outbox(), hostKeyFingerprint: sftp.hostKeyFingerprint },
+        interchange('orders-49.edi'),
+        { timeoutMs },
+      ),
+    )
+
+    expect(await remoteListing('/upload')).toContain('orders-49.edi')
+  })
+
+  it('refuses a server whose host key does not match and uploads nothing', async () => {
+    expect(
+      await failure(
+        uploadSftp(
+          { ...outbox(), hostKeyFingerprint: `SHA256:${'A'.repeat(43)}` },
+          interchange('orders-50.edi'),
+          { timeoutMs },
+        ),
+      ),
+    ).toEqual(new DeliveryFailed({ reason: 'hostKeyMismatch' }))
+
+    expect(await remoteListing('/upload')).not.toContain('orders-50.edi')
+  })
+
   it('reports a host that refuses the connection as unreachable', async () => {
     const port = await refusedPort()
 
@@ -194,6 +220,17 @@ describe('sftpChannelDelivery', () => {
     )
 
     expect(await remoteListing('/upload')).toContain('desadv-8.edi')
+  })
+
+  it('checks the host key against the fingerprint the channel stores', async () => {
+    expect(
+      await failure(
+        deliver(
+          { ...outboundChannel(), hostKeyFingerprint: `SHA256:${'A'.repeat(43)}` },
+          interchange('desadv-10.edi'),
+        ),
+      ),
+    ).toEqual(new DeliveryFailed({ reason: 'hostKeyMismatch' }))
   })
 
   it('refuses a credential sealed for another channel', async () => {

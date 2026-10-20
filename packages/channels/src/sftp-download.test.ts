@@ -137,6 +137,31 @@ describe('sftpChannelDownload', () => {
     )
   })
 
+  it('lists the files of a server whose host key matches the stored fingerprint', async () => {
+    const channel = await inbox('pinned', { 'orders-1.edi': 'UNB' })
+
+    expect(await listedNames({ ...channel, hostKeyFingerprint: sftp.hostKeyFingerprint })).toEqual([
+      'orders-1.edi',
+    ])
+  })
+
+  it('refuses a server whose host key does not match the stored fingerprint', async () => {
+    const channel = await inbox('impostor', { 'orders-1.edi': 'UNB' })
+    const impostor = { ...channel, hostKeyFingerprint: `SHA256:${'A'.repeat(43)}` }
+
+    for (const attempt of [
+      download.list(impostor),
+      download.read(impostor, 'orders-1.edi'),
+      download.remove(impostor, 'orders-1.edi'),
+    ]) {
+      expect(await Effect.runPromise(Effect.flip(attempt))).toEqual(
+        new DownloadFailed({ reason: 'hostKeyMismatch' }),
+      )
+    }
+
+    expect(await listedNames(channel)).toEqual(['orders-1.edi'])
+  })
+
   it('refuses a credential sealed for another channel', async () => {
     const exit = await Effect.runPromiseExit(
       download.list({
