@@ -1,6 +1,7 @@
 import { delay, http, HttpResponse } from 'msw'
 
 import {
+  type AiNoticeReason,
   applyLookupTableImport,
   classifyLookupTableImport,
   codeMeaningsOf,
@@ -21,6 +22,7 @@ import {
   languageQuerySchema,
   type LookupTableImportRow,
   type LookupTableInput,
+  lookupTableMissingCodeHintsEndpoint,
   lookupTableMissingCodesEndpoint,
   type LookupTableScope,
   type LookupTableScopeInput,
@@ -31,6 +33,7 @@ import {
   type LookupTableUse,
   type MissingCode,
   type MissingCodeCounts,
+  missingCodeHintsNotices,
   type RunSummary,
   type TradingPartner,
   type TradingPartnerSummary,
@@ -43,7 +46,7 @@ import { aiBudgetOf } from './ai-budget'
 import { type ChannelRecord, type ChannelStore, seedChannels, toChannelStore } from './channel'
 import { type FlowRecord, type FlowStore, seedFlows, toFlowStore } from './flow'
 import { lookupTableFailureOf } from './interchange'
-import { firstValuesOf, hintFor } from './lookup-table-codes'
+import { aiHintOf, firstValuesOf, knownMeaningOf, ownCodeHintOf } from './lookup-table-codes'
 import {
   type LookupTableRecord,
   type LookupTableStore,
@@ -326,7 +329,7 @@ export function createLookupTableUsage(
       .map(([code, references]) => ({
         urgency: 'blocking' as const,
         code,
-        ...hintFor(table.kind, code, language),
+        ...ownCodeHintOf(table.kind, code, language),
         failedRuns: references.toSorted(newestFirst),
       }))
       .toSorted((a, b) => newestFirst(a.failedRuns[0]!, b.failedRuns[0]!))
@@ -336,7 +339,14 @@ export function createLookupTableUsage(
       .flatMap(({ code, itemCount }): MissingCode[] =>
         translated.has(code) || failedRuns.has(code)
           ? []
-          : [{ urgency: 'upcoming', code, ...hintFor(table.kind, code, language), itemCount }],
+          : [
+              {
+                urgency: 'upcoming',
+                code,
+                ...ownCodeHintOf(table.kind, code, language),
+                itemCount,
+              },
+            ],
       )
 
     return [...blocking, ...upcoming]
@@ -389,6 +399,7 @@ function stateHandlers(apiUrl: string, state: LookupTablesState) {
     http.get(`${apiUrl}${lookupTablesEndpoint.path}`, respond),
     http.get(`${apiUrl}${lookupTableSuggestionsEndpoint.path}`, respond),
     http.get(`${apiUrl}${lookupTableMissingCodesEndpoint.path}`, respond),
+    http.post(`${apiUrl}${lookupTableMissingCodeHintsEndpoint.path}`, respond),
     http.get(`${apiUrl}${lookupTableEndpoint.path}`, respond),
   ]
 }
@@ -411,6 +422,7 @@ export function lookupTableHandlers(
     session = seedSession,
     settings,
     suggestions,
+    missingCodeHintsNotice,
     ...world
   }: {
     lookupTables?: ReadonlyArray<LookupTableRecord> | LookupTableStore | LookupTablesState
@@ -418,6 +430,7 @@ export function lookupTableHandlers(
     session?: Session | null | SessionStore
     settings?: WorkspaceSettings | WorkspaceSettingsStore
     suggestions?: LookupTableSuggestionsState | undefined
+    missingCodeHintsNotice?: AiNoticeReason | undefined
   } & LookupTableWorld = {},
 ) {
   if (lookupTables === 'loading' || lookupTables === 'error') {
@@ -547,6 +560,36 @@ export function lookupTableHandlers(
           ? HttpResponse.json(usageOf(table, query.data.language).missingCodes)
           : notFound()
       },
+    ),
+    http.post<{ id: string }>(
+      `${apiUrl}${lookupTableMissingCodeHintsEndpoint.path}`,
+      adminOnly(sessionStore, ({ params, request }) => {
+        const query = languageOf(request)
+
+        if (!query.success) {
+          return badRequest(query.error.message)
+        }
+
+        const table = store.get(params.id)
+
+        if (!table) {
+          return notFound()
+        }
+
+        const { language } = query.data
+        const { missingCodes } = usageOf(table, language)
+
+        // Like the api, a table without missing codes asks no model, so it has no notice.
+        const { hintOf, notice } =
+          missingCodeHintsNotice && missingCodes.length > 0
+            ? { hintOf: knownMeaningOf, notice: missingCodeHintsNotices[missingCodeHintsNotice] }
+            : { hintOf: aiHintOf, notice: null }
+
+        return HttpResponse.json({
+          hints: missingCodes.map(({ code }) => ({ code, ...hintOf(table.kind, code, language) })),
+          notice,
+        })
+      }),
     ),
     http.post(
       `${apiUrl}${createLookupTableEndpoint.path}`,

@@ -13,6 +13,7 @@ import {
   lookupTableEndpoint,
   lookupTableInUseMessage,
   lookupTableInUseStatus,
+  lookupTableMissingCodeHintsEndpoint,
   lookupTableMissingCodesEndpoint,
   lookupTableSchema,
   lookupTablesEndpoint,
@@ -621,6 +622,147 @@ describe('GET /lookup-tables/:id/missing-codes', () => {
   })
 })
 
+async function hintMissingCodes(id: string, language?: string) {
+  return send(
+    'POST',
+    inLanguage(toPath(lookupTableMissingCodeHintsEndpoint.path, { id }), language),
+  )
+}
+
+async function getHints(id: string, language?: string) {
+  const response = await hintMissingCodes(id, language)
+
+  return lookupTableMissingCodeHintsEndpoint.response.parse(await response.json())
+}
+
+describe('POST /lookup-tables/:id/missing-codes/hints', () => {
+  it('explains the own codes of the missing codes and suggests partner codes', async () => {
+    server.use(...lookupTableHandlers(apiUrl, { runs: [newerFailure] }))
+    const units = seedLookupTableNamed('Units of measure')
+    const anySuggestions: unknown = expect.any(Array)
+
+    expect(await getHints(units.id)).toEqual({
+      hints: [
+        {
+          code: 'KRT',
+          meaning: 'Carton',
+          suggestions: [
+            { code: 'CT', meaning: 'Carton' },
+            { code: 'PK', meaning: 'Package' },
+            { code: 'BX', meaning: 'Box' },
+          ],
+        },
+        { code: 'BTL', meaning: 'Bottle', suggestions: anySuggestions },
+        { code: 'SET', meaning: 'Set', suggestions: anySuggestions },
+      ],
+      notice: null,
+    })
+  })
+
+  it('explains the codes and their suggestions in German', async () => {
+    server.use(...lookupTableHandlers(apiUrl, { runs: [newerFailure] }))
+    const units = seedLookupTableNamed('Units of measure')
+
+    const { hints } = await getHints(units.id, 'de')
+
+    expect(hints[0]).toEqual({
+      code: 'KRT',
+      meaning: 'Karton',
+      suggestions: [
+        { code: 'CT', meaning: 'Karton' },
+        { code: 'PK', meaning: 'Packung' },
+        { code: 'BX', meaning: 'Kiste' },
+      ],
+    })
+  })
+
+  it('suggests a partner code for an own code that has no meaning of its own', async () => {
+    server.use(...lookupTableHandlers(apiUrl, { runs: [] }))
+
+    const { hints } = await getHints(seedLookupTableNamed('Country codes').id)
+
+    expect(hints).toEqual([
+      {
+        code: 'Polen',
+        meaning: null,
+        suggestions: [{ code: 'PL', meaning: 'Poland' }],
+      },
+    ])
+  })
+
+  it('explains the codes without AI when the AI budget is used up', async () => {
+    server.use(
+      ...lookupTableHandlers(apiUrl, {
+        runs: [newerFailure],
+        missingCodeHintsNotice: 'aiBudgetExhausted',
+      }),
+    )
+
+    const units = seedLookupTableNamed('Units of measure')
+    const response = await hintMissingCodes(units.id)
+
+    const { hints, notice } = lookupTableMissingCodeHintsEndpoint.response.parse(
+      await response.json(),
+    )
+
+    expect(response.status).toBe(200)
+    expect(notice?.reason).toBe('aiBudgetExhausted')
+    expect(hints).toEqual([
+      { code: 'KRT', meaning: null, suggestions: [] },
+      { code: 'BTL', meaning: null, suggestions: [] },
+      { code: 'SET', meaning: 'Set', suggestions: [{ code: 'SET', meaning: 'Set' }] },
+    ])
+  })
+
+  it('explains the codes without AI when the AI is unavailable', async () => {
+    server.use(
+      ...lookupTableHandlers(apiUrl, {
+        runs: [newerFailure],
+        missingCodeHintsNotice: 'aiUnavailable',
+      }),
+    )
+
+    const { hints, notice } = await getHints(seedLookupTableNamed('Units of measure').id)
+
+    expect(notice).toEqual({
+      reason: 'aiUnavailable',
+      message: 'AI unavailable; codes explained without AI',
+    })
+    expect(hints.map(({ meaning }) => meaning)).toEqual([null, null, 'Set'])
+  })
+
+  it.each([undefined, 'aiBudgetExhausted', 'aiUnavailable'] as const)(
+    'answers no hints and no notice for a table without missing codes (notice %s)',
+    async (missingCodeHintsNotice) => {
+      server.use(...lookupTableHandlers(apiUrl, { runs: [], missingCodeHintsNotice }))
+
+      expect(await getHints(seedLookupTableNamed('VAT categories').id)).toEqual({
+        hints: [],
+        notice: null,
+      })
+    },
+  )
+
+  it('explains a large volume of missing codes', async () => {
+    const [large] = createLookupTables({ count: 1, blockingCodeCount: 200, upcomingCodeCount: 500 })
+    server.use(...lookupTableHandlers(apiUrl, { lookupTables: [large!], runs: [] }))
+
+    const { hints } = await getHints(large!.id)
+
+    expect(hints.map(({ code }) => code)).toEqual(
+      (await getMissingCodes(large!.id)).map(({ code }) => code),
+    )
+    expect(hints).toHaveLength(700)
+  })
+
+  it('answers 404 for an unknown Lookup Table and 400 for an unknown language', async () => {
+    server.use(...lookupTableHandlers(apiUrl, { lookupTables: [] }))
+
+    expect((await hintMissingCodes(seedLookupTables[0]!.id)).status).toBe(404)
+    expect((await hintMissingCodes(seedLookupTables[0]!.id, 'fr')).status).toBe(400)
+  })
+})
+
 describe('Lookup Table uses', () => {
   it('names the Mappings that use a table with the Trading Partners of their Flows', async () => {
     server.use(...lookupTableHandlers(apiUrl), ...mappingHandlers(apiUrl))
@@ -813,6 +955,7 @@ describe('lookupTableHandlers states', () => {
     ['GET', toPath(lookupTableEndpoint.path, { id: seedLookupTables[0]!.id })],
     ['GET', toPath(lookupTableMissingCodesEndpoint.path, { id: seedLookupTables[0]!.id })],
     ['GET', `${lookupTableSuggestionsEndpoint.path}?kind=units`],
+    ['POST', toPath(lookupTableMissingCodeHintsEndpoint.path, { id: seedLookupTables[0]!.id })],
   ])('answers %s %s with a server error in the error state', async (method, path) => {
     server.use(...lookupTableHandlers(apiUrl, { lookupTables: 'error' }))
 
@@ -835,6 +978,10 @@ describe('lookupTableHandlers for a Viewer', () => {
     [
       'ask for suggested values',
       () => send('GET', `${lookupTableSuggestionsEndpoint.path}?kind=units`),
+    ],
+    [
+      'ask the AI about missing codes',
+      () => send('POST', path(lookupTableMissingCodeHintsEndpoint)),
     ],
   ])('answers 403 to %s and changes nothing', async (_, request) => {
     server.use(...lookupTableHandlers(apiUrl, { session: showcaseViewerSession }))

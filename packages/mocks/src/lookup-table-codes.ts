@@ -37,14 +37,32 @@ const firstValues: Readonly<Record<LookupTableKind, ReadonlyArray<readonly [stri
   other: [],
 }
 
-export function hintFor(kind: LookupTableKind, code: string, language: Language) {
+// Without AI a code is explained only when it is itself a known code, as the api does.
+export function knownMeaningOf(kind: LookupTableKind, code: string, language: Language) {
+  const meaning = codeMeaningOf(kind, code, language)
+
+  return { meaning, suggestions: meaning === null ? [] : [{ code, meaning }] }
+}
+
+function findOwnCodeHint(kind: LookupTableKind, code: string, language: Language) {
   const hint = ownCodeHints[kind].get(code)
-  const meansCode = hint?.meansCode ?? null
+
+  if (!hint) {
+    return null
+  }
 
   return {
-    meaning: meansCode === null ? null : codeMeaningOf(kind, meansCode, language),
-    suggestions: codeMeaningsOf(kind, hint?.suggestions ?? [], language),
+    meaning: hint.meansCode === null ? null : codeMeaningOf(kind, hint.meansCode, language),
+    suggestions: codeMeaningsOf(kind, hint.suggestions, language),
   }
+}
+
+export function ownCodeHintOf(kind: LookupTableKind, code: string, language: Language) {
+  return findOwnCodeHint(kind, code, language) ?? { meaning: null, suggestions: [] }
+}
+
+export function aiHintOf(kind: LookupTableKind, code: string, language: Language) {
+  return findOwnCodeHint(kind, code, language) ?? knownMeaningOf(kind, code, language)
 }
 
 export function firstValuesOf(kind: LookupTableKind, language: Language): SuggestedEntry[] {

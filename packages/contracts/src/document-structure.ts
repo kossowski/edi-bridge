@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import { type AiNotice, type AiNoticeReason, aiNoticeSchema } from './ai-notice'
 import { mappingVersionSummarySchema } from './mapping-version'
 
 import type { Endpoint } from './endpoint'
@@ -342,28 +343,17 @@ export const documentStructureOriginSchema = z.discriminatedUnion('kind', [
 
 export type DocumentStructureOrigin = z.infer<typeof documentStructureOriginSchema>
 
-export const fieldNamesNoticeReasons = ['aiBudgetExhausted', 'aiUnavailable'] as const
-
-export const fieldNamesNoticeSchema = z.object({
-  reason: z.enum(fieldNamesNoticeReasons),
-  message: z.string().min(1),
-})
-
-export type FieldNamesNotice = z.infer<typeof fieldNamesNoticeSchema>
-
-export type FieldNamesNoticeReason = FieldNamesNotice['reason']
-
 export const fieldNamesNotices = {
   aiBudgetExhausted: {
     reason: 'aiBudgetExhausted',
     message: 'AI budget used up for today; fields named without AI',
   },
   aiUnavailable: { reason: 'aiUnavailable', message: 'AI unavailable; fields named without AI' },
-} as const satisfies Record<FieldNamesNoticeReason, FieldNamesNotice>
+} as const satisfies Record<AiNoticeReason, AiNotice>
 
 export const documentStructureInferenceSchema = z.intersection(
   inferredDocumentStructureSchema,
-  z.object({ fieldNamesNotice: fieldNamesNoticeSchema.nullable() }),
+  z.object({ fieldNamesNotice: aiNoticeSchema.nullable() }),
 )
 
 export type DocumentStructureInference = z.infer<typeof documentStructureInferenceSchema>
