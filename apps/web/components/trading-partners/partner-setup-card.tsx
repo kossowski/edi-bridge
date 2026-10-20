@@ -1,15 +1,23 @@
 'use client'
 
-import { CheckmarkCircle02Icon, Loading03Icon, Rocket01Icon } from '@hugeicons/core-free-icons'
+import {
+  AlertCircleIcon,
+  CheckmarkCircle02Icon,
+  Loading03Icon,
+  Rocket01Icon,
+} from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { useEffect, useId, useRef, useState } from 'react'
 
+import { linkClass } from '@/components/detail-parts'
 import {
   awaitsReceiptConfirmation,
+  awaitsTestHandover,
   type PartnerActivityProps,
+  testRejected,
 } from '@/components/trading-partners/partner-page-helpers'
 import {
   type PartnerSetup,
@@ -18,11 +26,17 @@ import {
   type PartnerSetupStepState,
 } from '@/components/trading-partners/partner-setup'
 import { useSession } from '@/hooks/use-session'
-import { sendTestInterchange, switchToProduction } from '@/lib/api/client'
-import { currentWorkspaceQuery, storeSavedTradingPartner } from '@/lib/api/queries'
+import { sendTestInterchange, switchToProduction, testInterchangeRefusalOf } from '@/lib/api/client'
+import {
+  currentWorkspaceQuery,
+  storeSavedTradingPartner,
+  tradingPartnerKeys,
+} from '@/lib/api/queries'
+import { documentHref, flowHref } from '@/lib/navigation'
 import {
   canSendTestInterchange,
   canSwitchToProduction,
+  type TestInterchangeRefusal,
   type TradingPartner,
 } from '@edi-bridge/contracts'
 import {
@@ -64,6 +78,25 @@ const stepBadges = {
   open: 'outline',
 } as const satisfies Record<PartnerSetupStepState, 'secondary' | 'default' | 'outline'>
 
+function SendRefused({ refusal, name }: { refusal: TestInterchangeRefusal; name: string }) {
+  const t = useTranslations('TradingPartner.setup.sendRefused')
+
+  switch (refusal.reason) {
+    case 'notAwaited':
+    case 'noOutboundFlow':
+      return t(refusal.reason, { name })
+    case 'sampleMissing':
+      return t.rich('sampleMissing', {
+        flow: refusal.flow.name,
+        link: (chunks) => (
+          <Link href={flowHref(refusal.flow.id)} className={linkClass}>
+            {chunks}
+          </Link>
+        ),
+      })
+  }
+}
+
 function SendTestDocument({
   tradingPartner,
   again,
@@ -75,23 +108,27 @@ function SendTestDocument({
   const queryClient = useQueryClient()
 
   const send = useMutation({
+    mutationKey: tradingPartnerKeys.testInterchange(tradingPartner.id),
     mutationFn: () => sendTestInterchange(tradingPartner.id),
     onSuccess: (updated) => storeSavedTradingPartner(queryClient, updated),
   })
+
+  const refusal = testInterchangeRefusalOf(send.error)
+  const sending = send.isPending || awaitsTestHandover(tradingPartner, send.isSuccess)
 
   return (
     <div className="flex flex-col gap-2">
       <Button
         size="sm"
         variant={again ? 'outline' : 'default'}
-        aria-disabled={send.isPending || undefined}
+        aria-disabled={sending || undefined}
         className="w-fit aria-disabled:cursor-progress aria-disabled:opacity-50"
         onClick={() => {
-          if (!send.isPending) {
+          if (!sending) {
             send.mutate()
           }
         }}>
-        {send.isPending
+        {sending
           ? t('actions.sending')
           : again
             ? t('actions.resend')
@@ -99,7 +136,7 @@ function SendTestDocument({
       </Button>
       {send.isError && (
         <p role="alert" className="text-destructive-text text-sm">
-          {t('sendFailed')}
+          {refusal ? <SendRefused name={tradingPartner.name} refusal={refusal} /> : t('sendFailed')}
         </p>
       )}
     </div>
@@ -207,6 +244,27 @@ function Waiting({ tradingPartner }: { tradingPartner: TradingPartner }) {
   )
 }
 
+function Rejected({ name, runId }: { name: string; runId: string | null }) {
+  const t = useTranslations('TradingPartner.setup')
+
+  return (
+    <p className="border-destructive/40 bg-destructive/10 flex flex-wrap items-start gap-x-2 gap-y-1 rounded-lg border p-3 text-sm">
+      <HugeiconsIcon
+        icon={AlertCircleIcon}
+        strokeWidth={2}
+        aria-hidden
+        className="text-destructive-text mt-0.5 size-4 shrink-0"
+      />
+      <span>{t('rejected', { name })}</span>
+      {runId && (
+        <Link href={documentHref(runId)} className={linkClass}>
+          {t('rejectedReason')}
+        </Link>
+      )}
+    </p>
+  )
+}
+
 function Confirmed({ tradingPartner }: { tradingPartner: TradingPartner }) {
   const t = useTranslations('TradingPartner.setup')
 
@@ -274,7 +332,14 @@ function StepAction({ item, context }: { item: PartnerSetupItem; context: SetupC
     case 'awaitConfirmation':
       return (
         <>
-          <Waiting tradingPartner={tradingPartner} />
+          {testRejected(tradingPartner) ? (
+            <Rejected
+              name={tradingPartner.name}
+              runId={tradingPartner.onboarding.testRejectedRunId}
+            />
+          ) : (
+            <Waiting tradingPartner={tradingPartner} />
+          )}
           {canChange && canSendTestInterchange(tradingPartner, workspaceGln) && (
             <SendTestDocument again tradingPartner={tradingPartner} />
           )}
@@ -399,7 +464,9 @@ export function PartnerSetupCard({
 
   const status = !tradingPartner.testMode
     ? wentLive && t('goLive.done', { name })
-    : sawWaiting && !awaiting && t('arrived', { name })
+    : sawWaiting &&
+      !awaiting &&
+      (testRejected(tradingPartner) ? t('rejected', { name }) : t('arrived', { name }))
 
   return (
     <Card role="region" aria-labelledby={titleId}>

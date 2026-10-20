@@ -15,6 +15,9 @@ import {
   type TradingPartnerOnboarding,
   tradingPartnerSchema,
   sendTestInterchangeEndpoint,
+  type TestInterchangeRefusal,
+  testInterchangeRefusedProblem,
+  testInterchangeRefusedStatus,
   tradingPartnersEndpoint,
   updateTradingPartnerEndpoint,
   type Workspace,
@@ -22,7 +25,7 @@ import {
 } from '@edi-bridge/contracts'
 
 import { randomGln } from './gln'
-import { conflict, unprocessable } from './responses'
+import { notFound, unprocessable } from './responses'
 import { seedId } from './seed-id'
 import { seededFaker } from './seeded-faker'
 import { seedSession, toSessionStore } from './session'
@@ -37,10 +40,20 @@ export function hasTraffic({ onboarding }: Pick<TradingPartner, 'onboarding'>) {
   return onboarding.testInterchangeSentAt !== null
 }
 
-const notStarted: TradingPartnerOnboarding = { testInterchangeSentAt: null, contrlReceivedAt: null }
+const notStarted: TradingPartnerOnboarding = {
+  testInterchangeSentAt: null,
+  contrlReceivedAt: null,
+  testRejectedAt: null,
+  testRejectedRunId: null,
+}
 
 function onboarded(day: string): TradingPartnerOnboarding {
-  return { testInterchangeSentAt: `${day}T09:12:00.000Z`, contrlReceivedAt: `${day}T09:14:30.000Z` }
+  return {
+    testInterchangeSentAt: `${day}T09:12:00.000Z`,
+    contrlReceivedAt: `${day}T09:14:30.000Z`,
+    testRejectedAt: null,
+    testRejectedRunId: null,
+  }
 }
 
 const seeds: ReadonlyArray<
@@ -89,7 +102,12 @@ const seeds: ReadonlyArray<
     characterSet: 'UNOC',
     acknowledgementTimeLimitHours: 12,
     testMode: true,
-    onboarding: { testInterchangeSentAt: '2026-10-06T14:03:00.000Z', contrlReceivedAt: null },
+    onboarding: {
+      testInterchangeSentAt: '2026-10-06T14:03:00.000Z',
+      contrlReceivedAt: null,
+      testRejectedAt: null,
+      testRejectedRunId: null,
+    },
   },
   {
     name: 'Mainfranken Getränke GmbH',
@@ -145,6 +163,8 @@ function generateTradingPartner(faker: Faker, now: Date): TradingPartner {
         stage === 'awaitingTestInterchange' || stage === 'awaitingContrl'
           ? null
           : receivedAt.toISOString(),
+      testRejectedAt: null,
+      testRejectedRunId: null,
     },
   }
 }
@@ -215,7 +235,10 @@ export function toTradingPartnerStore(
 }
 
 export type TestInterchangeOptions = {
+  handoverDelayMs?: number
   contrlDelayMs?: number | null
+  rejectingRunId?: string
+  refusal?: Exclude<TestInterchangeRefusal, { reason: 'notAwaited' }>
 }
 
 const uuid = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i
@@ -225,12 +248,22 @@ function isTradingPartnerId(id: string) {
   return uuid.test(id)
 }
 
+const refuseTestInterchange = (refusal: TestInterchangeRefusal) =>
+  HttpResponse.json(testInterchangeRefusedProblem(refusal), {
+    status: testInterchangeRefusedStatus,
+  })
+
+// Registered after the handlers of /trading-partners/<word>, so only an unknown id reaches it.
+export function tradingPartnerNotFoundHandler(apiUrl: string) {
+  return http.get(`${apiUrl}${tradingPartnerEndpoint.path}`, () => notFound())
+}
+
 export function tradingPartnerHandlers(
   apiUrl: string,
   {
     tradingPartners = seedTradingPartners,
     workspace = seedWorkspace,
-    testInterchange: { contrlDelayMs = 5000 } = {},
+    testInterchange: { handoverDelayMs = 1000, contrlDelayMs = 5000, rejectingRunId, refusal } = {},
     session = seedSession,
   }: {
     tradingPartners?: ReadonlyArray<TradingPartner> | TradingPartnerStore
@@ -242,6 +275,7 @@ export function tradingPartnerHandlers(
   const store = toTradingPartnerStore(tradingPartners)
   const sessionStore = toSessionStore(session)
   const workspaceStore = toWorkspaceStore(workspace)
+  const handoverDueAt = new Map<string, number>()
   const contrlDueAt = new Map<string, number>()
 
   function receiveDueContrls() {
@@ -254,14 +288,50 @@ export function tradingPartnerHandlers(
 
       contrlDueAt.delete(id)
 
+      const at = new Date(dueAt).toISOString()
+
       store.set({
         ...tradingPartner,
         onboarding: {
           ...tradingPartner.onboarding,
-          contrlReceivedAt: new Date(dueAt).toISOString(),
+          ...(rejectingRunId === undefined
+            ? { contrlReceivedAt: at }
+            : { testRejectedAt: at, testRejectedRunId: rejectingRunId }),
         },
       })
     }
+  }
+
+  // Like the worker, which records only the first hand-over of a Trading Partner in Test Mode.
+  function handOverDueInterchanges() {
+    for (const [id, dueAt] of handoverDueAt) {
+      const tradingPartner = store.get(id)
+
+      if (dueAt > Date.now() || !tradingPartner) {
+        continue
+      }
+
+      handoverDueAt.delete(id)
+
+      store.set({
+        ...tradingPartner,
+        onboarding: {
+          ...tradingPartner.onboarding,
+          testInterchangeSentAt:
+            tradingPartner.onboarding.testInterchangeSentAt ?? new Date(dueAt).toISOString(),
+        },
+      })
+
+      if (contrlDelayMs !== null) {
+        contrlDueAt.set(id, dueAt + contrlDelayMs)
+      }
+    }
+  }
+
+  // CONTRLs first, so a CONTRL arrives at the earliest on the check after its hand-over.
+  function advance() {
+    receiveDueContrls()
+    handOverDueInterchanges()
   }
 
   function glnTaken(gln: string | null, ownId?: string) {
@@ -286,11 +356,9 @@ export function tradingPartnerHandlers(
   const glnConflict = () =>
     HttpResponse.json({ message: 'Another Trading Partner already uses this GLN' }, { status: 409 })
 
-  const notFound = () => HttpResponse.json({ message: 'Not found' }, { status: 404 })
-
   return [
     http.get(`${apiUrl}${tradingPartnersEndpoint.path}`, () => {
-      receiveDueContrls()
+      advance()
 
       return HttpResponse.json([...store.all()].sort((a, b) => a.name.localeCompare(b.name, 'de')))
     }),
@@ -299,7 +367,7 @@ export function tradingPartnerHandlers(
         return undefined
       }
 
-      receiveDueContrls()
+      advance()
       const tradingPartner = store.get(params.id)
 
       return tradingPartner ? HttpResponse.json(tradingPartner) : notFound()
@@ -361,7 +429,7 @@ export function tradingPartnerHandlers(
     http.post<{ id: string }>(
       `${apiUrl}${switchToProductionEndpoint.path}`,
       adminOnly(sessionStore, ({ params }) => {
-        receiveDueContrls()
+        advance()
         const existing = store.get(params.id)
 
         if (!existing) {
@@ -381,7 +449,7 @@ export function tradingPartnerHandlers(
     http.post<{ id: string }>(
       `${apiUrl}${sendTestInterchangeEndpoint.path}`,
       adminOnly(sessionStore, ({ params }) => {
-        receiveDueContrls()
+        advance()
         const existing = store.get(params.id)
 
         if (!existing) {
@@ -389,26 +457,22 @@ export function tradingPartnerHandlers(
         }
 
         if (!canSendTestInterchange(existing, workspaceStore.get().gln)) {
-          return conflict('The Trading Partner does not await a test Interchange')
+          return refuseTestInterchange({ reason: 'notAwaited' })
         }
 
-        const sentAt = Date.now()
+        if (refusal) {
+          return refuseTestInterchange(refusal)
+        }
 
+        // The api answers before the worker hands the test Interchange over.
         const updated: TradingPartner = {
           ...existing,
-          onboarding: {
-            testInterchangeSentAt: new Date(sentAt).toISOString(),
-            contrlReceivedAt: null,
-          },
+          onboarding: { ...existing.onboarding, testRejectedAt: null, testRejectedRunId: null },
         }
 
         store.set(updated)
-
-        if (contrlDelayMs === null) {
-          contrlDueAt.delete(existing.id)
-        } else {
-          contrlDueAt.set(existing.id, sentAt + contrlDelayMs)
-        }
+        contrlDueAt.delete(existing.id)
+        handoverDueAt.set(existing.id, Date.now() + handoverDelayMs)
 
         return HttpResponse.json(updated)
       }),

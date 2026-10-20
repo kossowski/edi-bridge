@@ -5,6 +5,8 @@ import {
   canSwitchToProduction,
   glnRequired,
   onboardingChecklist,
+  testInterchangeRefusedProblem,
+  testInterchangeRefusedProblemSchema,
   type TradingPartner,
   tradingPartnerInputSchema,
 } from './trading-partner'
@@ -17,7 +19,12 @@ function partner(overrides: Partial<OnboardingPartner> = {}): OnboardingPartner 
   return {
     gln: '4012345000009',
     testMode: true,
-    onboarding: { testInterchangeSentAt: null, contrlReceivedAt: null },
+    onboarding: {
+      testInterchangeSentAt: null,
+      contrlReceivedAt: null,
+      testRejectedAt: null,
+      testRejectedRunId: null,
+    },
     ...overrides,
   }
 }
@@ -81,7 +88,14 @@ describe('onboardingChecklist', () => {
 
   it('waits for the CONTRL after the test Interchange was sent', () => {
     const checklist = onboardingChecklist(
-      partner({ onboarding: { testInterchangeSentAt: sent, contrlReceivedAt: null } }),
+      partner({
+        onboarding: {
+          testInterchangeSentAt: sent,
+          contrlReceivedAt: null,
+          testRejectedAt: null,
+          testRejectedRunId: null,
+        },
+      }),
       ownGln,
     )
 
@@ -97,7 +111,14 @@ describe('onboardingChecklist', () => {
   it('offers the production switch once the CONTRL is received', () => {
     expect(
       states(
-        partner({ onboarding: { testInterchangeSentAt: sent, contrlReceivedAt: received } }),
+        partner({
+          onboarding: {
+            testInterchangeSentAt: sent,
+            contrlReceivedAt: received,
+            testRejectedAt: null,
+            testRejectedRunId: null,
+          },
+        }),
         ownGln,
       ),
     ).toEqual([
@@ -114,7 +135,12 @@ describe('onboardingChecklist', () => {
       states(
         partner({
           testMode: false,
-          onboarding: { testInterchangeSentAt: sent, contrlReceivedAt: received },
+          onboarding: {
+            testInterchangeSentAt: sent,
+            contrlReceivedAt: received,
+            testRejectedAt: null,
+            testRejectedRunId: null,
+          },
         }),
         ownGln,
       ),
@@ -130,10 +156,24 @@ describe('onboardingChecklist', () => {
 
 describe('canSwitchToProduction', () => {
   it.each([
-    ['before the CONTRL arrives', { testInterchangeSentAt: sent, contrlReceivedAt: null }, ownGln],
+    [
+      'before the CONTRL arrives',
+      {
+        testInterchangeSentAt: sent,
+        contrlReceivedAt: null,
+        testRejectedAt: null,
+        testRejectedRunId: null,
+      },
+      ownGln,
+    ],
     [
       'without the Workspace GLN',
-      { testInterchangeSentAt: sent, contrlReceivedAt: received },
+      {
+        testInterchangeSentAt: sent,
+        contrlReceivedAt: received,
+        testRejectedAt: null,
+        testRejectedRunId: null,
+      },
       null,
     ],
   ])('refuses %s', (_, onboarding, gln) => {
@@ -143,7 +183,14 @@ describe('canSwitchToProduction', () => {
   it('allows the switch once all earlier steps are done', () => {
     expect(
       canSwitchToProduction(
-        partner({ onboarding: { testInterchangeSentAt: sent, contrlReceivedAt: received } }),
+        partner({
+          onboarding: {
+            testInterchangeSentAt: sent,
+            contrlReceivedAt: received,
+            testRejectedAt: null,
+            testRejectedRunId: null,
+          },
+        }),
         ownGln,
       ),
     ).toBe(true)
@@ -154,7 +201,12 @@ describe('canSwitchToProduction', () => {
       canSwitchToProduction(
         partner({
           testMode: false,
-          onboarding: { testInterchangeSentAt: sent, contrlReceivedAt: received },
+          onboarding: {
+            testInterchangeSentAt: sent,
+            contrlReceivedAt: received,
+            testRejectedAt: null,
+            testRejectedRunId: null,
+          },
         }),
         ownGln,
       ),
@@ -170,7 +222,14 @@ describe('canSendTestInterchange', () => {
   it('allows sending again while the CONTRL is still awaited', () => {
     expect(
       canSendTestInterchange(
-        partner({ onboarding: { testInterchangeSentAt: sent, contrlReceivedAt: null } }),
+        partner({
+          onboarding: {
+            testInterchangeSentAt: sent,
+            contrlReceivedAt: null,
+            testRejectedAt: null,
+            testRejectedRunId: null,
+          },
+        }),
         ownGln,
       ),
     ).toBe(true)
@@ -181,19 +240,65 @@ describe('canSendTestInterchange', () => {
     ["without the Trading Partner's GLN", partner({ gln: null }), ownGln],
     [
       'once the CONTRL is received',
-      partner({ onboarding: { testInterchangeSentAt: sent, contrlReceivedAt: received } }),
+      partner({
+        onboarding: {
+          testInterchangeSentAt: sent,
+          contrlReceivedAt: received,
+          testRejectedAt: null,
+          testRejectedRunId: null,
+        },
+      }),
       ownGln,
     ],
     [
       'for a Trading Partner in production',
       partner({
         testMode: false,
-        onboarding: { testInterchangeSentAt: sent, contrlReceivedAt: received },
+        onboarding: {
+          testInterchangeSentAt: sent,
+          contrlReceivedAt: received,
+          testRejectedAt: null,
+          testRejectedRunId: null,
+        },
       }),
       ownGln,
     ],
   ])('refuses %s', (_, tradingPartner, gln) => {
     expect(canSendTestInterchange(tradingPartner, gln)).toBe(false)
+  })
+})
+
+describe('testInterchangeRefusedProblem', () => {
+  const flow = { id: '00000000-0000-4000-8000-0000000000f1', name: 'Invoices to Hansemarkt' }
+
+  it('says why a Trading Partner that does not await a test is refused', () => {
+    expect(testInterchangeRefusedProblem({ reason: 'notAwaited' })).toEqual({
+      reason: 'notAwaited',
+      message: 'The Trading Partner does not await a test Interchange.',
+    })
+  })
+
+  it('says that no outbound Flow leads to the Trading Partner', () => {
+    expect(testInterchangeRefusedProblem({ reason: 'noOutboundFlow' })).toEqual({
+      reason: 'noOutboundFlow',
+      message: 'No outbound Flow leads to the Trading Partner.',
+    })
+  })
+
+  it('names the Flow whose Document Structure has no sample Document', () => {
+    expect(testInterchangeRefusedProblem({ reason: 'sampleMissing', flow })).toEqual({
+      reason: 'sampleMissing',
+      flow,
+      message:
+        'The Document Structure of the Flow "Invoices to Hansemarkt" has no sample Document.',
+    })
+  })
+
+  it('needs the Flow for a missing sample Document', () => {
+    expect(
+      testInterchangeRefusedProblemSchema.safeParse({ reason: 'sampleMissing', message: 'x' })
+        .success,
+    ).toBe(false)
   })
 })
 
@@ -205,7 +310,14 @@ describe('glnRequired', () => {
   it.each<[string, OnboardingPartner]>([
     [
       'once a test Interchange was sent',
-      partner({ onboarding: { testInterchangeSentAt: sent, contrlReceivedAt: null } }),
+      partner({
+        onboarding: {
+          testInterchangeSentAt: sent,
+          contrlReceivedAt: null,
+          testRejectedAt: null,
+          testRejectedRunId: null,
+        },
+      }),
     ],
     ['for a Trading Partner in production', partner({ testMode: false })],
   ])('needs the GLN %s', (_, tradingPartner) => {

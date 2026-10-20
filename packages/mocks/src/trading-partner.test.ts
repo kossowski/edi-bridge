@@ -13,6 +13,8 @@ import {
   toPath,
   sendTestInterchangeEndpoint,
   switchToProductionEndpoint,
+  testInterchangeRefusedProblemSchema,
+  tradingPartnerActivitiesEndpoint,
   tradingPartnerEndpoint,
   tradingPartnerSchema,
   tradingPartnersEndpoint,
@@ -82,6 +84,8 @@ const awaitingProduction = createTradingPartner({
   onboarding: {
     testInterchangeSentAt: '2026-10-01T08:00:00.000Z',
     contrlReceivedAt: '2026-10-01T08:05:00.000Z',
+    testRejectedAt: null,
+    testRejectedRunId: null,
   },
 })
 
@@ -89,7 +93,12 @@ const awaitingContrl = createTradingPartner({
   id: '10000000-0000-4000-8000-000000000002',
   gln: '0200000000028',
   testMode: true,
-  onboarding: { testInterchangeSentAt: '2026-10-01T08:00:00.000Z', contrlReceivedAt: null },
+  onboarding: {
+    testInterchangeSentAt: '2026-10-01T08:00:00.000Z',
+    contrlReceivedAt: null,
+    testRejectedAt: null,
+    testRejectedRunId: null,
+  },
 })
 
 describe('seedTradingPartners', () => {
@@ -184,7 +193,12 @@ describe('tradingPartnerHandlers', () => {
     expect(created).toMatchObject({
       ...input,
       testMode: true,
-      onboarding: { testInterchangeSentAt: null, contrlReceivedAt: null },
+      onboarding: {
+        testInterchangeSentAt: null,
+        contrlReceivedAt: null,
+        testRejectedAt: null,
+        testRejectedRunId: null,
+      },
     })
 
     expect(await listTradingPartners()).toEqual([created])
@@ -240,7 +254,12 @@ describe('tradingPartnerHandlers', () => {
     const notStarted = createTradingPartner({
       gln: '0200000000035',
       testMode: true,
-      onboarding: { testInterchangeSentAt: null, contrlReceivedAt: null },
+      onboarding: {
+        testInterchangeSentAt: null,
+        contrlReceivedAt: null,
+        testRejectedAt: null,
+        testRejectedRunId: null,
+      },
     })
 
     server.use(...tradingPartnerHandlers(apiUrl, { tradingPartners: [notStarted] }))
@@ -314,7 +333,12 @@ describe('POST /trading-partners/:id/test-interchange', () => {
     id: '10000000-0000-4000-8000-000000000003',
     gln: '0200000000035',
     testMode: true,
-    onboarding: { testInterchangeSentAt: null, contrlReceivedAt: null },
+    onboarding: {
+      testInterchangeSentAt: null,
+      contrlReceivedAt: null,
+      testRejectedAt: null,
+      testRejectedRunId: null,
+    },
   })
 
   const sentAt = new Date('2026-10-10T12:00:00.000Z')
@@ -325,32 +349,141 @@ describe('POST /trading-partners/:id/test-interchange', () => {
     return tradingPartnerSchema.parse(await response.json())
   }
 
-  it('records the test Interchange and receives its CONTRL after the delay', async () => {
+  it('answers before the handover and records the test Interchange after the delay', async () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(sentAt)
 
     server.use(
       ...tradingPartnerHandlers(apiUrl, {
         tradingPartners: [notStarted],
-        testInterchange: { contrlDelayMs: 60_000 },
+        testInterchange: { handoverDelayMs: 1000, contrlDelayMs: null },
       }),
     )
 
     const response = await send('POST', toPath(sendTestInterchangeEndpoint.path, notStarted))
 
-    expect(tradingPartnerSchema.parse(await response.json()).onboarding).toEqual({
-      testInterchangeSentAt: '2026-10-10T12:00:00.000Z',
-      contrlReceivedAt: null,
-    })
+    expect(tradingPartnerSchema.parse(await response.json()).onboarding).toEqual(
+      notStarted.onboarding,
+    )
 
-    vi.setSystemTime(new Date('2026-10-10T12:00:59.000Z'))
+    vi.setSystemTime(new Date('2026-10-10T12:00:00.999Z'))
+    expect((await getTradingPartner(notStarted.id)).onboarding.testInterchangeSentAt).toBeNull()
+
+    vi.setSystemTime(new Date('2026-10-10T12:00:05.000Z'))
+    expect((await getTradingPartner(notStarted.id)).onboarding.testInterchangeSentAt).toBe(
+      '2026-10-10T12:00:01.000Z',
+    )
+  })
+
+  it('hands the test Interchange over after a second by default', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(sentAt)
+    server.use(...tradingPartnerHandlers(apiUrl, { tradingPartners: [notStarted] }))
+
+    await send('POST', toPath(sendTestInterchangeEndpoint.path, notStarted))
+    vi.setSystemTime(new Date('2026-10-10T12:00:01.000Z'))
+
+    expect((await getTradingPartner(notStarted.id)).onboarding.testInterchangeSentAt).toBe(
+      '2026-10-10T12:00:01.000Z',
+    )
+  })
+
+  it('receives the CONTRL the delay after the handover', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(sentAt)
+
+    server.use(
+      ...tradingPartnerHandlers(apiUrl, {
+        tradingPartners: [notStarted],
+        testInterchange: { handoverDelayMs: 1000, contrlDelayMs: 60_000 },
+      }),
+    )
+
+    await send('POST', toPath(sendTestInterchangeEndpoint.path, notStarted))
+    vi.setSystemTime(new Date('2026-10-10T12:00:01.000Z'))
+    await getTradingPartner(notStarted.id)
+
+    vi.setSystemTime(new Date('2026-10-10T12:01:00.999Z'))
     expect((await getTradingPartner(notStarted.id)).onboarding.contrlReceivedAt).toBeNull()
 
     vi.setSystemTime(new Date('2026-10-10T12:01:30.000Z'))
 
     expect((await listTradingPartners())[0]?.onboarding).toEqual({
-      testInterchangeSentAt: '2026-10-10T12:00:00.000Z',
-      contrlReceivedAt: '2026-10-10T12:01:00.000Z',
+      testInterchangeSentAt: '2026-10-10T12:00:01.000Z',
+      contrlReceivedAt: '2026-10-10T12:01:01.000Z',
+      testRejectedAt: null,
+      testRejectedRunId: null,
+    })
+  })
+
+  it('answers with the CONTRL at the earliest on the check after the handover', async () => {
+    server.use(
+      ...tradingPartnerHandlers(apiUrl, {
+        tradingPartners: [notStarted],
+        testInterchange: { handoverDelayMs: 0, contrlDelayMs: 0 },
+      }),
+    )
+
+    await send('POST', toPath(sendTestInterchangeEndpoint.path, notStarted))
+
+    const handedOver = (await getTradingPartner(notStarted.id)).onboarding
+    expect(handedOver.testInterchangeSentAt).toEqual(expect.any(String))
+    expect(handedOver.contrlReceivedAt).toBeNull()
+    expect((await getTradingPartner(notStarted.id)).onboarding.contrlReceivedAt).toEqual(
+      expect.any(String),
+    )
+  })
+
+  it('records a rejecting CONTRL after the delay, with the Run of the rejected test', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(sentAt)
+    const rejectingRunId = '10000000-0000-4000-8000-0000000000e1'
+
+    server.use(
+      ...tradingPartnerHandlers(apiUrl, {
+        tradingPartners: [notStarted],
+        testInterchange: { handoverDelayMs: 1000, contrlDelayMs: 60_000, rejectingRunId },
+      }),
+    )
+
+    await send('POST', toPath(sendTestInterchangeEndpoint.path, notStarted))
+    vi.setSystemTime(new Date('2026-10-10T12:00:01.000Z'))
+    await getTradingPartner(notStarted.id)
+    vi.setSystemTime(new Date('2026-10-10T12:01:30.000Z'))
+
+    expect((await getTradingPartner(notStarted.id)).onboarding).toEqual({
+      testInterchangeSentAt: '2026-10-10T12:00:01.000Z',
+      contrlReceivedAt: null,
+      testRejectedAt: '2026-10-10T12:01:01.000Z',
+      testRejectedRunId: rejectingRunId,
+    })
+  })
+
+  it('clears the rejected test with the next test send', async () => {
+    const rejected = {
+      ...notStarted,
+      onboarding: {
+        testInterchangeSentAt: '2026-10-09T08:00:00.000Z',
+        contrlReceivedAt: null,
+        testRejectedAt: '2026-10-09T08:05:00.000Z',
+        testRejectedRunId: '10000000-0000-4000-8000-0000000000e1',
+      },
+    }
+
+    server.use(
+      ...tradingPartnerHandlers(apiUrl, {
+        tradingPartners: [rejected],
+        testInterchange: { contrlDelayMs: null },
+      }),
+    )
+
+    const response = await send('POST', toPath(sendTestInterchangeEndpoint.path, rejected))
+
+    expect(tradingPartnerSchema.parse(await response.json()).onboarding).toEqual({
+      testInterchangeSentAt: '2026-10-09T08:00:00.000Z',
+      contrlReceivedAt: null,
+      testRejectedAt: null,
+      testRejectedRunId: null,
     })
   })
 
@@ -358,11 +491,12 @@ describe('POST /trading-partners/:id/test-interchange', () => {
     server.use(
       ...tradingPartnerHandlers(apiUrl, {
         tradingPartners: [notStarted],
-        testInterchange: { contrlDelayMs: 0 },
+        testInterchange: { handoverDelayMs: 0, contrlDelayMs: 0 },
       }),
     )
 
     await send('POST', toPath(sendTestInterchangeEndpoint.path, notStarted))
+    await getTradingPartner(notStarted.id)
     const response = await send('POST', toPath(switchToProductionEndpoint.path, notStarted))
 
     expect(response.status).toBe(200)
@@ -397,7 +531,31 @@ describe('POST /trading-partners/:id/test-interchange', () => {
     const response = await send('POST', toPath(sendTestInterchangeEndpoint.path, tradingPartner))
 
     expect(response.status).toBe(409)
+    expect(testInterchangeRefusedProblemSchema.parse(await response.json())).toMatchObject({
+      reason: 'notAwaited',
+    })
     expect(await getTradingPartner(tradingPartner.id)).toEqual(tradingPartner)
+  })
+
+  it.each([
+    { reason: 'noOutboundFlow' as const },
+    {
+      reason: 'sampleMissing' as const,
+      flow: { id: '10000000-0000-4000-8000-0000000000f1', name: 'Invoices to Kieler Kontor' },
+    },
+  ])('refuses the test send for the simulated reason $reason', async (refusal) => {
+    server.use(
+      ...tradingPartnerHandlers(apiUrl, {
+        tradingPartners: [notStarted],
+        testInterchange: { refusal },
+      }),
+    )
+
+    const response = await send('POST', toPath(sendTestInterchangeEndpoint.path, notStarted))
+
+    expect(response.status).toBe(409)
+    expect(testInterchangeRefusedProblemSchema.parse(await response.json())).toMatchObject(refusal)
+    expect(await getTradingPartner(notStarted.id)).toEqual(notStarted)
   })
 
   it('answers 404 for an unknown Trading Partner', async () => {
@@ -426,6 +584,16 @@ describe('createHandlers', () => {
 
     expect(workspaceSchema.parse(await workspace.json()).gln).toBe('0212345000007')
     expect((await send('POST', path)).status).toBe(200)
+  })
+
+  it('answers 404 for a Trading Partner id that is not a UUID, like the api', async () => {
+    server.use(...createHandlers(apiUrl))
+
+    const missing = await send('GET', toPath(tradingPartnerEndpoint.path, { id: 'no-such-id' }))
+    const activities = await send('GET', tradingPartnerActivitiesEndpoint.path)
+
+    expect(missing.status).toBe(404)
+    expect(activities.status).toBe(200)
   })
 
   it('rejects a company GLN with a wrong check digit', async () => {

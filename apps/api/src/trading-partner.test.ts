@@ -86,7 +86,12 @@ describe('POST /trading-partners', () => {
       ...hansemarkt,
       id: created.id,
       testMode: true,
-      onboarding: { testInterchangeSentAt: null, contrlReceivedAt: null },
+      onboarding: {
+        testInterchangeSentAt: null,
+        contrlReceivedAt: null,
+        testRejectedAt: null,
+        testRejectedRunId: null,
+      },
     })
 
     const read = await get(created.id)
@@ -293,7 +298,12 @@ describe('the GLN of a Trading Partner', () => {
 
     expect(read.json()).toEqual({
       ...created,
-      onboarding: { testInterchangeSentAt: '2026-10-06T14:03:00.000Z', contrlReceivedAt: null },
+      onboarding: {
+        testInterchangeSentAt: '2026-10-06T14:03:00.000Z',
+        contrlReceivedAt: null,
+        testRejectedAt: null,
+        testRejectedRunId: null,
+      },
     })
   })
 
@@ -437,6 +447,8 @@ describe('POST /trading-partners/:id/production', () => {
       onboarding: {
         testInterchangeSentAt: '2026-10-06T14:03:00.000Z',
         contrlReceivedAt: '2026-10-06T14:05:00.000Z',
+        testRejectedAt: null,
+        testRejectedRunId: null,
       },
     }
 

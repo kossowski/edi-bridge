@@ -54,7 +54,9 @@ import {
   reprocessRun,
   retryRun,
   saveMappingDraft,
+  sendTestInterchange,
   switchToProduction,
+  testInterchangeRefusalOf,
   updateCompanyIdentity,
   updateDocumentStructure,
   updateLookupTable,
@@ -177,6 +179,8 @@ describe('Trading Partner actions', () => {
     onboarding: {
       testInterchangeSentAt: '2026-10-01T08:00:00.000Z',
       contrlReceivedAt: '2026-10-01T08:05:00.000Z',
+      testRejectedAt: null,
+      testRejectedRunId: null,
     },
   })
 
@@ -206,6 +210,46 @@ describe('Trading Partner actions', () => {
     server.use(...tradingPartnerHandlers(apiUrl, { tradingPartners: [existing] }))
 
     await expect(switchToProduction(existing.id)).resolves.toMatchObject({ testMode: false })
+  })
+
+  it('reads why a test send was refused', async () => {
+    const flow = { id: '00000000-0000-4000-8000-0000000000f1', name: 'Invoices to Kieler Kontor' }
+
+    const notStarted = {
+      ...existing,
+      onboarding: {
+        testInterchangeSentAt: null,
+        contrlReceivedAt: null,
+        testRejectedAt: null,
+        testRejectedRunId: null,
+      },
+    }
+
+    server.use(
+      ...tradingPartnerHandlers(apiUrl, {
+        tradingPartners: [notStarted],
+        testInterchange: { refusal: { reason: 'sampleMissing', flow } },
+      }),
+    )
+
+    const error = await sendTestInterchange(notStarted.id).then(
+      () => null,
+      (failure: Error) => failure,
+    )
+
+    expect(testInterchangeRefusalOf(error)).toEqual({ reason: 'sampleMissing', flow })
+  })
+
+  it('has no refusal for other failures of the test send', async () => {
+    server.use(...tradingPartnerHandlers(apiUrl, { tradingPartners: [] }))
+
+    const error = await sendTestInterchange(existing.id).then(
+      () => null,
+      (failure: Error) => failure,
+    )
+
+    expect(error).toMatchObject({ status: 404 })
+    expect(testInterchangeRefusalOf(error)).toBeNull()
   })
 
   it('records the company GLN of the Workspace', async () => {

@@ -1,9 +1,45 @@
 import { describe, expect, it } from 'vitest'
 
-import { awaitsReceiptConfirmation, dayTotals } from './partner-page-helpers'
+import {
+  awaitsReceiptConfirmation,
+  awaitsTestHandover,
+  dayTotals,
+  onboardingPollInterval,
+  testRejected,
+} from './partner-page-helpers'
+
+describe('testRejected', () => {
+  const sent = {
+    testInterchangeSentAt: '2026-10-10T08:00:00.000Z',
+    contrlReceivedAt: null,
+    testRejectedAt: null,
+    testRejectedRunId: null,
+  }
+
+  it('is false while the Trading Partner has not rejected the test', () => {
+    expect(testRejected({ onboarding: sent })).toBe(false)
+  })
+
+  it('is true once the Trading Partner rejected the test', () => {
+    expect(
+      testRejected({
+        onboarding: {
+          ...sent,
+          testRejectedAt: '2026-10-10T08:05:00.000Z',
+          testRejectedRunId: '00000000-0000-4000-8000-0000000000e1',
+        },
+      }),
+    ).toBe(true)
+  })
+})
 
 describe('awaitsReceiptConfirmation', () => {
-  const sent = { testInterchangeSentAt: '2026-10-10T08:00:00.000Z', contrlReceivedAt: null }
+  const sent = {
+    testInterchangeSentAt: '2026-10-10T08:00:00.000Z',
+    contrlReceivedAt: null,
+    testRejectedAt: null,
+    testRejectedRunId: null,
+  }
 
   it('waits after a test document without a receipt confirmation', () => {
     expect(awaitsReceiptConfirmation({ testMode: true, onboarding: sent })).toBe(true)
@@ -18,17 +54,112 @@ describe('awaitsReceiptConfirmation', () => {
     ).toBe(false)
   })
 
+  it('stops waiting once the Trading Partner rejected the test', () => {
+    expect(
+      awaitsReceiptConfirmation({
+        testMode: true,
+        onboarding: {
+          ...sent,
+          testRejectedAt: '2026-10-10T08:05:00.000Z',
+          testRejectedRunId: '00000000-0000-4000-8000-0000000000e1',
+        },
+      }),
+    ).toBe(false)
+  })
+
   it('does not wait before a test document is sent', () => {
     expect(
       awaitsReceiptConfirmation({
         testMode: true,
-        onboarding: { testInterchangeSentAt: null, contrlReceivedAt: null },
+        onboarding: {
+          testInterchangeSentAt: null,
+          contrlReceivedAt: null,
+          testRejectedAt: null,
+          testRejectedRunId: null,
+        },
       }),
     ).toBe(false)
   })
 
   it('does not wait for a live partner', () => {
     expect(awaitsReceiptConfirmation({ testMode: false, onboarding: sent })).toBe(false)
+  })
+})
+
+describe('awaitsTestHandover', () => {
+  const notSent = {
+    testInterchangeSentAt: null,
+    contrlReceivedAt: null,
+    testRejectedAt: null,
+    testRejectedRunId: null,
+  }
+
+  it('waits after an accepted test send until the test Interchange is handed over', () => {
+    expect(awaitsTestHandover({ testMode: true, onboarding: notSent }, true)).toBe(true)
+  })
+
+  it('stops waiting once the test Interchange is handed over', () => {
+    expect(
+      awaitsTestHandover(
+        {
+          testMode: true,
+          onboarding: { ...notSent, testInterchangeSentAt: '2026-10-10T08:00:00.000Z' },
+        },
+        true,
+      ),
+    ).toBe(false)
+  })
+
+  it('does not wait before a test send', () => {
+    expect(awaitsTestHandover({ testMode: true, onboarding: notSent }, false)).toBe(false)
+  })
+
+  it('does not wait for a live partner', () => {
+    expect(awaitsTestHandover({ testMode: false, onboarding: notSent }, true)).toBe(false)
+  })
+})
+
+describe('onboardingPollInterval', () => {
+  const sent = {
+    testInterchangeSentAt: '2026-10-10T08:00:00.000Z',
+    contrlReceivedAt: null,
+    testRejectedAt: null,
+    testRejectedRunId: null,
+  }
+
+  it('checks every 10 seconds while the receipt confirmation is awaited', () => {
+    expect(onboardingPollInterval({ testMode: true, onboarding: sent }, false)).toBe(10_000)
+  })
+
+  it('checks every 10 seconds until an accepted test send is handed over', () => {
+    expect(
+      onboardingPollInterval(
+        { testMode: true, onboarding: { ...sent, testInterchangeSentAt: null } },
+        true,
+      ),
+    ).toBe(10_000)
+  })
+
+  it('does not check before a test send', () => {
+    expect(
+      onboardingPollInterval(
+        { testMode: true, onboarding: { ...sent, testInterchangeSentAt: null } },
+        false,
+      ),
+    ).toBe(false)
+  })
+
+  it('stops checking once the receipt confirmation arrived', () => {
+    expect(
+      onboardingPollInterval(
+        { testMode: true, onboarding: { ...sent, contrlReceivedAt: '2026-10-10T08:05:00.000Z' } },
+        true,
+      ),
+    ).toBe(false)
+  })
+
+  it('does not check before the Trading Partner is loaded', () => {
+    expect(onboardingPollInterval(undefined, true)).toBe(false)
   })
 })
 

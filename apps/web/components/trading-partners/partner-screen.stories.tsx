@@ -1,6 +1,9 @@
 import { getRouter } from '@storybook/nextjs-vite/navigation.mock'
+import { focusManager } from '@tanstack/react-query'
 import { delay, http, HttpResponse } from 'msw'
 import { expect, userEvent, waitFor, within } from 'storybook/test'
+
+import type { StoryContext } from '@storybook/nextjs-vite'
 
 import { darkMode, german } from '@/components/story-helpers'
 import { PartnerScreen } from '@/components/trading-partners/partner-screen'
@@ -20,7 +23,10 @@ import {
   activityDays,
   channelsEndpoint,
   type RunSummary,
+  sendTestInterchangeEndpoint,
   testChannelEndpoint,
+  testInterchangeRefusedProblem,
+  testInterchangeRefusedStatus,
   type TradingPartner,
   tradingPartnerActivityEndpoint,
   tradingPartnerEndpoint,
@@ -31,6 +37,8 @@ import {
   createHandlers,
   createWorkspaceActivity,
   createWorkspace,
+  seedFlows,
+  seedRuns,
   seedTradingPartners,
   tradingPartnerActivityHandlers,
   tradingPartnerHandlers,
@@ -40,7 +48,12 @@ import preview from '../../.storybook/preview'
 
 const readyForTest: TradingPartner = {
   ...confirmed,
-  onboarding: { testInterchangeSentAt: null, contrlReceivedAt: null },
+  onboarding: {
+    testInterchangeSentAt: null,
+    contrlReceivedAt: null,
+    testRejectedAt: null,
+    testRejectedRunId: null,
+  },
 }
 
 const withReadyForTest = seedTradingPartners.map((tradingPartner) =>
@@ -79,6 +92,12 @@ async function connectionItem(canvasElement: HTMLElement, list: string, way: str
   const items = within(await within(canvasElement).findByRole('list', { name: list }))
 
   return within(items.getByText(way).closest('li')!)
+}
+
+// Returning to the tab checks at once, so a story need not wait for the 10 s poll.
+function checkNow() {
+  focusManager.setFocused(false)
+  focusManager.setFocused(undefined)
 }
 
 const meta = preview.meta({
@@ -153,7 +172,7 @@ export const SendTestDocument = meta.story({
     msw.use(
       ...createHandlers(apiUrl, {
         tradingPartners: withReadyForTest,
-        testInterchange: { contrlDelayMs: null },
+        testInterchange: { handoverDelayMs: 0, contrlDelayMs: null },
       }),
     )
   },
@@ -161,11 +180,104 @@ export const SendTestDocument = meta.story({
     const current = await canvas.findByRole('listitem', { current: 'step' }, activityLoaded)
     await expect(current).toHaveTextContent('Send a test document')
     await userEvent.click(within(current).getByRole('button', { name: 'Send a test document' }))
-    await expect(
-      await canvas.findByText(/Waiting for the receipt confirmation from Spreewald Frische GmbH/),
-    ).toBeVisible()
+    await expect(within(current).getByRole('button', { name: 'Sending…' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    )
+    // The api answers before the hand-over, so the page checks again until it is recorded.
+    await waitFor(async () => {
+      checkNow()
+      await expect(
+        canvas.getByText(/Waiting for the receipt confirmation from Spreewald Frische GmbH/),
+      ).toBeVisible()
+    })
     await expect(canvas.getByRole('button', { name: 'Send the test again' })).toBeVisible()
     await expect(canvas.queryByRole('button', { name: 'Go live' })).toBeNull()
+  },
+})
+
+const [flowWithoutSample] = seedFlows
+
+const refusedForMissingSample = {
+  ...at(readyForTest),
+  beforeEach({ msw }: StoryContext) {
+    msw.use(
+      ...createHandlers(apiUrl, {
+        tradingPartners: withReadyForTest,
+        testInterchange: { refusal: { reason: 'sampleMissing', flow: flowWithoutSample! } },
+      }),
+    )
+  },
+}
+
+export const SendRefusedForMissingSample = meta.story({
+  ...refusedForMissingSample,
+  async play({ canvas }) {
+    await userEvent.click(
+      await canvas.findByRole('button', { name: 'Send a test document' }, activityLoaded),
+    )
+    const alert = await canvas.findByRole('alert')
+    await expect(alert).toHaveTextContent(
+      `The document route ${flowWithoutSample!.name} has no example document to send as a test. Add an example document to the data format of this document route.`,
+    )
+    await expect(
+      within(alert).getByRole('link', { name: flowWithoutSample!.name }),
+    ).toHaveAttribute('href', `/flows/${flowWithoutSample!.id}`)
+  },
+})
+
+export const SendRefusedForMissingSampleGerman = meta.story({
+  ...refusedForMissingSample,
+  decorators: [german],
+  async play({ canvas }) {
+    await userEvent.click(
+      await canvas.findByRole('button', { name: 'Testbeleg senden' }, activityLoaded),
+    )
+    await expect(await canvas.findByRole('alert')).toHaveTextContent(
+      `Der Belegweg ${flowWithoutSample!.name} hat keinen Beispielbeleg, der als Test gesendet werden kann. Fügen Sie dem Datenformat dieses Belegwegs einen Beispielbeleg hinzu.`,
+    )
+  },
+})
+
+export const SendRefusedWithoutOutboundFlow = meta.story({
+  ...at(readyForTest),
+  beforeEach({ msw }) {
+    msw.use(
+      ...createHandlers(apiUrl, {
+        tradingPartners: withReadyForTest,
+        testInterchange: { refusal: { reason: 'noOutboundFlow' } },
+      }),
+    )
+  },
+  async play({ canvas }) {
+    await userEvent.click(
+      await canvas.findByRole('button', { name: 'Send a test document' }, activityLoaded),
+    )
+    await expect(await canvas.findByRole('alert')).toHaveTextContent(
+      'No document route sends documents to Spreewald Frische GmbH yet, so there is nothing to send as a test.',
+    )
+  },
+})
+
+export const SendRefusedWhenNotAwaited = meta.story({
+  ...at(readyForTest),
+  beforeEach({ msw }) {
+    msw.use(...createHandlers(apiUrl, { tradingPartners: withReadyForTest }))
+    msw.use(
+      http.post(`${apiUrl}${sendTestInterchangeEndpoint.path}`, () =>
+        HttpResponse.json(testInterchangeRefusedProblem({ reason: 'notAwaited' }), {
+          status: testInterchangeRefusedStatus,
+        }),
+      ),
+    )
+  },
+  async play({ canvas }) {
+    await userEvent.click(
+      await canvas.findByRole('button', { name: 'Send a test document' }, activityLoaded),
+    )
+    await expect(await canvas.findByRole('alert')).toHaveTextContent(
+      'Spreewald Frische GmbH does not await a test document right now.',
+    )
   },
 })
 
@@ -175,7 +287,7 @@ export const ConfirmationArrives = meta.story({
     msw.use(
       ...createHandlers(apiUrl, {
         tradingPartners: withReadyForTest,
-        testInterchange: { contrlDelayMs: 1000 },
+        testInterchange: { handoverDelayMs: 0, contrlDelayMs: 0 },
       }),
     )
   },
@@ -183,14 +295,19 @@ export const ConfirmationArrives = meta.story({
     await userEvent.click(
       await canvas.findByRole('button', { name: 'Send a test document' }, activityLoaded),
     )
-    await expect(await canvas.findByText(/Waiting for the receipt confirmation/)).toBeVisible()
-    await expect(
-      await canvas.findByText(
-        'The receipt confirmation from Spreewald Frische GmbH arrived. You can go live now.',
-        { selector: ':not([role="status"])' },
-        { timeout: 10_000 },
-      ),
-    ).toBeVisible()
+    await waitFor(async () => {
+      checkNow()
+      await expect(canvas.getByText(/Waiting for the receipt confirmation/)).toBeVisible()
+    })
+    await waitFor(async () => {
+      checkNow()
+      await expect(
+        canvas.getByText(
+          'The receipt confirmation from Spreewald Frische GmbH arrived. You can go live now.',
+          { selector: ':not([role="status"])' },
+        ),
+      ).toBeVisible()
+    })
     const goLive = canvas.getByRole('button', { name: 'Go live' })
     await userEvent.click(goLive)
 
@@ -208,6 +325,79 @@ export const ConfirmationArrives = meta.story({
     )
     await userEvent.keyboard('{Escape}')
     await waitFor(() => expect(goLive).toHaveFocus())
+  },
+})
+
+const [rejectedRun] = seedRuns()
+
+export const TestRejected = meta.story({
+  ...at(readyForTest),
+  beforeEach({ msw }) {
+    msw.use(
+      ...createHandlers(apiUrl, {
+        tradingPartners: withReadyForTest,
+        testInterchange: { handoverDelayMs: 0, contrlDelayMs: 0, rejectingRunId: rejectedRun!.id },
+      }),
+    )
+  },
+  async play({ canvas }) {
+    await userEvent.click(
+      await canvas.findByRole('button', { name: 'Send a test document' }, activityLoaded),
+    )
+    await waitFor(async () => {
+      checkNow()
+      await expect(canvas.getByText(/Waiting for the receipt confirmation/)).toBeVisible()
+    })
+    await waitFor(async () => {
+      checkNow()
+      await expect(
+        canvas.getByText('Spreewald Frische GmbH rejected the test document.', {
+          selector: ':not([role="status"])',
+        }),
+      ).toBeVisible()
+    })
+    const current = canvas.getByRole('listitem', { current: 'step' })
+    await expect(within(current).getByRole('link', { name: 'See why' })).toHaveAttribute(
+      'href',
+      `/documents/${rejectedRun!.id}`,
+    )
+    await expect(within(current).getByRole('button', { name: 'Send the test again' })).toBeVisible()
+    await expect(canvas.queryByText(/Waiting for the receipt confirmation/)).toBeNull()
+    await expect(canvas.getByRole('status')).toHaveTextContent(
+      'Spreewald Frische GmbH rejected the test document.',
+    )
+  },
+})
+
+const rejectedOnLoad: TradingPartner = {
+  ...readyForTest,
+  onboarding: {
+    ...readyForTest.onboarding,
+    testInterchangeSentAt: '2026-10-19T09:12:00.000Z',
+    testRejectedAt: '2026-10-19T09:14:30.000Z',
+    testRejectedRunId: rejectedRun!.id,
+  },
+}
+
+export const TestRejectedGerman = meta.story({
+  ...at(rejectedOnLoad),
+  decorators: [german],
+  beforeEach({ msw }) {
+    msw.use(
+      ...createHandlers(apiUrl, {
+        tradingPartners: seedTradingPartners.map((tradingPartner) =>
+          tradingPartner.id === rejectedOnLoad.id ? rejectedOnLoad : tradingPartner,
+        ),
+      }),
+    )
+  },
+  async play({ canvas }) {
+    const current = await canvas.findByRole('listitem', { current: 'step' }, activityLoaded)
+    await expect(
+      within(current).getByText('Spreewald Frische GmbH hat den Testbeleg abgelehnt.'),
+    ).toBeVisible()
+    await expect(within(current).getByRole('link', { name: 'Grund ansehen' })).toBeVisible()
+    await expect(within(current).getByRole('button', { name: 'Test erneut senden' })).toBeVisible()
   },
 })
 
@@ -451,6 +641,13 @@ export const SettingsWithoutGlnAsViewer = meta.story({
 
 export const NotFound = meta.story({
   ...at({ ...live, id: '10000000-0000-4000-8000-0000000000ff' }),
+  async play({ canvas }) {
+    await expect(await canvas.findByText('Trading partner not found')).toBeVisible()
+  },
+})
+
+export const NotFoundForAnIdThatIsNoUuid = meta.story({
+  ...at({ ...live, id: 'no-such-id' }),
   async play({ canvas }) {
     await expect(await canvas.findByText('Trading partner not found')).toBeVisible()
   },

@@ -1358,9 +1358,16 @@
         "other": "Ein Admin setzt die Einrichtung fort."
       },
       "sendFailed": "Der Testbeleg konnte nicht gesendet werden. Versuchen Sie es erneut.",
+      "sendRefused": {
+        "notAwaited": "{name} erwartet gerade keinen Testbeleg.",
+        "noOutboundFlow": "Noch kein Belegweg sendet Belege an {name}, daher gibt es nichts als Test zu senden.",
+        "sampleMissing": "Der Belegweg <link>{flow}</link> hat keinen Beispielbeleg, der als Test gesendet werden kann. Fügen Sie dem Datenformat dieses Belegwegs einen Beispielbeleg hinzu."
+      },
       "waiting": "Warten auf die Empfangsbestätigung von {name}. Diese Seite aktualisiert sich von selbst.",
       "sentAt": "Testbeleg gesendet <when>{time}</when>.",
       "arrived": "Die Empfangsbestätigung von {name} ist eingetroffen. Sie können jetzt live schalten.",
+      "rejected": "{name} hat den Testbeleg abgelehnt.",
+      "rejectedReason": "Grund ansehen",
       "goLive": {
         "title": "{name} live schalten?",
         "description": "Ab jetzt sind Belege mit {name} echt und nicht mehr als Test markiert. Sie landen in Ihrer täglichen Arbeit und in der echten Auftragsbearbeitung des Partners.",

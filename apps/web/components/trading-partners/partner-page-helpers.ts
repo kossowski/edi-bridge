@@ -14,13 +14,42 @@ export type PartnerActivityProps = {
   activity: TradingPartnerActivityDetail
 }
 
-export function awaitsReceiptConfirmation({
-  testMode,
-  onboarding,
-}: Pick<TradingPartner, 'testMode' | 'onboarding'>) {
+export function testRejected({ onboarding }: Pick<TradingPartner, 'onboarding'>) {
+  return onboarding.testRejectedAt !== null
+}
+
+export function awaitsReceiptConfirmation(
+  tradingPartner: Pick<TradingPartner, 'testMode' | 'onboarding'>,
+) {
   return (
-    testMode && onboarding.testInterchangeSentAt !== null && onboarding.contrlReceivedAt === null
+    tradingPartner.testMode &&
+    tradingPartner.onboarding.testInterchangeSentAt !== null &&
+    tradingPartner.onboarding.contrlReceivedAt === null &&
+    !testRejected(tradingPartner)
   )
+}
+
+// The api answers the test send before the worker hands the test Interchange over.
+export function awaitsTestHandover(
+  tradingPartner: Pick<TradingPartner, 'testMode' | 'onboarding'>,
+  testSent: boolean,
+) {
+  return (
+    testSent && tradingPartner.testMode && tradingPartner.onboarding.testInterchangeSentAt === null
+  )
+}
+
+// One indexed row per check, so an open page polling every 10 s is cheap for the api.
+const onboardingPollMs = 10_000
+
+export function onboardingPollInterval(
+  tradingPartner: Pick<TradingPartner, 'testMode' | 'onboarding'> | undefined,
+  testSent: boolean,
+) {
+  return tradingPartner &&
+    (awaitsTestHandover(tradingPartner, testSent) || awaitsReceiptConfirmation(tradingPartner))
+    ? onboardingPollMs
+    : false
 }
 
 export function dayTotals(days: ReadonlyArray<ActivityDay>) {
