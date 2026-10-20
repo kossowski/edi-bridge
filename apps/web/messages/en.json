@@ -3610,7 +3610,11 @@
         "description": "The suggested values could not be loaded. Try again, or add your own values.",
         "retry": "Try again"
       },
-      "byAi": "Suggested by AI"
+      "byAi": "Suggested by AI",
+      "budget": {
+        "exhausted": "Today's AI budget is used up, so no values are suggested. Add your own values below; suggestions are back tomorrow.",
+        "turnedOff": "AI is turned off, so no values are suggested. Add your own values below."
+      }
     },
     "values": {
       "title": "Values in the new list",

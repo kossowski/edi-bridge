@@ -3610,7 +3610,11 @@
         "description": "Die vorgeschlagenen Werte konnten nicht geladen werden. Versuchen Sie es erneut oder fügen Sie eigene Werte hinzu.",
         "retry": "Erneut versuchen"
       },
-      "byAi": "Von der KI vorgeschlagen"
+      "byAi": "Von der KI vorgeschlagen",
+      "budget": {
+        "exhausted": "Das KI-Budget für heute ist aufgebraucht, daher werden keine Werte vorgeschlagen. Fügen Sie unten eigene Werte hinzu; morgen gibt es wieder Vorschläge.",
+        "turnedOff": "Die KI ist ausgeschaltet, daher werden keine Werte vorgeschlagen. Fügen Sie unten eigene Werte hinzu."
+      }
     },
     "values": {
       "title": "Werte in der neuen Liste",

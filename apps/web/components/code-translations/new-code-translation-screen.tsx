@@ -30,7 +30,7 @@ import { scopeInputOf, scopeKey } from '@/components/lookup-tables/lookup-table-
 import { TradingPartnerChoice } from '@/components/lookup-tables/trading-partner-choice'
 import { ChoiceCards } from '@/components/trading-partners/choice-cards'
 import { useLanguage } from '@/hooks/use-language'
-import { createLookupTable } from '@/lib/api/client'
+import { aiBudgetExhaustedProblemOf, createLookupTable } from '@/lib/api/client'
 import {
   lookupTableSuggestionsQuery,
   lookupTablesQuery,
@@ -39,6 +39,7 @@ import {
 } from '@/lib/api/queries'
 import { lookupTableHref } from '@/lib/navigation'
 import {
+  type AiBudget,
   type Direction,
   type Language,
   type LookupTableEntry,
@@ -184,7 +185,7 @@ function Suggestions({
   onSkip,
   onShowSkipped,
 }: {
-  query: { isPending: boolean; isError: boolean; onRetry: () => void }
+  query: { isPending: boolean; isError: boolean; budget: AiBudget | null; onRetry: () => void }
   direction: Direction
   suggestedCount: number
   pending: ReadonlyArray<SuggestedEntry>
@@ -245,6 +246,14 @@ function Suggestions({
           />
         ))}
       </ul>
+    )
+  }
+
+  if (query.budget) {
+    return (
+      <p className="text-muted-foreground text-sm">
+        {t(query.budget.dailyLimit === 0 ? 'budget.turnedOff' : 'budget.exhausted')}
+      </p>
     )
   }
 
@@ -309,6 +318,7 @@ function FirstValues({
     lookupTableSuggestionsQuery(suggestionsQueryOf(kind, scope, language)),
   )
 
+  const budgetProblem = aiBudgetExhaustedProblemOf(suggestions.error)
   const valuesId = useId()
   const valuesHeading = useRef<HTMLHeadingElement>(null)
   const valuesList = useRef<HTMLUListElement>(null)
@@ -319,7 +329,7 @@ function FirstValues({
   const [adding, setAdding] = useState<AddRow>({ status: 'initial' })
   const [announcement, setAnnouncement] = useState('')
   const suggested = suggestions.data?.entries ?? []
-  const noSuggestions = suggestions.isSuccess && suggested.length === 0
+  const noSuggestions = (suggestions.isSuccess && suggested.length === 0) || budgetProblem !== null
 
   const pending = suggested.filter(
     ({ sourceCode }) => !hasValue(entries, sourceCode) && !skipped.includes(sourceCode),
@@ -427,6 +437,7 @@ function FirstValues({
         query={{
           isPending: suggestions.isPending,
           isError: suggestions.isError,
+          budget: budgetProblem?.budget ?? null,
           onRetry: () => void suggestions.refetch(),
         }}
         restoredCode={restoredCode}
