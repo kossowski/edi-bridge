@@ -42,6 +42,7 @@ const sftp = { way: 'sftp', values: toFormValues() } as const
 const context: SetupContext<PlanChannel> = {
   channels: [erpDelivery, erpWebhook, otherPartnerInbox],
   mappingVersions: [ordersVersion, invoicVersion],
+  documentStructures: [{ id: 'erp-json' }],
   names: {
     connection: (kind) => `Kieler Kontor ${kind}`,
     route: (messageType) => `${messageType} route`,
@@ -148,8 +149,39 @@ describe('setupPlan', () => {
       context,
     )
 
-    expect(plan.mappingDrafts).toEqual(['INVOIC'])
+    expect(plan.mappingDrafts).toEqual([{ messageType: 'INVOIC', documentStructureId: 'erp-json' }])
+    expect(plan.skippedMappingDrafts).toEqual([])
     expect(plan.documents[1]).toEqual({ messageType: 'INVOIC', reasons: ['mappingDraft'] })
+  })
+
+  it('skips each AI draft when the workspace has no document structure or several', () => {
+    const drafts: WizardResult = {
+      ...result,
+      mappings: { ORDERS: { way: 'ai' }, INVOIC: { way: 'ai' } },
+    }
+
+    const none = setupPlan(drafts, { ...context, documentStructures: [] })
+
+    expect(none.mappingDrafts).toEqual([])
+    expect(none.skippedMappingDrafts).toEqual([
+      { messageType: 'ORDERS', reason: 'noDocumentStructure' },
+      { messageType: 'INVOIC', reason: 'noDocumentStructure' },
+    ])
+
+    const several = setupPlan(drafts, {
+      ...context,
+      documentStructures: [{ id: 'erp-json' }, { id: 'erp-csv' }],
+    })
+
+    expect(several.mappingDrafts).toEqual([])
+    expect(several.skippedMappingDrafts).toEqual([
+      { messageType: 'ORDERS', reason: 'severalDocumentStructures' },
+      { messageType: 'INVOIC', reason: 'severalDocumentStructures' },
+    ])
+    expect(several.documents.map((document) => 'reasons' in document && document.reasons)).toEqual([
+      ['mappingDraft'],
+      ['mappingDraft'],
+    ])
   })
 
   it('leaves a document whose mapping is chosen later or no longer offered', () => {

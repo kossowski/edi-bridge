@@ -18,7 +18,11 @@ import {
 } from '@/components/trading-partners/partner-wizard-load-state'
 import { type WizardResult } from '@/components/trading-partners/partner-wizard-state'
 import { TestModeBadge } from '@/components/trading-partners/test-mode-badge'
-import { channelsQuery, publishedMappingVersionsQuery } from '@/lib/api/queries'
+import {
+  channelsQuery,
+  documentStructuresQuery,
+  publishedMappingVersionsQuery,
+} from '@/lib/api/queries'
 import { directionOf } from '@edi-bridge/contracts'
 
 function PlanSection({ title, children }: { title: string; children: ReactNode }) {
@@ -62,6 +66,8 @@ export function useSetupPlan(result: WizardResult, active: boolean): SetupPlanSt
   const plainNames = usePlainNames()
   const name = result.partner.name
   const channels = useQuery({ ...channelsQuery, enabled: active })
+  const drafts = result.documents.some((document) => result.mappings[document]?.way === 'ai')
+  const documentStructures = useQuery({ ...documentStructuresQuery, enabled: active && drafts })
 
   const versions = useQueries({
     queries: result.documents.flatMap((document) =>
@@ -71,7 +77,7 @@ export function useSetupPlan(result: WizardResult, active: boolean): SetupPlanSt
     ),
   })
 
-  const queries = [channels, ...versions]
+  const queries = [channels, ...(drafts ? [documentStructures] : []), ...versions]
 
   if (queries.some((query) => query.isError)) {
     return {
@@ -86,7 +92,7 @@ export function useSetupPlan(result: WizardResult, active: boolean): SetupPlanSt
     }
   }
 
-  if (channels.data === undefined || versions.some((query) => query.data === undefined)) {
+  if (channels.data === undefined || queries.some((query) => query.data === undefined)) {
     return { status: 'loading' }
   }
 
@@ -95,6 +101,7 @@ export function useSetupPlan(result: WizardResult, active: boolean): SetupPlanSt
     plan: setupPlan(result, {
       channels: channels.data,
       mappingVersions: versions.flatMap((query) => query.data ?? []),
+      documentStructures: documentStructures.data ?? [],
       names: {
         connection: (kind) => tSuggested(kind, { name }),
         route: (messageType) =>
@@ -155,13 +162,22 @@ export function ReviewStep({ state }: { state: SetupPlanState }) {
         )}
       </PlanSection>
 
-      {plan.mappingDrafts.length > 0 && (
+      {plan.mappingDrafts.length + plan.skippedMappingDrafts.length > 0 && (
         <PlanSection title={t('mappings.title')}>
           <ul className="flex flex-col gap-2">
-            {plan.mappingDrafts.map((messageType) => (
+            {plan.mappingDrafts.map(({ messageType }) => (
               <PlanItem
                 key={messageType}
                 detail={t('mappings.detail')}
+                title={t('mappings.draft', {
+                  documents: tWizard(`documentNames.${messageType}`),
+                })}
+              />
+            ))}
+            {plan.skippedMappingDrafts.map(({ messageType, reason }) => (
+              <PlanItem
+                key={messageType}
+                detail={t(`mappings.skipped.${reason}`)}
                 title={t('mappings.draft', {
                   documents: tWizard(`documentNames.${messageType}`),
                 })}

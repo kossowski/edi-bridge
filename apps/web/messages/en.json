@@ -1270,6 +1270,12 @@
         "mappingDraft": "New mapping for {documents}",
         "route": "Document route {name}"
       },
+      "skipped": {
+        "title": "Mappings to create",
+        "noDocumentStructure": "These mappings were not created because you have no data format yet. Add one, then create each mapping.",
+        "severalDocumentStructures": "These mappings were not created because you have several data formats. Create each mapping and choose its data format.",
+        "create": "Create the mapping for {documents}"
+      },
       "later": {
         "title": "Set up later",
         "description": "You left these for later. Add them with the setup steps below when you are ready.",
@@ -1822,7 +1828,11 @@
       "mappings": {
         "title": "Mappings",
         "draft": "New mapping for {documents}",
-        "detail": "The AI drafts it from an example document. You review and publish it in the mapping editor."
+        "detail": "The AI drafts it from an example document. You review and publish it in the mapping editor.",
+        "skipped": {
+          "noDocumentStructure": "Not created here: add your data format first, then create this mapping in Mappings.",
+          "severalDocumentStructures": "Not created here: you have several data formats, so you choose one when you create this mapping in Mappings."
+        }
       },
       "routes": {
         "title": "Document routes",

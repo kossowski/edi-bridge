@@ -3,6 +3,7 @@ import {
   type Direction,
   directionOf,
   directions,
+  type DocumentStructureSummary,
   type MappingVersionSummary,
 } from '@edi-bridge/contracts'
 
@@ -39,16 +40,25 @@ export type PlannedDocument<Channel extends PlanChannel> = { messageType: Wizard
   | { reasons: LeftReason[] }
 )
 
+export type PlannedMappingDraft = { messageType: WizardDocument; documentStructureId: string }
+
+export type SkippedMappingDraft = {
+  messageType: WizardDocument
+  reason: 'noDocumentStructure' | 'severalDocumentStructures'
+}
+
 export type SetupPlan<Channel extends PlanChannel> = {
   partner: WizardResult['partner']
   connections: PlannedConnection[]
-  mappingDrafts: WizardDocument[]
+  mappingDrafts: PlannedMappingDraft[]
+  skippedMappingDrafts: SkippedMappingDraft[]
   documents: PlannedDocument<Channel>[]
 }
 
 export type SetupContext<Channel extends PlanChannel> = {
   channels: ReadonlyArray<Channel>
   mappingVersions: ReadonlyArray<MappingVersionSummary>
+  documentStructures: ReadonlyArray<Pick<DocumentStructureSummary, 'id'>>
   names: {
     connection: (kind: ChannelKindKey) => string
     route: (messageType: WizardDocument) => string
@@ -136,6 +146,33 @@ function plannedDocument<Channel extends PlanChannel>(
   }
 }
 
+// A Mapping Draft names its Document Structure; the wizard picks one only when the Workspace has
+// exactly one, and leaves the choice to the create step otherwise.
+function plannedMappingDrafts(
+  result: WizardResult,
+  documentStructures: SetupContext<PlanChannel>['documentStructures'],
+): Pick<SetupPlan<PlanChannel>, 'mappingDrafts' | 'skippedMappingDrafts'> {
+  const drafts = result.documents.filter(
+    (messageType) => result.mappings[messageType]?.way === 'ai',
+  )
+
+  const [only, ...others] = documentStructures
+
+  if (only !== undefined && others.length === 0) {
+    return {
+      mappingDrafts: drafts.map((messageType) => ({ messageType, documentStructureId: only.id })),
+      skippedMappingDrafts: [],
+    }
+  }
+
+  const reason = only === undefined ? 'noDocumentStructure' : 'severalDocumentStructures'
+
+  return {
+    mappingDrafts: [],
+    skippedMappingDrafts: drafts.map((messageType) => ({ messageType, reason })),
+  }
+}
+
 export function setupPlan<Channel extends PlanChannel>(
   result: WizardResult,
   context: SetupContext<Channel>,
@@ -145,9 +182,7 @@ export function setupPlan<Channel extends PlanChannel>(
   return {
     partner: result.partner,
     connections,
-    mappingDrafts: result.documents.filter(
-      (messageType) => result.mappings[messageType]?.way === 'ai',
-    ),
+    ...plannedMappingDrafts(result, context.documentStructures),
     documents: result.documents.map((messageType) =>
       plannedDocument(messageType, result, connections, context),
     ),

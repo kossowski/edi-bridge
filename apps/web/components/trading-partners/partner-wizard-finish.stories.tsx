@@ -20,9 +20,16 @@ import { apiUrl } from '@/lib/api/config'
 import {
   createChannelEndpoint,
   createFlowEndpoint,
+  createMappingEndpoint,
   createTradingPartnerEndpoint,
 } from '@edi-bridge/contracts'
-import { createHandlers, createTradingPartner, seedTradingPartners } from '@edi-bridge/mocks'
+import {
+  createHandlers,
+  createTradingPartner,
+  documentStructureHandlers,
+  seedDocumentStructures,
+  seedTradingPartners,
+} from '@edi-bridge/mocks'
 
 import preview from '../../.storybook/preview'
 
@@ -79,9 +86,26 @@ const meta = preview.meta({
   parameters: { layout: 'fullscreen' },
   decorators: [withPartnerFrame],
   beforeEach({ msw }) {
-    msw.use(...createHandlers(apiUrl))
+    msw.use(
+      ...documentStructureHandlers(apiUrl, {
+        documentStructures: seedDocumentStructures.slice(0, 1),
+      }),
+      ...createHandlers(apiUrl),
+    )
   },
 })
+
+function recordMappingCreates(msw: StoryContext['msw']) {
+  const bodies: unknown[] = []
+
+  msw.use(
+    http.post(`${apiUrl}${createMappingEndpoint.path}`, async ({ request }) => {
+      bodies.push(await request.clone().json())
+    }),
+  )
+
+  return bodies
+}
 
 export const Success = meta.story({
   async play({ canvas }) {
@@ -160,12 +184,22 @@ export const LeftForLater = meta.story({
 })
 
 export const AiDrafts = meta.story({
-  async play({ canvas }) {
+  async play({ canvas, msw }) {
+    const bodies = recordMappingCreates(msw)
+
     await toReviewWithAiDrafts(canvas)
     await userEvent.click(canvas.getByRole('button', { name: finishLabel }))
 
     const notice = await findNotice(canvas)
     const drafts = within(notice.getByRole('region', { name: 'AI drafts' }))
+
+    await expect(bodies).toEqual(
+      ['ORDERS', 'DESADV'].map((messageType) => ({
+        messageType,
+        documentStructureId: seedDocumentStructures[0]?.id,
+      })),
+    )
+    await expect(notice.queryByRole('region', { name: 'Mappings to create' })).toBeNull()
 
     for (const documents of ['purchase orders', 'dispatch advices']) {
       await expect(
@@ -176,6 +210,55 @@ export const AiDrafts = meta.story({
     await expect(
       notice.getByRole('heading', { name: `Web address for ${wizardPartner}` }),
     ).toBeVisible()
+  },
+})
+
+export const AiDraftsWithSeveralDocumentStructures = meta.story({
+  beforeEach({ msw }) {
+    msw.use(...documentStructureHandlers(apiUrl, { documentStructures: seedDocumentStructures }))
+  },
+  async play({ canvas, msw }) {
+    const bodies = recordMappingCreates(msw)
+
+    await toReviewWithAiDrafts(canvas)
+    await userEvent.click(canvas.getByRole('button', { name: finishLabel }))
+
+    const notice = await findNotice(canvas)
+    const skipped = within(notice.getByRole('region', { name: 'Mappings to create' }))
+
+    await expect(
+      skipped.getByText(
+        'These mappings were not created because you have several data formats. Create each mapping and choose its data format.',
+      ),
+    ).toBeVisible()
+    await expect(
+      skipped.getByRole('link', { name: 'Create the mapping for purchase orders' }),
+    ).toHaveAttribute('href', '/mappings?new=ORDERS')
+    await expect(
+      skipped.getByRole('link', { name: 'Create the mapping for dispatch advices' }),
+    ).toHaveAttribute('href', '/mappings?new=DESADV')
+    await expect(notice.queryByRole('region', { name: 'AI drafts' })).toBeNull()
+    await expect(bodies).toEqual([])
+  },
+})
+
+export const AiDraftsWithoutDocumentStructure = meta.story({
+  beforeEach({ msw }) {
+    msw.use(...documentStructureHandlers(apiUrl, { documentStructures: [] }))
+  },
+  async play({ canvas }) {
+    await toReviewWithAiDrafts(canvas)
+    await userEvent.click(canvas.getByRole('button', { name: finishLabel }))
+
+    const notice = await findNotice(canvas)
+    const skipped = within(notice.getByRole('region', { name: 'Mappings to create' }))
+
+    await expect(
+      skipped.getByText(
+        'These mappings were not created because you have no data format yet. Add one, then create each mapping.',
+      ),
+    ).toBeVisible()
+    await expect(skipped.getAllByRole('link')).toHaveLength(2)
   },
 })
 
@@ -337,6 +420,37 @@ export const German = meta.story({
       `Verbindung für Belege an ${wizardPartner} Fügen Sie sie hinzu, sobald ${wizardPartner} Ihnen die Verbindungsangaben schickt.`,
       'Belegweg für Rechnungen Er folgt, sobald die Verbindung zu Kieler Kontor GmbH hinzugefügt ist. Er braucht den veröffentlichten KI-Entwurf.',
     ])
+  },
+})
+
+export const GermanWithSeveralDocumentStructures = meta.story({
+  decorators: [german],
+  beforeEach({ msw }) {
+    msw.use(...documentStructureHandlers(apiUrl, { documentStructures: seedDocumentStructures }))
+  },
+  async play({ canvas }) {
+    await userEvent.type(canvas.getByLabelText('Firmenname'), wizardPartner)
+    await userEvent.click(canvas.getByRole('checkbox', { name: 'Ich trage sie später ein' }))
+    await userEvent.click(canvas.getByRole('button', { name: 'Weiter' }))
+    await userEvent.click(await canvas.findByRole('checkbox', { name: /Rechnungen senden/ }))
+    await userEvent.click(canvas.getByRole('button', { name: 'Weiter' }))
+    await userEvent.click(await canvas.findByRole('radio', { name: /Wir fragen den Partner/ }))
+    await userEvent.click(canvas.getByRole('button', { name: 'Weiter' }))
+    await userEvent.click(await canvas.findByRole('radio', { name: /Von der KI entwerfen lassen/ }))
+    await userEvent.click(canvas.getByRole('button', { name: 'Weiter' }))
+    await canvas.findByRole('region', { name: 'Belegwege' })
+    await userEvent.click(canvas.getByRole('button', { name: 'Partner im Testbetrieb anlegen' }))
+
+    const skipped = within(await canvas.findByRole('region', { name: 'Anzulegende Mappings' }))
+
+    await expect(
+      skipped.getByText(
+        'Diese Mappings wurden nicht angelegt, weil Sie mehrere Datenformate haben. Legen Sie jedes Mapping an und wählen Sie sein Datenformat.',
+      ),
+    ).toBeVisible()
+    await expect(
+      skipped.getByRole('link', { name: 'Mapping für Rechnungen anlegen' }),
+    ).toHaveAttribute('href', '/mappings?new=INVOIC')
   },
 })
 

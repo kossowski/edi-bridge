@@ -9,11 +9,13 @@ import { type ReactNode, useEffect, useId, useRef } from 'react'
 import { WebhookTokenReveal } from '@/components/channels/webhook-token'
 import { CopyableValue } from '@/components/copy-button'
 import { aiDraftStartHref } from '@/components/mappings/ai-draft-run'
+import { type SkippedMappingDraft } from '@/components/trading-partners/partner-setup-plan'
 import {
   nothingForLater,
   nothingLeft,
   type SetupSummary,
 } from '@/components/trading-partners/partner-wizard-finish'
+import { newMappingHref } from '@/lib/navigation'
 import { Button, buttonVariants } from '@edi-bridge/ui/components/button'
 import { cn } from '@edi-bridge/ui/lib/utils'
 
@@ -30,6 +32,36 @@ function NoticeSection({ title, children }: { title: string; children: ReactNode
   )
 }
 
+function SkippedMappingDrafts({ skipped }: { skipped: ReadonlyArray<SkippedMappingDraft> }) {
+  const t = useTranslations('TradingPartner.created.skipped')
+  const tWizard = useTranslations('PartnerWizard')
+  const [first] = skipped
+
+  if (first === undefined) {
+    return null
+  }
+
+  return (
+    <NoticeSection title={t('title')}>
+      <p className="text-sm">{t(first.reason)}</p>
+      <ul className="flex flex-wrap gap-2">
+        {skipped.map(({ messageType }) => (
+          <li key={messageType} className="max-w-full min-w-0">
+            <Link
+              href={newMappingHref(messageType)}
+              className={cn(
+                buttonVariants({ variant: 'outline' }),
+                'h-auto min-h-8 max-w-full py-1.5 text-left whitespace-normal',
+              )}>
+              {t('create', { documents: tWizard(`documentNames.${messageType}`) })}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </NoticeSection>
+  )
+}
+
 export function SetupNotice({
   summary,
   onDismiss,
@@ -42,7 +74,7 @@ export function SetupNotice({
   const tWizard = useTranslations('PartnerWizard')
   const titleId = useId()
   const titleRef = useRef<HTMLHeadingElement>(null)
-  const { name, webhook, mappingDrafts, left, later } = summary
+  const { name, webhook, mappingDrafts, skippedMappingDrafts, left, later } = summary
 
   useEffect(() => {
     titleRef.current?.focus()
@@ -89,6 +121,8 @@ export function SetupNotice({
           </ul>
         </NoticeSection>
       )}
+
+      <SkippedMappingDrafts skipped={skippedMappingDrafts} />
 
       {!nothingForLater(later) && (
         <NoticeSection title={t('later.title')}>

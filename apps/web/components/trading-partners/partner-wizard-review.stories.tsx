@@ -14,7 +14,13 @@ import {
 } from '@/components/trading-partners/partner-wizard-story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import { channelKinds, channelsEndpoint } from '@edi-bridge/contracts'
-import { channelHandlers, createChannel, seedChannels } from '@edi-bridge/mocks'
+import {
+  channelHandlers,
+  createChannel,
+  documentStructureHandlers,
+  seedChannels,
+  seedDocumentStructures,
+} from '@edi-bridge/mocks'
 
 import preview from '../../.storybook/preview'
 
@@ -114,25 +120,85 @@ export const AllPostponed = meta.story({
   },
 })
 
+async function toReviewWithAiDrafts(canvas: Canvas) {
+  await toMappings(canvas, ['ORDERS', 'DESADV'])
+
+  for (const document of ['ORDERS', 'DESADV'] as const) {
+    const group = await findMappingGroup(canvas, document)
+    await userEvent.click(group.getByRole('radio', { name: /Let AI draft one/ }))
+  }
+
+  await continueTo(canvas, 'Review and create')
+
+  return findSection(canvas, 'Mappings')
+}
+
+const aiDraftDetail =
+  'The AI drafts it from an example document. You review and publish it in the mapping editor.'
+
 export const AiDrafts = meta.story({
+  beforeEach({ msw }) {
+    msw.use(
+      ...documentStructureHandlers(apiUrl, {
+        documentStructures: seedDocumentStructures.slice(0, 1),
+      }),
+    )
+  },
   async play({ canvas }) {
-    await toMappings(canvas, ['ORDERS', 'DESADV'])
+    const mappings = await toReviewWithAiDrafts(canvas)
 
-    for (const document of ['ORDERS', 'DESADV'] as const) {
-      const group = await findMappingGroup(canvas, document)
-      await userEvent.click(group.getByRole('radio', { name: /Let AI draft one/ }))
-    }
-
-    await continueTo(canvas, 'Review and create')
-
-    const mappings = await findSection(canvas, 'Mappings')
     await expect(mappings.getByText('New mapping for purchase orders')).toBeVisible()
     await expect(mappings.getByText('New mapping for dispatch advices')).toBeVisible()
+    await expect(mappings.getAllByText(aiDraftDetail)).toHaveLength(2)
 
     const routes = section(canvas, 'Document routes')
     await expect(
       routes.getAllByText('The route follows once the AI draft is published.'),
     ).toHaveLength(2)
+  },
+})
+
+export const AiDraftsWithSeveralDocumentStructures = meta.story({
+  async play({ canvas }) {
+    const mappings = await toReviewWithAiDrafts(canvas)
+
+    await expect(mappings.getByText('New mapping for purchase orders')).toBeVisible()
+    await expect(
+      mappings.getAllByText(
+        'Not created here: you have several data formats, so you choose one when you create this mapping in Mappings.',
+      ),
+    ).toHaveLength(2)
+    await expect(mappings.queryByText(aiDraftDetail)).toBeNull()
+  },
+})
+
+export const AiDraftsWithoutDocumentStructure = meta.story({
+  beforeEach({ msw }) {
+    msw.use(...documentStructureHandlers(apiUrl, { documentStructures: [] }))
+  },
+  async play({ canvas }) {
+    const mappings = await toReviewWithAiDrafts(canvas)
+
+    await expect(
+      mappings.getAllByText(
+        'Not created here: add your data format first, then create this mapping in Mappings.',
+      ),
+    ).toHaveLength(2)
+  },
+})
+
+export const AiDraftsDocumentStructuresUnavailable = meta.story({
+  beforeEach({ msw }) {
+    msw.use(...documentStructureHandlers(apiUrl, { state: 'error' }))
+  },
+  async play({ canvas }) {
+    await toMappings(canvas, ['ORDERS'])
+    await userEvent.click(
+      (await findMappingGroup(canvas, 'ORDERS')).getByRole('radio', { name: /Let AI draft one/ }),
+    )
+    await continueTo(canvas, 'Review and create')
+
+    await expect(await canvas.findByRole('button', { name: 'Try again' })).toBeVisible()
   },
 })
 
@@ -258,6 +324,11 @@ export const German = meta.story({
     ).toBeVisible()
     await expect(
       section(canvas, 'Mappings').getByText('Neues Mapping für Rechnungen'),
+    ).toBeVisible()
+    await expect(
+      section(canvas, 'Mappings').getByText(
+        'Wird hier nicht angelegt: Sie haben mehrere Datenformate und wählen eines, wenn Sie das Mapping unter Mappings anlegen.',
+      ),
     ).toBeVisible()
     await expect(canvas.getByText('Im Testbetrieb angelegt')).toBeVisible()
     await expect(
