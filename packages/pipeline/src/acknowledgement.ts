@@ -1,4 +1,5 @@
-import { and, eq, isNull, lt, or } from 'drizzle-orm'
+import { and, eq, inArray, isNull, lt, notExists, or } from 'drizzle-orm'
+import { alias } from 'drizzle-orm/pg-core'
 import { Data, DateTime, type Duration, Effect, Result } from 'effect'
 
 import { directionOf } from '@edi-bridge/contracts'
@@ -6,6 +7,8 @@ import {
   acknowledgements,
   channels,
   claimTradingPartnerControlReference,
+  type Connection,
+  documents,
   flows,
   tradingPartners,
   workspaces,
@@ -39,6 +42,7 @@ const notSentMessages: Record<NotSentReason, string> = {
   ambiguousChannel: 'the outbound EDIFACT Flows of its Trading Partner name different Channels',
   workspaceGlnMissing: 'the Workspace has no GLN',
   unechoableInterchangeHeader: 'its UNB cannot be echoed in a valid CONTRL',
+  seededChannel: 'a seeded Channel never sends',
 }
 
 const builtContrl = (content: string) =>
@@ -54,26 +58,39 @@ const builtContrl = (content: string) =>
   })
 
 // The destination of the Trading Partner's outbound EDIFACT Flows is where it takes Interchanges.
-const channelOf = (workspaceId: string, tradingPartnerId: string) =>
+const channelOf = (workspaceId: string, tradingPartnerId: string, documentId: string) =>
   Effect.gen(function* () {
     const db = yield* Database
 
+    const [source] = yield* Effect.promise(() =>
+      db
+        .select({ seeded: channels.seeded })
+        .from(documents)
+        .innerJoin(channels, eq(channels.id, documents.channelId))
+        .where(eq(documents.id, documentId)),
+    )
+
+    // A Document received over a seeded Channel is seeded traffic, whichever Channel would answer it.
+    if (source?.seeded === true) {
+      return { channelId: null, notSentReason: 'seededChannel' as const }
+    }
+
     const found = yield* Effect.promise(() =>
       db
-        .selectDistinct({ messageType: flows.messageType, channelId: flows.destinationChannelId })
+        .selectDistinct({
+          messageType: flows.messageType,
+          channelId: flows.destinationChannelId,
+          seeded: channels.seeded,
+        })
         .from(flows)
+        .innerJoin(channels, eq(channels.id, flows.destinationChannelId))
         .where(
           and(eq(flows.workspaceId, workspaceId), eq(flows.tradingPartnerId, tradingPartnerId)),
         ),
     )
 
-    const channelIds = [
-      ...new Set(
-        found.flatMap(({ messageType, channelId }) =>
-          directionOf({ messageType }) === 'outbound' ? [channelId] : [],
-        ),
-      ),
-    ]
+    const outbound = found.filter(({ messageType }) => directionOf({ messageType }) === 'outbound')
+    const channelIds = [...new Set(outbound.map(({ channelId }) => channelId))]
 
     const [channelId] = channelIds
 
@@ -81,8 +98,12 @@ const channelOf = (workspaceId: string, tradingPartnerId: string) =>
       return { channelId: null, notSentReason: 'noOutboundChannel' as const }
     }
 
-    return channelIds.length > 1
-      ? { channelId: null, notSentReason: 'ambiguousChannel' as const }
+    if (channelIds.length > 1) {
+      return { channelId: null, notSentReason: 'ambiguousChannel' as const }
+    }
+
+    return outbound.some(({ seeded }) => seeded)
+      ? { channelId: null, notSentReason: 'seededChannel' as const }
       : { channelId, notSentReason: null }
   })
 
@@ -126,7 +147,7 @@ const answerOf = (workspaceId: string, documentId: string, content: string) =>
     }
 
     const { tradingPartnerId, testMode, workspaceGln } = found
-    const { channelId, notSentReason } = yield* channelOf(workspaceId, tradingPartnerId)
+    const { channelId, notSentReason } = yield* channelOf(workspaceId, tradingPartnerId, documentId)
     const message = Result.isSuccess(built) ? built.success : null
 
     return {
@@ -219,8 +240,31 @@ export const answerDocument = (
     ),
   )
 
-const isDue = (cutoff: Date) =>
+const seededChannel = alias(channels, 'seeded_channel')
+
+// A CONTRL over a seeded Channel, or one answering a Document received over it, never sends.
+const isDue = (db: Connection['db'], cutoff: Date) =>
   and(
+    notExists(
+      db
+        .select({ id: seededChannel.id })
+        .from(seededChannel)
+        .where(
+          and(
+            eq(seededChannel.seeded, true),
+            or(
+              eq(seededChannel.id, acknowledgements.channelId),
+              inArray(
+                seededChannel.id,
+                db
+                  .select({ channelId: documents.channelId })
+                  .from(documents)
+                  .where(eq(documents.id, acknowledgements.documentId)),
+              ),
+            ),
+          ),
+        ),
+    ),
     isNull(acknowledgements.handedOverAt),
     isNull(acknowledgements.notSentReason),
     or(
@@ -246,7 +290,7 @@ const claimAttempt = (id: string, cutoff: Date) =>
           })
           .from(acknowledgements)
           .innerJoin(channels, eq(channels.id, acknowledgements.channelId))
-          .where(and(eq(acknowledgements.id, id), isDue(cutoff)))
+          .where(and(eq(acknowledgements.id, id), isDue(db, cutoff)))
           .for('update', { of: acknowledgements })
 
         if (due === undefined) {
@@ -315,7 +359,7 @@ export const sendAcknowledgements = (retryAfter: Duration.Input) =>
     const cutoff = DateTime.toDateUtc(DateTime.subtractDuration(yield* DateTime.now, retryAfter))
 
     const due = yield* Effect.promise(() =>
-      db.select({ id: acknowledgements.id }).from(acknowledgements).where(isDue(cutoff)),
+      db.select({ id: acknowledgements.id }).from(acknowledgements).where(isDue(db, cutoff)),
     )
 
     yield* Effect.forEach(

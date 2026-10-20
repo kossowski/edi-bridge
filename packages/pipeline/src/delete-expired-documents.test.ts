@@ -27,6 +27,7 @@ import {
   goldenInvoice,
   inMemoryRunQueue,
   type InvoiceWorkspace,
+  markSeeded,
   pipelineServices,
   readRun,
   seedInvoiceWorkspace,
@@ -138,6 +139,29 @@ describe('the deletion of expired Documents', () => {
       documentDeletedAt: deletedAt,
       document: undefined,
       steps: received.steps,
+    })
+  })
+
+  it('keeps a Document received over a seeded Channel past the retention period of its Workspace', async () => {
+    const seeded = await seedInvoiceWorkspace(connection.db, 'Seeded Expired Foods')
+    const into = await seedInvoiceWorkspace(connection.db, 'Unseeded Expired Foods')
+
+    await markSeeded(connection.db, seeded.inboundChannelId)
+
+    const kept = await receiveFailedInvoice(seeded)
+    const expired = await receiveFailedInvoice(into)
+    const deletedAt = after(expired.document.receivedAt, Duration.days(90))
+
+    await deleteAt(deletedAt)
+
+    await expect(readRun(connection.db, kept.id)).resolves.toMatchObject({
+      documentId: kept.document.id,
+      documentDeletedAt: null,
+      document: { content: goldenInvoice },
+    })
+    await expect(readRun(connection.db, expired.id)).resolves.toMatchObject({
+      documentId: null,
+      documentDeletedAt: deletedAt,
     })
   })
 

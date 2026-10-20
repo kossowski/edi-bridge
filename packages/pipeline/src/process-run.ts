@@ -40,6 +40,7 @@ import {
 import {
   channels,
   claimControlReference,
+  documents,
   documentStructures,
   flows,
   lookupTableEntries,
@@ -112,6 +113,9 @@ export class CharacterSetUnsupported extends Data.TaggedError('CharacterSetUnsup
 export class ChannelDefect extends Data.TaggedError('ChannelDefect')<{
   readonly defect: unknown
 }> {}
+
+// Seeded traffic names a reserved .invalid host, and a Flow repointed in the Sandbox must not send it.
+export class SeededChannel extends Data.TaggedError('SeededChannel') {}
 
 // Any other defect in the delivery step, such as a database error.
 export class DeliveryDefect extends Data.TaggedError('DeliveryDefect')<{
@@ -366,6 +370,7 @@ type DeliveryError =
   | CharacterSetUnsupported
   | ChannelDefect
   | DeliveryDefect
+  | SeededChannel
 
 const deliveryFailure = (
   failure: DeliveryError,
@@ -436,6 +441,19 @@ const deliveryFailure = (
           fixTarget: { kind: 'channelCredential', channelId: channel.id, name: channel.name },
         },
       }),
+      SeededChannel: (): Failure => ({
+        stage: 'delivery',
+        error: {
+          code: 'seededChannel',
+          message: 'A seeded Channel never sends, so the Document never left EDI Bridge',
+          position: null,
+          details: null,
+        },
+        problem: {
+          reason: 'unreachable',
+          fixTarget: { kind: 'channel', channelId: channel.id, name: channel.name },
+        },
+      }),
       DeliveryDefect: (): Failure => ({
         stage: 'delivery',
         error: {
@@ -470,6 +488,7 @@ const validated = (message: Message, characterSet: CharacterSet) =>
 const loadDestination = ({ workspaceId, runId }: QueuedRun) =>
   Effect.gen(function* () {
     const db = yield* Database
+    const sourceChannel = alias(channels, 'source_channel')
 
     const [found] = yield* Effect.promise(() =>
       db
@@ -483,12 +502,15 @@ const loadDestination = ({ workspaceId, runId }: QueuedRun) =>
             testMode: tradingPartners.testMode,
           },
           channel: channels,
+          source: { seeded: sourceChannel.seeded },
         })
         .from(runs)
         .innerJoin(workspaces, eq(workspaces.id, runs.workspaceId))
         .innerJoin(tradingPartners, eq(tradingPartners.id, runs.tradingPartnerId))
         .innerJoin(flows, eq(flows.id, runs.flowId))
         .innerJoin(channels, eq(channels.id, flows.destinationChannelId))
+        .leftJoin(documents, eq(documents.id, runs.documentId))
+        .leftJoin(sourceChannel, eq(sourceChannel.id, documents.channelId))
         .where(and(eq(runs.workspaceId, workspaceId), eq(runs.id, runId))),
     )
 
@@ -496,7 +518,10 @@ const loadDestination = ({ workspaceId, runId }: QueuedRun) =>
       return yield* Effect.die(new Error(`Run ${runId} has no destination Channel`))
     }
 
-    return found
+    const { source, ...destination } = found
+
+    // A Run of a Document received over a seeded Channel is seeded traffic too.
+    return { ...destination, seeded: destination.channel.seeded || source?.seeded === true }
   })
 
 type Destination = Effect.Success<ReturnType<typeof loadDestination>>
@@ -571,7 +596,7 @@ const recordTestRejection = (
 const handOver = (
   run: ClaimedRun,
   lease: StepLease,
-  channel: Destination['channel'],
+  { channel, seeded }: Destination,
   document: OutboundDocument,
   { isInterchange = false }: { isInterchange?: boolean } = {},
 ) =>
@@ -581,6 +606,10 @@ const handOver = (
     }
 
     yield* ensureOwned(lease)
+
+    if (seeded) {
+      return yield* new SeededChannel()
+    }
 
     const delivery = yield* Delivery
 
@@ -694,7 +723,7 @@ const deliverInterchange =
       yield* handOver(
         run,
         lease,
-        destination.channel,
+        destination,
         {
           name: `${messageType}-${String(reference)}.edi`,
           content,
@@ -725,7 +754,7 @@ const deliverDocument =
 
       const { extension, mediaType } = documentFormats[structure.format]
 
-      yield* handOver(run, lease, destination.channel, {
+      yield* handOver(run, lease, destination, {
         name: `${pinned.messageType}-${run.id}.${extension}`,
         content: Buffer.from(encodeText(run.output, encodingOf(structure))),
         mediaType,

@@ -211,6 +211,13 @@
       "when": 1792479801247,
       "tag": "0029_workspace_kind",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1792480350865,
+      "tag": "0030_acknowledgement_seeded_channel",
+      "breakpoints": true
     }
   ]
 }

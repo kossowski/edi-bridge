@@ -554,6 +554,12 @@ export async function deliverOverSftp(
   return id
 }
 
+export async function markSeeded(db: Db, channelId: string) {
+  return one(
+    await db.update(channels).set({ seeded: true }).where(eq(channels.id, channelId)).returning(),
+  )
+}
+
 export async function readRun(db: Db, id: string) {
   const [run] = await db.select().from(runs).where(eq(runs.id, id))
 

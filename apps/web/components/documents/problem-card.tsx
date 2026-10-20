@@ -91,6 +91,10 @@ function useProblemText(run: FailedRun) {
     }
 
     case 'unreachable': {
+      if (error.code === 'seededChannel') {
+        return { title: t('seededChannel.title'), description: t('seededChannel.description') }
+      }
+
       return {
         title: t('unreachable.title', values),
         description: t('unreachable.description', values),

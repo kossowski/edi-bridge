@@ -181,7 +181,7 @@ export const EveryNotSentReason = meta.story({
   async play({ canvasElement }) {
     const orders = within(stepOf(await timelineOf(canvasElement, 'Rheinkauf eG'), 'Purchase order'))
 
-    await expect(orders.getAllByText('Not sent')).toHaveLength(4)
+    await expect(orders.getAllByText('Not sent')).toHaveLength(5)
     await expect(
       orders.getByText(/because no document route sends documents to Rheinkauf eG/),
     ).toBeVisible()
@@ -204,6 +204,11 @@ export const EveryNotSentReason = meta.story({
         /because the header of the transmission from Rheinkauf eG cannot be repeated/,
       ),
     ).toBeVisible()
+    await expect(
+      orders.getByText(
+        /because the connection is a demo connection, and a demo connection never sends\. Nothing needs fixing: in the demo, receipt confirmations stay in EDI Bridge\./,
+      ),
+    ).toBeVisible()
   },
 })
 
@@ -211,7 +216,7 @@ export const ReceiptConfirmationNotSentGerman = meta.story({
   ...everyNotSentReason,
   decorators: [german],
   async play({ canvas }) {
-    await expect(await canvas.findAllByText('Nicht gesendet')).toHaveLength(4)
+    await expect(await canvas.findAllByText('Nicht gesendet')).toHaveLength(5)
     await expect(
       canvas.getByText(
         /Rheinkauf eG hat für diese Bestellung keine Empfangsbestätigung erhalten, weil kein Belegweg Belege an Rheinkauf eG sendet./,
@@ -223,6 +228,11 @@ export const ReceiptConfirmationNotSentGerman = meta.story({
       ),
     ).toBeVisible()
     await expect(canvas.getByRole('link', { name: 'GLN Ihres Unternehmens' })).toBeVisible()
+    await expect(
+      canvas.getByText(
+        /weil die Verbindung eine Demo-Verbindung ist, die nie sendet\. Hier ist nichts zu beheben: In der Demo bleiben Empfangsbestätigungen in EDI Bridge\./,
+      ),
+    ).toBeVisible()
   },
 })
 

@@ -12,6 +12,11 @@ export const channelDelivery = (options: {
   const http = httpChannelDelivery(options)
 
   return (channel, document) => {
+    // The pipeline stops a seeded Channel before it gets here; this keeps any other caller off its host.
+    if (channel.seeded) {
+      return Effect.die(new Error(`Seeded Channel ${channel.id} never sends`))
+    }
+
     switch (channel.type) {
       case 'sftp':
         return sftp(channel, document)

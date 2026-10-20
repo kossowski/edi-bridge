@@ -808,6 +808,10 @@
           "title": "{direction, select, inbound {Ihr ERP hat nicht geantwortet} other {Der Server von {tradingPartner} hat nicht geantwortet}}",
           "description": "{direction, select, inbound {Der Beleg wurde übersetzt, aber Ihr ERP hat ihn bei der Zustellung nicht angenommen.} other {Der Beleg ist fertig, aber die Übertragung an {tradingPartner} ist fehlgeschlagen.}} Das ist meist nur vorübergehend."
         },
+        "seededChannel": {
+          "title": "Demo-Verbindungen senden nie",
+          "description": "Dies ist eine Demo-Verbindung, über die EDI Bridge nie Belege sendet. Der Beleg ist fertig, bleibt aber in EDI Bridge, und ein neuer Versuch endet genauso."
+        },
         "incompleteSetup": {
           "title": "Die Einrichtung für {tradingPartner} ist nicht vollständig",
           "description": "{piece, select, workspaceGln {Der Beleg ist fertig, aber die GLN Ihres Unternehmens fehlt, daher kann EDI Bridge den Beleg nicht adressieren. Vervollständigen Sie die Einrichtung und versuchen Sie es dann erneut.} tradingPartnerGln {Der Beleg ist fertig, aber die GLN von {tradingPartner} fehlt, daher kann EDI Bridge den Beleg nicht adressieren. Vervollständigen Sie die Einrichtung und versuchen Sie es dann erneut.} channelCredential {Der Beleg ist fertig, aber EDI Bridge kann die Zugangsdaten der Verbindung zu {tradingPartner} nicht verwenden. Vervollständigen Sie die Einrichtung und versuchen Sie es dann erneut.} tradingPartner {Der Beleg ist fertig, aber EDI Bridge kann ihn nicht im Zeichensatz schreiben, der für {tradingPartner} gewählt ist. Wählen Sie für {tradingPartner} einen unterstützten Zeichensatz (UNOA, UNOB oder UNOC) und versuchen Sie es dann erneut.} other {Der Beleg ist fertig, aber ein Teil der Einrichtung für {tradingPartner} fehlt. Vervollständigen Sie die Einrichtung und versuchen Sie es dann erneut.}}"
@@ -1185,8 +1189,8 @@
     },
     "notSent": {
       "state": "Nicht gesendet",
-      "reason": "{tradingPartner} hat für {messageType, select, DESADV {dieses} other {diese}} {document} keine Empfangsbestätigung erhalten, weil {reason, select, noOutboundChannel {kein Belegweg Belege an {tradingPartner} sendet.} ambiguousChannel {die Belegwege zu {tradingPartner} verschiedene Verbindungen nutzen und EDI Bridge nicht weiß, welche gilt.} workspaceGlnMissing {die GLN Ihres Unternehmens fehlt.} other {sich der Kopf der Übertragung von {tradingPartner} nicht in einer gültigen Empfangsbestätigung wiederholen lässt.}}",
-      "fix": "{reason, select, noOutboundChannel {Legen Sie einen <link>Belegweg zu {tradingPartner}</link> an, damit spätere Belege eine Empfangsbestätigung erhalten.} ambiguousChannel {Prüfen Sie die <link>Belegwege von {tradingPartner}</link> und wählen Sie für alle dieselbe Verbindung.} workspaceGlnMissing {Erfassen Sie die <link>GLN Ihres Unternehmens</link>, damit spätere Belege eine Empfangsbestätigung erhalten.} other {Bitten Sie {tradingPartner}, den Kopf der Übertragungen zu prüfen.}}"
+      "reason": "{tradingPartner} hat für {messageType, select, DESADV {dieses} other {diese}} {document} keine Empfangsbestätigung erhalten, weil {reason, select, noOutboundChannel {kein Belegweg Belege an {tradingPartner} sendet.} ambiguousChannel {die Belegwege zu {tradingPartner} verschiedene Verbindungen nutzen und EDI Bridge nicht weiß, welche gilt.} workspaceGlnMissing {die GLN Ihres Unternehmens fehlt.} seededChannel {die Verbindung eine Demo-Verbindung ist, die nie sendet.} other {sich der Kopf der Übertragung von {tradingPartner} nicht in einer gültigen Empfangsbestätigung wiederholen lässt.}}",
+      "fix": "{reason, select, noOutboundChannel {Legen Sie einen <link>Belegweg zu {tradingPartner}</link> an, damit spätere Belege eine Empfangsbestätigung erhalten.} ambiguousChannel {Prüfen Sie die <link>Belegwege von {tradingPartner}</link> und wählen Sie für alle dieselbe Verbindung.} workspaceGlnMissing {Erfassen Sie die <link>GLN Ihres Unternehmens</link>, damit spätere Belege eine Empfangsbestätigung erhalten.} seededChannel {Hier ist nichts zu beheben: In der Demo bleiben Empfangsbestätigungen in EDI Bridge.} other {Bitten Sie {tradingPartner}, den Kopf der Übertragungen zu prüfen.}}"
     },
     "acknowledgement": {
       "state": {
