@@ -1,8 +1,13 @@
+import { withSentryConfig } from '@sentry/nextjs/config'
 import createNextIntlPlugin from 'next-intl/plugin'
 
 import type { NextConfig } from 'next'
 
+import { browserSentryOptions, sentryBuildOptions } from './lib/sentry'
+
 const withNextIntl = createNextIntlPlugin()
+
+browserSentryOptions()
 
 const nextConfig: NextConfig = {
   output: 'standalone',
@@ -38,4 +43,4 @@ const nextConfig: NextConfig = {
     ]),
 }
 
-export default withNextIntl(nextConfig)
+export default withSentryConfig(withNextIntl(nextConfig), sentryBuildOptions())
