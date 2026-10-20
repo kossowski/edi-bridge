@@ -24,7 +24,7 @@ const interchangeFieldsOf = (
   id: AnyPgColumn,
   direction: Direction,
   controlReference: SQL<string>,
-  preparedAt: AnyPgColumn,
+  preparedAt: SQL<Date>,
 ) => ({
   id: sql<string>`${id}`.as('id'),
   direction: sql<Direction>`${direction}`.as('direction'),
@@ -43,7 +43,8 @@ const outboundBranch = {
   controlReference: sql<string>`${runs.controlReference}::text`,
 }
 
-// An outbound Run the Channel took is its own Interchange, so the Run id names it.
+// An outbound Run is its own Interchange once delivery built it, so the Run id names it. One the
+// Channel has not taken yet counts as prepared when the Run was received.
 const outboundInterchangeRuns = (db: Database, workspaceId: string, condition: BranchCondition) =>
   fromRuns(
     db,
@@ -51,13 +52,12 @@ const outboundInterchangeRuns = (db: Database, workspaceId: string, condition: B
       outboundBranch.id,
       'outbound',
       outboundBranch.controlReference,
-      runs.handedOverAt,
+      sql<Date>`coalesce(${runs.handedOverAt}, ${runs.receivedAt})`,
     ),
   ).where(
     inWorkspace(
       runs,
       workspaceId,
-      isNotNull(runs.handedOverAt),
       isNotNull(runs.controlReference),
       isNotNull(runs.output),
       condition(outboundBranch),
@@ -77,7 +77,7 @@ const inboundInterchangeRuns = (db: Database, workspaceId: string, condition: Br
       inboundBranch.id,
       'inbound',
       inboundBranch.controlReference,
-      documents.receivedAt,
+      sql<Date>`${documents.receivedAt}`,
     ),
   )
     .innerJoin(documents, eq(documents.id, runs.documentId))

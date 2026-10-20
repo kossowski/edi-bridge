@@ -108,25 +108,29 @@ async function addTradingPartner(target: InvoiceWorkspace, name: string, gln: st
         .returning(),
     )
 
+  // Without handedOverAt, delivery built the Interchange but the Channel has not taken it yet.
   const sendInvoice = async ({
     controlReference,
     handedOverAt,
+    receivedAt = handedOverAt,
     businessReference = null,
   }: {
     controlReference: number
-    handedOverAt: Date
     businessReference?: string | null
-  }) => {
+  } & (
+    | { handedOverAt: Date; receivedAt?: Date }
+    | { handedOverAt?: undefined; receivedAt: Date }
+  )) => {
     return addRun({
       flowId: invoic.id,
-      status: 'delivered',
+      status: handedOverAt === undefined ? 'processing' : 'delivered',
       businessReference,
       output: interchangeOf(workspaceGln, gln, String(controlReference), [
         { reference: '1', messageType: 'INVOIC' },
       ]),
       handedOverAt,
       controlReference,
-      receivedAt: handedOverAt,
+      receivedAt,
     })
   }
 
@@ -248,6 +252,29 @@ describe('GET /interchanges', () => {
           }),
         ],
       },
+    ])
+  })
+
+  it('lists an outbound Interchange delivery built before the Channel took it, prepared when received', async () => {
+    const partner = await addTradingPartner(workspace, 'Moselgut eG', '4012345000122')
+
+    const invoice = await partner.sendInvoice({ controlReference: 4712, receivedAt: hoursAgo(2) })
+
+    const { interchanges } = await listed({ tradingPartnerId: [partner.tradingPartner.id] })
+
+    expect(interchanges).toEqual([
+      expect.objectContaining({
+        id: invoice.id,
+        controlReference: '4712',
+        direction: 'outbound',
+        preparedAt: hoursAgo(2).toISOString(),
+        runs: [
+          expect.objectContaining({
+            id: invoice.id,
+            interchange: { id: invoice.id, controlReference: '4712' },
+          }),
+        ],
+      }),
     ])
   })
 
@@ -406,6 +433,29 @@ describe('GET /interchanges/:id', () => {
         }),
       ],
     })
+  })
+
+  it('shows the outbound Interchange a Run names before the Channel took it', async () => {
+    const partner = await addTradingPartner(workspace, 'Saalegrund KG', '4012345000139')
+    const invoice = await partner.sendInvoice({ controlReference: 516, receivedAt: hoursAgo(1) })
+
+    const response = await loaded(invoice.id)
+
+    expect(response.statusCode).toBe(200)
+    expect(interchangeSchema.parse(response.json())).toEqual(
+      expect.objectContaining({
+        id: invoice.id,
+        controlReference: '516',
+        direction: 'outbound',
+        raw: invoice.output,
+        runs: [
+          expect.objectContaining({
+            id: invoice.id,
+            interchange: { id: invoice.id, controlReference: '516' },
+          }),
+        ],
+      }),
+    )
   })
 
   it('shows a received Interchange with the Message reference of each Run', async () => {
