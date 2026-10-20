@@ -370,7 +370,7 @@ describe('the polling of inbound SFTP Channels', () => {
     expect(run).toMatchObject({
       status: 'failed',
       failureStage: 'mapping',
-      error: { code: 'invalid-byte-sequence', message: 'Byte 574 (0xFC) is not valid utf-8' },
+      error: { code: 'invalid-byte-sequence', message: 'Byte 574 (0xFC) is not valid UTF-8' },
     })
   })
 

@@ -135,14 +135,14 @@ describe('manualSubmissionSchema', () => {
 
 describe('documentUndecodableProblem', () => {
   it('suggests another encoding when the submitted encoding decided', () => {
-    const problem = documentUndecodableProblem('Byte 12 (0xFC) is not valid utf-8', 'utf-8')
+    const problem = documentUndecodableProblem('Byte 12 (0xFC) is not valid UTF-8', 'utf-8')
 
     expect(documentUndecodableProblemSchema.parse(problem)).toEqual({
       code: 'documentUndecodable',
       encoding: 'utf-8',
       message:
-        'Byte 12 (0xFC) is not valid utf-8. Choose another encoding, such as Windows-1252 for a typical German CSV.',
-      reason: 'Byte 12 (0xFC) is not valid utf-8',
+        'Byte 12 (0xFC) is not valid UTF-8. Choose another encoding, such as Windows-1252 for a typical German CSV.',
+      reason: 'Byte 12 (0xFC) is not valid UTF-8',
     })
   })
 

@@ -323,7 +323,7 @@ describe('POST /webhooks/:id with a Document in an encoding other than UTF-8', (
   })
 
   it.each([
-    ['without a charset', 'application/json', 'Byte 574 (0xFC) is not valid utf-8'],
+    ['without a charset', 'application/json', 'Byte 574 (0xFC) is not valid UTF-8'],
     [
       'with an unknown charset',
       'application/json; charset=klingon',

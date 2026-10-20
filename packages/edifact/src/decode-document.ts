@@ -19,6 +19,24 @@ const encodingNamed = (label: string) => {
   }
 }
 
+const encodingNames = new Map([
+  ['big5', 'Big5'],
+  ['macintosh', 'Macintosh'],
+])
+
+// WHATWG names an encoding in lowercase; a reason names it as people read it, as the UNB reason does.
+const nameOf = (encoding: string) => {
+  if (encoding.startsWith('windows-')) {
+    return `Windows-${encoding.slice('windows-'.length)}`
+  }
+
+  if (encoding.startsWith('iso-8859-')) {
+    return `ISO 8859-${encoding.slice('iso-8859-'.length)}`
+  }
+
+  return encodingNames.get(encoding) ?? encoding.toUpperCase()
+}
+
 export const decodeDocument = (bytes: Uint8Array, label = 'utf-8'): DecodedDocument => {
   const interchange = decodeInterchange(bytes)
 
@@ -53,7 +71,7 @@ export const decodeDocument = (bytes: Uint8Array, label = 'utf-8'): DecodedDocum
     : {
         characterSet: undefined,
         readable: decoded.readable,
-        reason: `Byte ${String(decoded.invalidAt + 1)} (${hexOf(bytes[decoded.invalidAt] ?? 0)}) is not valid ${encoding}`,
+        reason: `Byte ${String(decoded.invalidAt + 1)} (${hexOf(bytes[decoded.invalidAt] ?? 0)}) is not valid ${nameOf(encoding)}`,
         characterSetError: undefined,
       }
 }

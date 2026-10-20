@@ -257,8 +257,8 @@ describe('manualSubmissionHandler', () => {
       code: 'documentUndecodable',
       encoding: 'utf-8',
       message:
-        'Byte 2 (0xE4) is not valid utf-8. Choose another encoding, such as Windows-1252 for a typical German CSV.',
-      reason: 'Byte 2 (0xE4) is not valid utf-8',
+        'Byte 2 (0xE4) is not valid UTF-8. Choose another encoding, such as Windows-1252 for a typical German CSV.',
+      reason: 'Byte 2 (0xE4) is not valid UTF-8',
     })
     expect(runs.all()).toHaveLength(0)
   })

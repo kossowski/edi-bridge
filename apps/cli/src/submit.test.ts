@@ -138,7 +138,7 @@ describe('submit', () => {
     [
       'no encoding is named and the file is not valid UTF-8',
       ['--channel', 'ERP webhook', dispatchFile],
-      'is not valid utf-8. Choose another encoding, such as Windows-1252 for a typical German CSV.',
+      'is not valid UTF-8. Choose another encoding, such as Windows-1252 for a typical German CSV.',
     ],
     [
       'the encoding is unknown',

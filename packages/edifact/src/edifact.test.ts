@@ -914,18 +914,21 @@ describe('decodeDocument', () => {
   })
 
   it.each([
-    ['utf-8', Buffer.from([0x4b, 0xe4, 0x73, 0x65]), 'Byte 2 (0xE4) is not valid utf-8'],
-    ['iso-8859-7', Buffer.from([0x4b, 0xae]), 'Byte 2 (0xAE) is not valid iso-8859-7'],
-  ])('names the first byte not valid in %s', (encoding, bytes, reason) => {
-    const withReplacement: unknown = expect.stringContaining('\ufffd')
+    ['utf-8', Buffer.from([0x4b, 0xe4, 0x73, 0x65]), 'Byte 2 (0xE4) is not valid UTF-8'],
+    ['iso-8859-7', Buffer.from([0x4b, 0xae]), 'Byte 2 (0xAE) is not valid ISO 8859-7'],
+  ])(
+    'names the first byte not valid in %s as people read the encoding',
+    (encoding, bytes, reason) => {
+      const withReplacement: unknown = expect.stringContaining('\ufffd')
 
-    expect(decodeDocument(bytes, encoding)).toMatchObject({
-      characterSet: undefined,
-      readable: withReplacement,
-      reason,
-      characterSetError: undefined,
-    })
-  })
+      expect(decodeDocument(bytes, encoding)).toMatchObject({
+        characterSet: undefined,
+        readable: withReplacement,
+        reason,
+        characterSetError: undefined,
+      })
+    },
+  )
 
   it('names an encoding that is unknown', () => {
     expect(decodeDocument(Buffer.from('x'), 'klingon')).toEqual({
