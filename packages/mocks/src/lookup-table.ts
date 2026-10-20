@@ -15,6 +15,8 @@ import {
   lookupTableEndpoint,
   lookupTableInUseMessage,
   lookupTableImportPreviewEndpoint,
+  type Language,
+  languageQuerySchema,
   type LookupTableImportRow,
   type LookupTableInput,
   lookupTableMissingCodesEndpoint,
@@ -22,6 +24,7 @@ import {
   type LookupTableScopeInput,
   lookupTablesEndpoint,
   lookupTableSuggestionsEndpoint,
+  lookupTableSuggestionsQuerySchema,
   type LookupTableSummary,
   type LookupTableUse,
   type MissingCode,
@@ -31,8 +34,10 @@ import {
   type TradingPartnerSummary,
   updateLookupTableEndpoint,
   type Session,
+  type WorkspaceSettings,
 } from '@edi-bridge/contracts'
 
+import { aiBudgetOf } from './ai-budget'
 import { type ChannelRecord, type ChannelStore, seedChannels, toChannelStore } from './channel'
 import { type FlowRecord, type FlowStore, seedFlows, toFlowStore } from './flow'
 import { lookupTableFailureOf } from './interchange'
@@ -51,7 +56,14 @@ import {
   seedMappingDrafts,
   toMappingDraftStore,
 } from './mapping'
-import { badRequest, conflict, notFound, serverError, unprocessable } from './responses'
+import {
+  aiBudgetExhaustedProblem,
+  badRequest,
+  conflict,
+  notFound,
+  serverError,
+  unprocessable,
+} from './responses'
 import { seedRuns } from './run'
 import { problemOf } from './run-problem'
 import { type Reprocessed, type RunStore, toRunStore } from './run-store'
@@ -62,6 +74,7 @@ import {
   toTradingPartnerStore,
   type TradingPartnerStore,
 } from './trading-partner'
+import { toWorkspaceSettingsStore, type WorkspaceSettingsStore } from './workspace-settings'
 
 import type { MappingVersionStore } from './mapping-version'
 
@@ -141,6 +154,7 @@ export function toLookupTable(
   record: LookupTableRecord,
   tradingPartners: TradingPartnerNames,
   usage: LookupTableUsage = unused,
+  language: Language = 'en',
 ): LookupTable {
   return {
     ...toLookupTableSummary(record, tradingPartners, usage),
@@ -148,6 +162,7 @@ export function toLookupTable(
     codeMeanings: codeMeaningsOf(
       record.kind,
       record.entries.map(({ targetCode }) => targetCode),
+      language,
     ),
   }
 }
@@ -283,7 +298,7 @@ export function createLookupTableUsage(
       .sort(byName)
   }
 
-  function missingCodesOf(table: LookupTableRecord): MissingCode[] {
+  function missingCodesOf(table: LookupTableRecord, language: Language): MissingCode[] {
     const translated = new Set(table.entries.map(({ sourceCode }) => sourceCode))
     const failedRuns = new Map<string, FailedRunReference[]>()
 
@@ -309,7 +324,7 @@ export function createLookupTableUsage(
       .map(([code, references]) => ({
         urgency: 'blocking' as const,
         code,
-        ...hintFor(table.kind, code),
+        ...hintFor(table.kind, code, language),
         failedRuns: references.toSorted(newestFirst),
       }))
       .toSorted((a, b) => newestFirst(a.failedRuns[0]!, b.failedRuns[0]!))
@@ -319,19 +334,19 @@ export function createLookupTableUsage(
       .flatMap(({ code, itemCount }): MissingCode[] =>
         translated.has(code) || failedRuns.has(code)
           ? []
-          : [{ urgency: 'upcoming', code, ...hintFor(table.kind, code), itemCount }],
+          : [{ urgency: 'upcoming', code, ...hintFor(table.kind, code, language), itemCount }],
       )
 
     return [...blocking, ...upcoming]
   }
 
-  return (table: LookupTableRecord): LookupTableUsage => ({
+  return (table: LookupTableRecord, language: Language = 'en'): LookupTableUsage => ({
     uses: usesOf(table),
-    missingCodes: missingCodesOf(table),
+    missingCodes: missingCodesOf(table, language),
   })
 }
 
-type Usage = (table: LookupTableRecord) => LookupTableUsage
+type Usage = (table: LookupTableRecord, language?: Language) => LookupTableUsage
 
 export function lookupTableListHandler(
   apiUrl: string,
@@ -354,6 +369,8 @@ export function lookupTableListHandler(
 }
 
 export type LookupTablesState = 'loading' | 'error'
+
+export type LookupTableSuggestionsState = 'aiBudgetExhausted'
 
 function stateHandlers(apiUrl: string, state: LookupTablesState) {
   const respond = async () => {
@@ -388,11 +405,15 @@ export function lookupTableHandlers(
     lookupTables = seedLookupTables,
     tradingPartners = seedTradingPartners,
     session = seedSession,
+    settings,
+    suggestions,
     ...world
   }: {
     lookupTables?: ReadonlyArray<LookupTableRecord> | LookupTableStore | LookupTablesState
     tradingPartners?: ReadonlyArray<TradingPartner> | TradingPartnerStore
     session?: Session | null | SessionStore
+    settings?: WorkspaceSettings | WorkspaceSettingsStore
+    suggestions?: LookupTableSuggestionsState | undefined
   } & LookupTableWorld = {},
 ) {
   if (lookupTables === 'loading' || lookupTables === 'error') {
@@ -403,6 +424,11 @@ export function lookupTableHandlers(
   const tradingPartnerStore = toTradingPartnerStore(tradingPartners)
   const usageOf = createLookupTableUsage(store, tradingPartnerStore, world)
   const sessionStore = toSessionStore(session)
+  const settingsStore = toWorkspaceSettingsStore(settings)
+
+  function languageOf(request: Request) {
+    return languageQuerySchema.safeParse(fromSearchParams(new URL(request.url).searchParams))
+  }
 
   function nameTaken(name: string, scope: LookupTableScopeInput, ownId?: string) {
     return store
@@ -456,39 +482,68 @@ export function lookupTableHandlers(
       : { response: badRequest(body.error.message) }
   }
 
-  function serve(table: LookupTableRecord, init?: ResponseInit) {
-    return HttpResponse.json(toLookupTable(table, tradingPartnerStore, usageOf(table)), init)
+  function serve(table: LookupTableRecord, init?: ResponseInit, language: Language = 'en') {
+    return HttpResponse.json(
+      toLookupTable(table, tradingPartnerStore, usageOf(table, language), language),
+      init,
+    )
   }
 
   return [
     lookupTableListHandler(apiUrl, store, tradingPartnerStore, usageOf),
-    http.get(`${apiUrl}${lookupTableSuggestionsEndpoint.path}`, ({ request }) => {
-      const query = lookupTableSuggestionsEndpoint.query.safeParse(
-        fromSearchParams(new URL(request.url).searchParams),
-      )
+    http.get(
+      `${apiUrl}${lookupTableSuggestionsEndpoint.path}`,
+      adminOnly(sessionStore, ({ request }, { workspace }) => {
+        const query = lookupTableSuggestionsQuerySchema.safeParse(
+          fromSearchParams(new URL(request.url).searchParams),
+        )
+
+        if (!query.success) {
+          return badRequest(query.error.message)
+        }
+
+        const { kind, tradingPartnerId, language } = query.data
+
+        if (tradingPartnerId !== undefined && !tradingPartnerStore.get(tradingPartnerId)) {
+          return unprocessable('Unknown Trading Partner')
+        }
+
+        if (suggestions === 'aiBudgetExhausted') {
+          return aiBudgetExhaustedProblem(
+            aiBudgetOf(settingsStore, workspace.id, { exhausted: true }),
+          )
+        }
+
+        return HttpResponse.json({ entries: firstValuesOf(kind, language) })
+      }),
+    ),
+    http.get<{ id: string }>(`${apiUrl}${lookupTableEndpoint.path}`, ({ params, request }) => {
+      const query = languageOf(request)
 
       if (!query.success) {
         return badRequest(query.error.message)
       }
 
-      const { kind, tradingPartnerId } = query.data
-
-      if (tradingPartnerId !== undefined && !tradingPartnerStore.get(tradingPartnerId)) {
-        return unprocessable('Unknown Trading Partner')
-      }
-
-      return HttpResponse.json({ entries: firstValuesOf(kind) })
-    }),
-    http.get<{ id: string }>(`${apiUrl}${lookupTableEndpoint.path}`, ({ params }) => {
       const table = store.get(params.id)
 
-      return table ? serve(table) : notFound()
+      return table ? serve(table, undefined, query.data.language) : notFound()
     }),
-    http.get<{ id: string }>(`${apiUrl}${lookupTableMissingCodesEndpoint.path}`, ({ params }) => {
-      const table = store.get(params.id)
+    http.get<{ id: string }>(
+      `${apiUrl}${lookupTableMissingCodesEndpoint.path}`,
+      ({ params, request }) => {
+        const query = languageOf(request)
 
-      return table ? HttpResponse.json(usageOf(table).missingCodes) : notFound()
-    }),
+        if (!query.success) {
+          return badRequest(query.error.message)
+        }
+
+        const table = store.get(params.id)
+
+        return table
+          ? HttpResponse.json(usageOf(table, query.data.language).missingCodes)
+          : notFound()
+      },
+    ),
     http.post(
       `${apiUrl}${createLookupTableEndpoint.path}`,
       adminOnly(sessionStore, async ({ request }) => {

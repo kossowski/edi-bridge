@@ -35,6 +35,7 @@ import {
   createLookupTableStore,
   lookupTableHandlers,
   type LookupTableRecord,
+  type LookupTableSuggestionsState,
   seedLookupTables,
 } from './lookup-table'
 import { manualSubmissionHandler } from './manual-submission'
@@ -173,6 +174,7 @@ export {
   lookupTableListHandler,
   type LookupTablesState,
   type LookupTableStore,
+  type LookupTableSuggestionsState,
   type LookupTableUsage,
   type LookupTableWorld,
   partnerScope,
@@ -370,9 +372,10 @@ export function createHandlers(
     documentStructures = [...seedDocumentStructures, ...seedUnusedDocumentStructures],
     documentStructuresState,
     documentStructureInferenceState,
-    lookupTables = seedLookupTables,
-    mappingSamples = seedMappingSamples,
     documentStructureFieldNamesNotice,
+    lookupTables = seedLookupTables,
+    lookupTableSuggestions,
+    mappingSamples = seedMappingSamples,
     mappingVersions,
     liveEvents = { mode: 'quiet' },
     aiDraft = {},
@@ -391,10 +394,11 @@ export function createHandlers(
     documentStructures?: ReadonlyArray<DocumentStructure> | DocumentStructureStore
     documentStructuresState?: DocumentStructuresState
     documentStructureInferenceState?: DocumentStructuresState
+    documentStructureFieldNamesNotice?: FieldNamesNoticeReason
     lookupTables?: ReadonlyArray<LookupTableRecord>
+    lookupTableSuggestions?: LookupTableSuggestionsState
     mappingSamples?: ReadonlyArray<MappingSampleRecord>
     mappingVersions?: ReadonlyArray<MappingVersionRecord> | MappingVersionStore
-    documentStructureFieldNamesNotice?: FieldNamesNoticeReason
     liveEvents?: Omit<LiveEventsOptions, 'runs' | 'bus'>
     aiDraft?: Pick<AiDraftOptions, 'state' | 'stepDelayMs' | 'signal'>
   } = {},
@@ -560,11 +564,11 @@ export function createHandlers(
       versions: mappingVersionStore,
       state: documentStructuresState,
       inferenceState: documentStructureInferenceState,
+      fieldNamesNotice: documentStructureFieldNamesNotice,
       session: sessionStore,
     }),
     messageTypeStructureHandler(apiUrl),
     ...lookupTableHandlers(apiUrl, {
-      fieldNamesNotice: documentStructureFieldNamesNotice,
       lookupTables: lookupTableStore,
       tradingPartners: tradingPartnerStore,
       mappings: mappingDraftStore,
@@ -573,6 +577,8 @@ export function createHandlers(
       channels: channelStore,
       runs,
       session: sessionStore,
+      settings: workspaceSettingsStore,
+      suggestions: lookupTableSuggestions,
     }),
   ]
 }

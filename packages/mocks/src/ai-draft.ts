@@ -4,7 +4,6 @@ import {
   acceptAiDraftEndpoint,
   acceptAiProposedPartsEndpoint,
   acceptedAiReview,
-  type AiBudget,
   aiBudgetEndpoint,
   aiBudgetExhausted,
   type AiDraftFailureReason,
@@ -24,6 +23,7 @@ import {
   unknownPaths,
 } from '@edi-bridge/contracts'
 
+import { aiBudgetOf } from './ai-budget'
 import {
   type DocumentStructureStore,
   seedDocumentStructures,
@@ -93,12 +93,6 @@ const failureReasons: Partial<Record<AiDraftState, AiDraftFailureReason>> = {
   error: 'checkFailed',
   budgetExhaustedMidRun: 'budgetExhausted',
   unavailable: 'unavailable',
-}
-
-function nextMidnight(now: Date) {
-  return new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1),
-  ).toISOString()
 }
 
 const touchesAny =
@@ -336,14 +330,8 @@ export function aiDraftHandlers(
   const sessionStore = toSessionStore(session)
   const settingsStore = toWorkspaceSettingsStore(settings)
 
-  function budgetOf(workspaceId: string): AiBudget {
-    const { dailyLimit, usedToday } = settingsStore.get(workspaceId).aiTokenBudget
-
-    return {
-      dailyLimit,
-      usedToday: state === 'budgetExhausted' ? Math.max(dailyLimit, usedToday) : usedToday,
-      resetsAt: nextMidnight(new Date()),
-    }
+  function budgetOf(workspaceId: string) {
+    return aiBudgetOf(settingsStore, workspaceId, { exhausted: state === 'budgetExhausted' })
   }
 
   function spend(workspaceId: string) {

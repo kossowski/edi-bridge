@@ -439,6 +439,16 @@ export {
 export { applyLookupTableImport, classifyLookupTableImport } from './lookup-table-import'
 
 export {
+  codeMeaningOf,
+  codeMeaningsOf,
+  type Language,
+  type LanguageQuery,
+  languageQuerySchema,
+  languages,
+  languageSchema,
+} from './code-meaning'
+
+export {
   byNameAndNewest,
   type ComparisonOutputs,
   comparisonOutputsSchema,
