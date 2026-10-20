@@ -753,28 +753,29 @@ describe('POST /trading-partners/:id/test-interchange', () => {
   it('runs the sample of the outbound Flow as a Run and answers the Trading Partner', async () => {
     const into = await seedTestingWorkspace('Sample Test Foods')
     const queuedBefore = api.runQueue.queued.length
-    const before = (await get(into.tradingPartnerId, seededAdmin)).json()
+
+    const before = tradingPartnerSchema.parse(
+      (await get(into.tradingPartnerId, seededAdmin)).json(),
+    )
 
     const response = await postTest(into.tradingPartnerId, seededAdmin)
 
     expect(response.statusCode).toBe(200)
     expect(response.json()).toEqual(before)
 
-    const sent = await runsOf(into)
+    const [sent, ...more] = await runsOf(into)
 
-    expect(sent).toEqual([
-      {
-        id: expect.any(String),
-        flowId: into.flowId,
-        manualSubmission: true,
-        status: 'received',
-        fileName: 'invoice-sample.json',
-        content: '{"invoiceNumber":"87441"}',
-      },
-    ])
-    expect(api.runQueue.queued.slice(queuedBefore)).toEqual([
-      { workspaceId: into.id, runId: sent[0]?.id },
-    ])
+    expect(more).toEqual([])
+    assert(sent)
+    const { id: runId, ...run } = sent
+    expect(run).toEqual({
+      flowId: into.flowId,
+      manualSubmission: true,
+      status: 'received',
+      fileName: 'invoice-sample.json',
+      content: '{"invoiceNumber":"87441"}',
+    })
+    expect(api.runQueue.queued.slice(queuedBefore)).toEqual([{ workspaceId: into.id, runId }])
   })
 
   it('clears the rejection of the earlier test Interchange', async () => {
