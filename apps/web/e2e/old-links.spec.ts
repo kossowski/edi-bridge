@@ -14,6 +14,14 @@ const redirects: ReadonlyArray<{ from: string; to: string; search?: Record<strin
     to: '/orders',
     search: { q: '4711/2026' },
   },
+  {
+    from: `/order-lifecycle?businessReference=${encodeURIComponent('50%')}`,
+    to: '/orders',
+    search: { q: '50%' },
+  },
+  { from: '/order-lifecycle?businessReference=..', to: '/orders', search: { q: '..' } },
+  { from: '/order-lifecycle?businessReference=.', to: '/orders', search: { q: '.' } },
+  { from: '/order-lifecycle?businessReference=', to: '/orders' },
 ]
 
 for (const { from, to, search } of redirects) {
@@ -21,7 +29,9 @@ for (const { from, to, search } of redirects) {
     const response = await request.get(from, { maxRedirects: 0 })
 
     expect(response.status()).toBe(308)
-    const location = new URL(response.headers().location ?? '', 'http://localhost')
+    const header = response.headers().location ?? ''
+    expect(header, 'every % in the location starts an escape').not.toMatch(/%(?![\dA-F]{2})/i)
+    const location = new URL(header, 'http://localhost')
     expect(location.pathname).toBe(to)
 
     if (search) expect(Object.fromEntries(location.searchParams)).toMatchObject(search)

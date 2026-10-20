@@ -18,7 +18,13 @@ const nextConfig: NextConfig = {
       { source: '/runs/:id', destination: '/documents/:id', permanent: true },
       {
         source: '/order-lifecycle',
-        has: [{ type: 'query', key: 'businessReference', value: '(?<businessReference>[^/]+)' }],
+        has: [
+          {
+            type: 'query',
+            key: 'businessReference',
+            value: String.raw`(?<businessReference>(?!\.{1,2}$)[^/%]+)`,
+          },
+        ],
         destination: '/orders/:businessReference',
         permanent: true,
       },
