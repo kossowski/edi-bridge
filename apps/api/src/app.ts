@@ -47,6 +47,7 @@ import {
   inviteUnusableStatus,
   lookupTableEndpoint,
   lookupTableImportPreviewEndpoint,
+  lookupTableMissingCodeHintsEndpoint,
   lookupTableMissingCodesEndpoint,
   lookupTableSuggestionsEndpoint,
   lookupTableSuggestionsQuerySchema,
@@ -118,6 +119,7 @@ import {
 import { loadAiBudget } from './ai-budget.js'
 import { requestAiDraft } from './ai-draft-request.js'
 import { suggestLookupTableEntries } from './ai-lookup-table-suggestions.js'
+import { hintMissingCodes } from './ai-missing-code-hints.js'
 import { acceptAiDraft, acceptAiProposedParts } from './ai-review.js'
 import { type AuthSettings, mountAuth } from './auth.js'
 import {
@@ -804,6 +806,20 @@ function registerRoutes(
       reply,
       Effect.flatMap(parse(languageQuerySchema, request.query), ({ language }) =>
         listLookupTableMissingCodes(request.params.id, language),
+      ),
+    ),
+  )
+
+  app.post<{ Params: { id: string } }>(lookupTableMissingCodeHintsEndpoint.path, (request, reply) =>
+    respond(
+      request,
+      reply,
+      Effect.flatMap(parse(languageQuerySchema, request.query), ({ language }) =>
+        hintMissingCodes(request.params.id, language, {
+          model: aiModel,
+          timeoutMs: aiTimeoutMs,
+          log: request.log,
+        }),
       ),
     ),
   )
