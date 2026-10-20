@@ -34,6 +34,8 @@ export {
 
 export { markOverdueInterchanges } from './mark-overdue-interchanges'
 
+export { runSummariesOf } from './run-summary'
+
 export { pollInboundChannels } from './poll-inbound-channels'
 
 export { queueReceivedRuns } from './queue-received-runs'
