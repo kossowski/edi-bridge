@@ -69,6 +69,7 @@ import {
   updateLookupTableEndpoint,
   updateOperatorWorkspaceSettingsEndpoint,
   switchToProductionEndpoint,
+  sendTestInterchangeEndpoint,
   updateTradingPartnerEndpoint,
   updateWorkspaceSettingsEndpoint,
   withCheckDigit,
@@ -319,6 +320,10 @@ const changes: Change[] = [
   [
     'switch a Trading Partner to production',
     () => ({ method: 'POST', url: withId(switchToProductionEndpoint.path, ids.tradingPartner) }),
+  ],
+  [
+    'send a test Interchange to a Trading Partner',
+    () => ({ method: 'POST', url: withId(sendTestInterchangeEndpoint.path, ids.tradingPartner) }),
   ],
   ['create a Channel', () => ({ method: 'POST', url: createChannelEndpoint.path, body: channel })],
   [
