@@ -300,12 +300,10 @@ describe('createHandlers live events', () => {
 
     const response = await fetch(`${apiUrl}${toPath(tradingPartnerEndpoint.path, readyForTest)}`)
 
-    expect(tradingPartnerSchema.parse(await response.json()).onboarding).toEqual(
-      expect.objectContaining({
-        testInterchangeSentAt: expect.any(String),
-        contrlReceivedAt: expect.any(String),
-      }),
-    )
+    const { onboarding } = tradingPartnerSchema.parse(await response.json())
+
+    expect(onboarding.testInterchangeSentAt).toEqual(expect.any(String))
+    expect(onboarding.contrlReceivedAt).toEqual(expect.any(String))
 
     const { runs } = await listRuns()
 
