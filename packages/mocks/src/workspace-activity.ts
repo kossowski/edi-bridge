@@ -20,14 +20,14 @@ import {
 import { serverError } from './responses'
 import { seedRuns, toRunSummary } from './run'
 import { seedReprocessed } from './run-detail'
-import { createRunStore, type RunStore } from './run-store'
+import { createRunStore, type RunStore, type WaitingForTradingPartnerSince } from './run-store'
 import { createTradingPartners, seedTradingPartners } from './trading-partner'
 
 export type WorkspaceActivity = {
   runs: ReadonlyArray<RunSummary> | RunStore
   tradingPartners: ReadonlyArray<TradingPartner>
   overdueAcknowledgements: ReadonlyArray<OverdueAcknowledgement>
-  waitingForTradingPartnerSince?: ReadonlyMap<string, string> | undefined
+  waitingForTradingPartnerSince?: WaitingForTradingPartnerSince | undefined
 }
 
 export type WorkspaceActivityState = 'empty' | 'large' | 'loading' | 'error'
@@ -134,7 +134,7 @@ function seedRunStore() {
 
 export function seedWorkspaceActivity(
   runs: RunStore = seedRunStore(),
-  waitingForTradingPartnerSince?: ReadonlyMap<string, string>,
+  waitingForTradingPartnerSince?: WaitingForTradingPartnerSince,
 ): WorkspaceActivity {
   return {
     runs,

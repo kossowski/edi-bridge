@@ -439,6 +439,11 @@ export function createHandlers(
     mappingVersions ?? [...seedMappingVersions, ...createMappingVersions(mappingDraftStore.all())],
   )
 
+  const workspaceActivity = seedWorkspaceActivity(
+    runs,
+    orderLifecycles.waitingForTradingPartnerSince,
+  )
+
   return [
     ...sessionHandlers(apiUrl, sessionStore, credentialStore, workspaceMemberStore),
     ...workspaceHandlers(apiUrl, workspaceStore, sessionStore),
@@ -491,11 +496,8 @@ export function createHandlers(
     runsHandler(apiUrl, runs, { flows, mappings: mappingVersionStore }),
     interchangesHandler(apiUrl, runs),
     liveEventsHandler(apiUrl, { ...liveEvents, runs, bus: liveEventBus }),
-    homeHandler(apiUrl, seedWorkspaceActivity(runs, orderLifecycles.waitingForTradingPartnerSince)),
-    tasksHandler(
-      apiUrl,
-      seedWorkspaceActivity(runs, orderLifecycles.waitingForTradingPartnerSince),
-    ),
+    homeHandler(apiUrl, workspaceActivity),
+    tasksHandler(apiUrl, workspaceActivity),
     orderLifecycleListHandler(apiUrl, orderLifecycles.orderLifecycles, {
       runs,
       tradingPartners: tradingPartnerStore,

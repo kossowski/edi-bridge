@@ -18,7 +18,7 @@ import {
 } from '@edi-bridge/contracts'
 
 import { hour } from './overdue'
-import { type RunStore, toRunStore } from './run-store'
+import { type RunStore, toRunStore, type WaitingForTradingPartnerSince } from './run-store'
 import {
   isFinished,
   type WorkspaceActivity,
@@ -88,12 +88,14 @@ type FailedRun = Extract<RunSummary, { status: 'failed' }>
 
 const isFailed = (run: RunSummary): run is FailedRun => run.status === 'failed'
 
-type WaitingForTradingPartner = ReadonlyMap<string, string> | undefined
-
-const whoActsOn = (run: FailedRun, waiting: WaitingForTradingPartner) =>
+const whoActsOn = (run: FailedRun, waiting: WaitingForTradingPartnerSince | undefined) =>
   whoActsOnFailedRun({ ...run, waitingForTradingPartner: waiting?.has(run.id) ?? false })
 
-function failedRunTasks(runs: RunStore, waiting: WaitingForTradingPartner, from: number) {
+function failedRunTasks(
+  runs: RunStore,
+  waiting: WaitingForTradingPartnerSince | undefined,
+  from: number,
+) {
   return runs.all().flatMap((run): Task[] =>
     isFailed(run) && Date.parse(run.receivedAt) >= from && runs.replacingOf(run.id) === undefined
       ? [
