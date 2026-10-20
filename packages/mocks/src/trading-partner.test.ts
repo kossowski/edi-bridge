@@ -204,6 +204,19 @@ describe('tradingPartnerHandlers', () => {
     expect(await listTradingPartners()).toEqual([created])
   })
 
+  it('keeps the Message Types chosen for a new Trading Partner', async () => {
+    server.use(...tradingPartnerHandlers(apiUrl, { tradingPartners: [] }))
+
+    await send('POST', createTradingPartnerEndpoint.path, {
+      ...input,
+      messageTypes: ['ORDERS', 'INVOIC'],
+    })
+
+    expect((await listTradingPartners()).map(({ messageTypes }) => messageTypes)).toEqual([
+      ['ORDERS', 'INVOIC'],
+    ])
+  })
+
   it('creates several Trading Partners whose GLN is added later', async () => {
     server.use(...tradingPartnerHandlers(apiUrl, { tradingPartners: [] }))
 

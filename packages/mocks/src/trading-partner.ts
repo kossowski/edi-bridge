@@ -57,7 +57,10 @@ function onboarded(day: string): TradingPartnerOnboarding {
 }
 
 const seeds: ReadonlyArray<
-  Pick<TradingPartner, 'name' | 'characterSet' | 'acknowledgementTimeLimitHours' | 'testMode'> & {
+  Pick<
+    TradingPartner,
+    'name' | 'characterSet' | 'acknowledgementTimeLimitHours' | 'testMode' | 'messageTypes'
+  > & {
     onboarding: TradingPartnerOnboarding
     gln?: null
   }
@@ -115,6 +118,7 @@ const seeds: ReadonlyArray<
     acknowledgementTimeLimitHours: 24,
     testMode: true,
     onboarding: notStarted,
+    messageTypes: ['ORDERS', 'INVOIC'],
   },
   {
     name: 'Ostsee Feinkost GmbH',

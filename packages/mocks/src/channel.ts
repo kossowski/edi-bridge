@@ -277,9 +277,29 @@ const tradingPartnerSeeds = seedTrafficPartners.flatMap(
   },
 )
 
-export const seedChannels: ReadonlyArray<ChannelRecord> = [...erpSeeds, ...tradingPartnerSeeds].map(
-  parseRecord,
-)
+// Chose Message Types in both directions, but postponed the outbound Connection.
+const postponedOutboundSeeds = seedTradingPartners
+  .filter((tradingPartner) => !hasTraffic(tradingPartner) && tradingPartner.messageTypes)
+  .map((tradingPartner, index): ChannelRecord => {
+    const shortName = tradingPartner.name.split(' ')[0] ?? tradingPartner.name
+    const host = `sftp.${shortName.toLowerCase()}.example`
+
+    return sftpChannel(
+      seedId(3, erpSeeds.length + tradingPartnerSeeds.length + index + 1),
+      'inbound',
+      shortName,
+      sftpConnection(seededFaker(`sftp:${tradingPartner.id}`), tradingPartner.id, host, {
+        hostKeyFingerprint: serverHostKey(host),
+      }),
+      1,
+    )
+  })
+
+export const seedChannels: ReadonlyArray<ChannelRecord> = [
+  ...erpSeeds,
+  ...tradingPartnerSeeds,
+  ...postponedOutboundSeeds,
+].map(parseRecord)
 
 export function createChannel(
   kind: ChannelKind = channelKinds[0],

@@ -346,6 +346,20 @@ describe('createHandlers', () => {
     expect(activities.some(({ flowCount }) => flowCount > 0)).toBe(true)
   })
 
+  it('gives a seed Trading Partner a Connection in one needed direction only', async () => {
+    server.use(...createHandlers(apiUrl))
+
+    const activities = await listActivities()
+
+    expect(
+      activities.some(
+        ({ channelDirections, neededDirections }) =>
+          channelDirections.length === 1 &&
+          neededDirections.some((direction) => !channelDirections.includes(direction)),
+      ),
+    ).toBe(true)
+  })
+
   it('follows the Trading Partners of the Workspace', async () => {
     server.use(...createHandlers(apiUrl, { tradingPartners: [] }))
 
