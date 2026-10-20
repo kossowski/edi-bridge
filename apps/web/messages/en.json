@@ -132,9 +132,9 @@
     "firstSteps": "First Steps",
     "documents": "Documents",
     "orders": "Orders",
-    "tradingPartners": "Trading Partners",
-    "channels": "Channels",
-    "flows": "Flows",
+    "tradingPartners": "Trading partners",
+    "channels": "All connections",
+    "flows": "All document routes",
     "mappings": "Mappings",
     "documentStructures": "Data formats",
     "codeTranslations": "Code Translations",
@@ -1028,7 +1028,7 @@
     "technical": {
       "facts": {
         "label": "Technical details",
-        "messageType": "Message type",
+        "messageType": "Document type",
         "failedStep": "Failed step",
         "noFailure": "None",
         "errorCode": "Error code",
@@ -1667,10 +1667,10 @@
       "tooLong": "Use at most {max} characters.",
       "range": "Enter a whole number of hours from {min} to {max}.",
       "gln": {
-        "taken": "Another Trading Partner already uses this GLN.",
+        "taken": "Another trading partner already uses this GLN.",
         "stillNeeded": "Enter the GLN. Documents exchanged with this partner are addressed with it, so it cannot be removed."
       },
-      "saveFailed": "The Trading Partner could not be saved. Try again."
+      "saveFailed": "The trading partner could not be saved. Try again."
     },
     "save": "Save changes",
     "saving": "Saving…"
@@ -1859,48 +1859,48 @@
     "retry": "Try again"
   },
   "Channels": {
-    "new": "New Channel",
-    "caption": "Channels, by name",
-    "loading": "Loading Channels",
-    "count": "{count, plural, one {# Channel} other {# Channels}}",
-    "filteredCount": "{count} of {total} Channels",
-    "search": "Search by name, Trading Partner or address",
-    "noMatch": "No Channel matches the search.",
+    "new": "New connection",
+    "caption": "Connections, by name",
+    "loading": "Loading connections",
+    "count": "{count, plural, one {# connection} other {# connections}}",
+    "filteredCount": "{count} of {total} connections",
+    "search": "Search by name, trading partner or address",
+    "noMatch": "No connection matches the search.",
     "ownSystems": "Own systems",
-    "unknownTradingPartner": "Unknown Trading Partner",
+    "unknownTradingPartner": "Unknown trading partner",
     "columns": {
       "name": "Name",
       "kind": "Kind",
-      "tradingPartner": "Trading Partner",
+      "tradingPartner": "Trading partner",
       "address": "Address"
     },
     "empty": {
-      "title": "No Channels yet",
-      "description": "Create a Channel to receive Documents or deliver them.",
-      "viewOnlyDescription": "Channels appear here once an Admin creates one."
+      "title": "No connections yet",
+      "description": "Create a connection to receive documents or deliver them.",
+      "viewOnlyDescription": "Connections appear here once an Admin creates one."
     },
     "error": {
-      "title": "Channels unavailable",
-      "description": "The Channels could not be loaded. Try again.",
+      "title": "Connections unavailable",
+      "description": "The connections could not be loaded. Try again.",
       "retry": "Try again"
     }
   },
   "Channel": {
-    "title": "Channel",
-    "loading": "Loading Channel",
+    "title": "Connection",
+    "loading": "Loading connection",
     "notFound": {
-      "title": "Channel not found",
-      "description": "There is no Channel with this ID in this Workspace."
+      "title": "Connection not found",
+      "description": "There is no connection with this ID in this workspace."
     },
     "error": {
-      "title": "Channel unavailable",
-      "description": "The Channel could not be loaded. Try again.",
+      "title": "Connection unavailable",
+      "description": "The connection could not be loaded. Try again.",
       "retry": "Try again"
     },
     "facts": {
-      "label": "Channel details",
+      "label": "Connection details",
       "kind": "Kind",
-      "tradingPartner": "Trading Partner",
+      "tradingPartner": "Trading partner",
       "host": "Host",
       "port": "Port",
       "username": "Username",
@@ -2014,8 +2014,8 @@
   "ChannelForm": {
     "createTitle": "New connection",
     "editTitle": "Edit {name}",
-    "editPageTitle": "Edit Channel",
-    "webhookNotice": "EDI Bridge generates the webhook URL and token when you create the Channel.",
+    "editPageTitle": "Edit connection",
+    "webhookNotice": "EDI Bridge generates the webhook URL and token when you create the connection.",
     "sections": {
       "sftp": "SFTP connection",
       "webhook": "Webhook",
@@ -2024,16 +2024,16 @@
     "fields": {
       "kind": {
         "label": "Kind",
-        "description": "The kind cannot change after the Channel is created.",
-        "fixed": "The kind cannot change. Create a new Channel for another kind."
+        "description": "The kind cannot change after the connection is created.",
+        "fixed": "The kind cannot change. Create a new connection for another kind."
       },
       "name": {
         "label": "Name",
-        "description": "Shown in Flows and Runs."
+        "description": "Shown in document routes and documents."
       },
       "tradingPartner": {
-        "label": "Trading Partner",
-        "description": "The Trading Partner on the other end. Choose Own systems for your ERP.",
+        "label": "Trading partner",
+        "description": "The trading partner on the other end. Choose Own systems for your ERP.",
         "none": "Own systems"
       },
       "host": {
@@ -2109,16 +2109,16 @@
         "url": "Enter a full URL that starts with https:// or http://."
       },
       "invalid": "Check this value.",
-      "kindChanged": "The kind of a Channel cannot change.",
-      "saveFailed": "The Channel could not be saved. Try again."
+      "kindChanged": "The kind of a connection cannot change.",
+      "saveFailed": "The connection could not be saved. Try again."
     },
     "created": {
       "title": "{name} created",
-      "status": "The Channel {name} is created.",
+      "status": "The connection {name} is created.",
       "url": "Webhook URL",
-      "continue": "Go to the Channel"
+      "continue": "Go to the connection"
     },
-    "create": "Create Channel",
+    "create": "Create connection",
     "save": "Save changes",
     "saving": "Saving…",
     "cancel": "Cancel"
@@ -2142,59 +2142,59 @@
     }
   },
   "Flows": {
-    "new": "New Flow",
-    "caption": "Flows, by name",
-    "loading": "Loading Flows",
-    "count": "{count, plural, one {# Flow} other {# Flows}}",
-    "filteredCount": "{count} of {total} Flows",
-    "search": "Search by name, Trading Partner, Channel or Mapping",
-    "noMatch": "No Flow matches the search.",
+    "new": "New document route",
+    "caption": "Document routes, by name",
+    "loading": "Loading document routes",
+    "count": "{count, plural, one {# document route} other {# document routes}}",
+    "filteredCount": "{count} of {total} document routes",
+    "search": "Search by name, trading partner, connection or mapping",
+    "noMatch": "No document route matches the search.",
     "toDestination": "to",
     "version": "Version {version}",
     "newerAvailable": "Newer version available",
     "columns": {
       "name": "Name",
-      "tradingPartner": "Trading Partner",
-      "messageType": "Message Type",
-      "channels": "Channels",
-      "mappingVersion": "Mapping Version"
+      "tradingPartner": "Trading partner",
+      "messageType": "Document type",
+      "channels": "Connections",
+      "mappingVersion": "Version"
     },
     "empty": {
-      "title": "No Flows yet",
-      "description": "Create a Flow to route Documents of one Message Type from a Trading Partner to a destination Channel.",
-      "viewOnlyDescription": "Flows appear here once an Admin creates one."
+      "title": "No document routes yet",
+      "description": "Create a document route to send documents of one document type from a trading partner to a destination connection.",
+      "viewOnlyDescription": "Document routes appear here once an Admin creates one."
     },
     "error": {
-      "title": "Flows unavailable",
-      "description": "The Flows could not be loaded. Try again.",
+      "title": "Document routes unavailable",
+      "description": "The document routes could not be loaded. Try again.",
       "retry": "Try again"
     }
   },
   "Flow": {
-    "title": "Flow",
-    "loading": "Loading Flow",
-    "unknownChannel": "Unknown Channel",
+    "title": "Document route",
+    "loading": "Loading document route",
+    "unknownChannel": "Unknown connection",
     "notFound": {
-      "title": "Flow not found",
-      "description": "There is no Flow with this ID in this Workspace."
+      "title": "Document route not found",
+      "description": "There is no document route with this ID in this workspace."
     },
     "error": {
-      "title": "Flow unavailable",
-      "description": "The Flow could not be loaded. Try again.",
+      "title": "Document route unavailable",
+      "description": "The document route could not be loaded. Try again.",
       "retry": "Try again"
     },
     "facts": {
-      "label": "Flow details",
-      "messageType": "Message Type",
-      "tradingPartner": "Trading Partner",
-      "inboundChannel": "Inbound Channel",
-      "destinationChannel": "Destination Channel"
+      "label": "Document route details",
+      "messageType": "Document type",
+      "tradingPartner": "Trading partner",
+      "inboundChannel": "Inbound connection",
+      "destinationChannel": "Destination connection"
     },
     "mappingVersion": "{mappingName}, version {version}",
     "versionOption": "Version {version}, published {publishedAt}",
     "pinned": {
-      "title": "Mapping Version",
-      "description": "Every Run of this Flow uses the pinned version. The Flow never follows a newer version on its own.",
+      "title": "Version",
+      "description": "Every document on this document route uses the pinned version. The document route never follows a newer version on its own.",
       "published": "Published {publishedAt}",
       "newest": "This is the newest published version.",
       "newer": "{count, plural, one {A newer version is available: version {latest}.} other {# newer versions are available, up to version {latest}.}}"
@@ -2202,75 +2202,75 @@
     "move": {
       "button": "Move to a newer version",
       "legend": "Version to move to",
-      "confirmation": "Runs that start after the move use the chosen version. Runs already processed keep the version they used.",
+      "confirmation": "Documents that arrive after the move use the chosen version. Documents already processed keep the version they used.",
       "confirm": "Move to version {version}",
       "cancel": "Cancel",
       "pending": "Moving…",
-      "failed": "The Flow could not be moved. Try again.",
-      "done": "The Flow now uses version {version}."
+      "failed": "The document route could not be moved. Try again.",
+      "done": "The document route now uses version {version}."
     }
   },
   "FlowForm": {
     "createTitle": "New document route",
     "editTitle": "Edit {name}",
-    "editPageTitle": "Edit Flow",
+    "editPageTitle": "Edit document route",
     "sections": {
-      "channels": "Channels",
-      "mappingVersion": "Mapping Version"
+      "channels": "Connections",
+      "mappingVersion": "Version"
     },
     "fields": {
       "name": {
         "label": "Name",
-        "description": "Shown in Runs and on the Trading Partner."
+        "description": "Shown on documents and on the trading partner."
       },
       "tradingPartner": {
-        "label": "Trading Partner",
-        "description": "The Trading Partner whose Documents this Flow handles.",
-        "placeholder": "Choose a Trading Partner",
-        "fixed": "The Trading Partner cannot change. Create a new Flow for another one."
+        "label": "Trading partner",
+        "description": "The trading partner whose documents this document route handles.",
+        "placeholder": "Choose a trading partner",
+        "fixed": "The trading partner cannot change. Create a new document route for another one."
       },
       "messageType": {
-        "label": "Message Type",
-        "description": "The kind of Document this Flow handles.",
-        "fixed": "The Message Type cannot change. Create a new Flow for another one."
+        "label": "Document type",
+        "description": "The kind of document this document route handles.",
+        "fixed": "The document type cannot change. Create a new document route for another one."
       },
       "inboundChannel": {
-        "label": "Inbound Channel",
-        "description": "Where the Documents arrive: for an inbound Message Type a Channel of this Trading Partner, for an outbound one a Channel of your own systems.",
-        "placeholder": "Choose an inbound Channel",
-        "none": "No inbound Channel fits this Trading Partner and Message Type. Create one first."
+        "label": "Inbound connection",
+        "description": "Where the documents arrive: for an inbound document type a connection of this trading partner, for an outbound one a connection of your own systems.",
+        "placeholder": "Choose an inbound connection",
+        "none": "No inbound connection fits this trading partner and document type. Create one first."
       },
       "destinationChannel": {
-        "label": "Destination Channel",
-        "description": "Where EDI Bridge delivers the mapped Document: for an inbound Message Type a Channel of your own systems, for an outbound one a Channel of this Trading Partner.",
-        "placeholder": "Choose a destination Channel",
-        "none": "No outbound Channel fits this Trading Partner and Message Type. Create one first."
+        "label": "Destination connection",
+        "description": "Where EDI Bridge delivers the mapped document: for an inbound document type a connection of your own systems, for an outbound one a connection of this trading partner.",
+        "placeholder": "Choose a destination connection",
+        "none": "No outbound connection fits this trading partner and document type. Create one first."
       },
-      "channelsLoading": "Loading Channels…",
+      "channelsLoading": "Loading connections…",
       "mappingVersion": {
-        "label": "Mapping Version",
-        "description": "Only a published Mapping Version can be pinned, never a Draft. The Flow keeps this version until you move it to a newer one.",
-        "placeholder": "Choose a Mapping Version",
-        "loading": "Loading Mapping Versions…",
-        "none": "No Mapping Version is published for {messageType} yet.",
-        "failed": "The Mapping Versions could not be loaded.",
-        "fixed": "To use a newer version, move the Flow to it on the Flow's page."
+        "label": "Version",
+        "description": "Only a published mapping version can be pinned, never a draft. The document route keeps this version until you move it to a newer one.",
+        "placeholder": "Choose a version",
+        "loading": "Loading versions…",
+        "none": "No mapping version is published for {messageType} yet.",
+        "failed": "The versions could not be loaded.",
+        "fixed": "To use a newer version, move the document route to it on its page."
       }
     },
     "errors": {
       "required": {
         "name": "Enter a name.",
-        "tradingPartnerId": "Choose a Trading Partner.",
-        "messageType": "Choose a Message Type.",
-        "inboundChannelId": "Choose an inbound Channel.",
-        "destinationChannelId": "Choose a destination Channel.",
-        "mappingVersionId": "Choose a Mapping Version."
+        "tradingPartnerId": "Choose a trading partner.",
+        "messageType": "Choose a document type.",
+        "inboundChannelId": "Choose an inbound connection.",
+        "destinationChannelId": "Choose a destination connection.",
+        "mappingVersionId": "Choose a version."
       },
       "tooLong": "This value is too long.",
-      "invalidReference": "A chosen Channel or Mapping Version no longer fits this Flow. Check the choices and save again.",
-      "saveFailed": "The Flow could not be saved. Try again."
+      "invalidReference": "A chosen connection or version no longer fits this document route. Check the choices and save again.",
+      "saveFailed": "The document route could not be saved. Try again."
     },
-    "create": "Create Flow",
+    "create": "Create document route",
     "save": "Save changes",
     "saving": "Saving…",
     "cancel": "Cancel"
@@ -2471,13 +2471,13 @@
     "aiDraft": {
       "button": "Draft with AI",
       "title": "Draft with AI",
-      "description": "The AI drafts links from a Sample Document and checks them against it, which takes a few minutes. The links reach the canvas only once they pass the check.",
+      "description": "The AI drafts links from an example document and checks them against it, which takes a few minutes. The links reach the canvas only once they pass the check.",
       "samples": {
-        "label": "Sample Document",
-        "loading": "Loading the Sample Documents",
-        "error": "The Sample Documents could not be loaded.",
+        "label": "Example document",
+        "loading": "Loading the example documents",
+        "error": "The example documents could not be loaded.",
         "retry": "Try again",
-        "empty": "This Mapping has no Sample Documents yet. The AI needs one to draft the links from and to check them against."
+        "empty": "This mapping has no example documents yet. The AI needs one to draft the links from and to check them against."
       },
       "source": "Source",
       "target": "Target",
@@ -2505,25 +2505,25 @@
         "stopped": "Stopped"
       },
       "step": {
-        "readingSample": "Reading the Sample Document",
+        "readingSample": "Reading the example document",
         "lookingUpSegments": "Looking up segments: {tags}",
         "lookingUpManySegments": "Looking up segments: {tags} and {count} more",
         "linksDrafted": "{count, plural, =0 {No links drafted} one {# link drafted} other {# links drafted}}",
-        "checkingAgainstSample": "Checking against the Sample Document",
+        "checkingAgainstSample": "Checking against the example document",
         "fixingErrors": "Fixing {count, plural, one {# error} other {# errors}}"
       },
       "outcome": {
         "drafted": {
           "title": "Links added to the canvas",
-          "description": "The AI-proposed links passed the check against the Sample Document: {links, plural, one {# link} other {# links}} and {transforms, plural, one {# Transform} other {# Transforms}} are on the canvas now."
+          "description": "The AI-proposed links passed the check against the example document: {links, plural, one {# link} other {# links}} and {transforms, plural, one {# Transform} other {# Transforms}} are on the canvas now."
         },
         "empty": {
           "title": "The AI found no links",
-          "description": "The AI found nothing in the Sample Document to link to a free target, so the Draft is unchanged. Try again with another Sample Document."
+          "description": "The AI found nothing in the example document to link to a free target, so the draft is unchanged. Try again with another example document."
         },
         "checkFailed": {
           "title": "The links did not pass the check",
-          "description": "The AI could not fix every error the check against the Sample Document found within {rounds, plural, one {# round} other {# rounds}}, so no links were added. Try again or pick another Sample Document."
+          "description": "The AI could not fix every error the check against the example document found within {rounds, plural, one {# round} other {# rounds}}, so no links were added. Try again or pick another example document."
         },
         "budgetExhausted": {
           "title": "AI token budget used up",
@@ -2632,13 +2632,13 @@
       "transforms": "Transforms"
     },
     "direction": {
-      "inbound": "Inbound: Message Type to data format",
-      "outbound": "Outbound: data format to Message Type"
+      "inbound": "Inbound: document type to data format",
+      "outbound": "Outbound: data format to document type"
     },
     "linkCount": "{count, plural, =0 {No links yet} one {# link} other {# links}}",
     "side": {
       "documentStructure": "Data format {name}",
-      "messageType": "Message Type {messageType}"
+      "messageType": "Document type {messageType}"
     },
     "canvas": {
       "label": "Mapping canvas: {source} to {target}",
@@ -2782,7 +2782,7 @@
         "substring": "Substring",
         "dateFormat": "Date format",
         "numberFormat": "Number format",
-        "lookupTable": "Lookup Table",
+        "lookupTable": "Code translation",
         "conditional": "Conditional",
         "loop": "Loop over line items",
         "jsonata": "JSONata expression"
@@ -2794,7 +2794,7 @@
         "substring": "Keeps part of a value, counted in characters.",
         "dateFormat": "Rewrites a date from one pattern into another.",
         "numberFormat": "Rounds a number and sets its decimal separator.",
-        "lookupTable": "Translates a value with a Lookup Table.",
+        "lookupTable": "Translates a value with a code translation.",
         "conditional": "Chooses between two values by a condition.",
         "loop": "Repeats the links beneath a repeating part once per item. Link a repeating source part, such as lines[], into Items, and Items into a repeating target part, such as SG25; then link the fields beneath them.",
         "jsonata": "Computes a value from the whole source Document."
@@ -2841,9 +2841,9 @@
         "substring": "{length, select, all {From character {start} to the end} other {{length} characters from character {start}}}",
         "dateFormat": "{from} → {to}",
         "numberFormat": "{places, select, keep {Decimal places kept} other {{places} decimal places}}, separator “{separator}”",
-        "lookupTableNone": "No Lookup Table chosen",
-        "lookupTableChosen": "Lookup Table chosen",
-        "lookupTableMissing": "Lookup Table not found",
+        "lookupTableNone": "No code translation chosen",
+        "lookupTableChosen": "Code translation chosen",
+        "lookupTableMissing": "Code translation not found",
         "conditional": "If the value {operator}",
         "loop": "Counter starts at {start}",
         "jsonata": "{expression}"
@@ -2887,7 +2887,7 @@
           "decimalSeparator": "Decimal separator"
         },
         "lookupTable": {
-          "lookupTableId": "Lookup Table",
+          "lookupTableId": "Code translation",
           "fallback": "When no entry matches"
         },
         "conditional": {
@@ -2926,8 +2926,8 @@
           "decimalSeparator": "The character between the whole number and its decimals."
         },
         "lookupTable": {
-          "lookupTableId": "The Lookup Table that translates the value. A Workspace table serves every Trading Partner, a Trading Partner's table only that partner.",
-          "fallback": "What happens when the Lookup Table has no entry for the value."
+          "lookupTableId": "The code translation that translates the value. A workspace list serves every trading partner, a trading partner's list only that partner.",
+          "fallback": "What happens when the code translation has no entry for the value."
         },
         "conditional": {
           "operator": "How the Value input is checked. When the condition holds, Then is written, otherwise Else.",
@@ -2947,16 +2947,16 @@
       "fallbacks": {
         "keepValue": "Keep the incoming value",
         "empty": "Leave the target empty",
-        "fail": "Fail the Run"
+        "fail": "Fail the document"
       },
       "lookupTables": {
-        "placeholder": "Choose a Lookup Table",
-        "loading": "Loading the Lookup Tables…",
-        "error": "The Lookup Tables could not be loaded.",
+        "placeholder": "Choose a code translation",
+        "loading": "Loading the code translations…",
+        "error": "The code translations could not be loaded.",
         "retry": "Try again",
-        "empty": "There are no Lookup Tables in this Workspace yet.",
+        "empty": "There are no code translations in this workspace yet.",
         "workspace": "Workspace",
-        "tradingPartner": "Trading Partner {name}",
+        "tradingPartner": "Trading partner {name}",
         "scope": "Belongs to: {scope}"
       },
       "expression": {
@@ -3013,7 +3013,7 @@
         "invalidConfig": "The settings are invalid.",
         "notWholeNumber": "{field} must be a whole number.",
         "unconnected": "The {input} input is not linked.",
-        "unknownLookupTable": "The chosen Lookup Table no longer exists. Choose another one.",
+        "unknownLookupTable": "The chosen code translation no longer exists. Choose another one.",
         "outsideLoop": "The link from {source} to {target} leaves the loop: links run once per item only between fields beneath the looped parts."
       },
       "details": {
@@ -3068,7 +3068,7 @@
         "title": "{count, plural, one {# target left empty} other {# targets left empty}}",
         "stopped": "The preview stopped and built no target Document",
         "invalidTransform": "{transform} has an invalid configuration.",
-        "noLookupMatch": "{transform} found no match in its Lookup Table.",
+        "noLookupMatch": "{transform} found no match in its code translation.",
         "expressionFailed": "{transform} failed on this example document.",
         "expressionNotPreviewed": "{transform} is not previewed on EDIFACT example documents yet.",
         "brokenLink": "A link here reaches a field or element its side does not have, so the preview skips it.",
@@ -3076,23 +3076,23 @@
         "outsideLoop": "A link here reads a repeating part outside a loop over line items.",
         "invalidDate": "{transform} cannot read the date in this example document.",
         "invalidNumber": "The value here is not a valid number.",
-        "unknownLookupTable": "{transform} uses a Lookup Table that does not exist."
+        "unknownLookupTable": "{transform} uses a code translation that does not exist."
       },
       "description": "The target Document this Mapping makes of an example document, with the links as they are now.",
       "close": "Close preview"
     }
   },
   "MappingComparison": {
-    "title": "Compare Mapping Versions",
+    "title": "Compare versions",
     "heading": "Compare versions of {name}",
     "loading": "Loading the comparison",
     "openDraft": "Open the Draft",
     "from": "From",
     "to": "To",
     "swap": "Swap versions",
-    "sample": "Sample Document",
+    "sample": "Example document",
     "chooseVersion": "Choose a version",
-    "chooseSample": "Choose a Sample Document",
+    "chooseSample": "Choose an example document",
     "version": "Version {version}",
     "latestVersion": "Version {version} (latest)",
     "retry": "Try again",
@@ -3108,11 +3108,11 @@
     },
     "tooFew": {
       "title": "Nothing to compare yet",
-      "description": "A comparison needs at least two Mapping Versions. Publish the Draft on the canvas to create another one.",
-      "viewOnlyDescription": "A comparison needs at least two Mapping Versions. Another one appears here once an Admin publishes the Draft."
+      "description": "A comparison needs at least two versions. Publish the draft on the canvas to create another one.",
+      "viewOnlyDescription": "A comparison needs at least two versions. Another one appears here once an Admin publishes the draft."
     },
     "unknownVersion": {
-      "title": "Mapping Version not found",
+      "title": "Version not found",
       "description": "A chosen version is not one of this Mapping. Choose two of its versions above."
     },
     "sameVersion": {
@@ -3121,8 +3121,8 @@
     },
     "versions": {
       "error": {
-        "title": "Mapping Versions unavailable",
-        "description": "The Mapping Versions could not be loaded. Try again."
+        "title": "Versions unavailable",
+        "description": "The versions could not be loaded. Try again."
       }
     },
     "differences": {
@@ -3159,8 +3159,8 @@
     },
     "outputs": {
       "title": "Output differences",
-      "description": "The target Documents both versions produce for the same Sample Document, and the values that differ.",
-      "loadingSamples": "Loading the Sample Documents",
+      "description": "The target documents both versions produce for the same example document, and the values that differ.",
+      "loadingSamples": "Loading the example documents",
       "loading": "Building the outputs for {name}",
       "summary": "{count, plural, one {# value differs} other {# values differ}} for {name}",
       "caption": "Values that differ, by target and repetition",
@@ -3180,16 +3180,16 @@
         "description": "Version {from} and Version {to} produce the same target Document for {name}."
       },
       "noSamples": {
-        "title": "No Sample Documents yet",
-        "description": "Output differences need a Sample Document of this Mapping, and it has none yet."
+        "title": "No example documents yet",
+        "description": "Output differences need an example document of this mapping, and it has none yet."
       },
       "unknownSample": {
-        "title": "Sample Document not found",
-        "description": "The chosen Sample Document is not one of this Mapping. Choose another one above."
+        "title": "Example document not found",
+        "description": "The chosen example document is not one of this mapping. Choose another one above."
       },
       "error": {
         "title": "Outputs unavailable",
-        "description": "The outputs for this Sample Document could not be built. Try again."
+        "description": "The outputs for this example document could not be built. Try again."
       }
     }
   },
@@ -3250,7 +3250,7 @@
       "mappings": "Read by",
       "mappingsLoading": "Loading Mappings"
     },
-    "usedNote": "Published Mapping Versions never change, so EDI Bridge refuses changes to fields they use. Fields only a Draft links can change as long as they keep their place.",
+    "usedNote": "Published versions never change, so EDI Bridge refuses changes to fields they use. Fields only a draft links can change as long as they keep their place.",
     "name": {
       "label": "Name",
       "description": "Shown in the Mapping list and on the mapping canvas."

@@ -132,9 +132,9 @@
     "firstSteps": "Erste Schritte",
     "documents": "Belege",
     "orders": "Aufträge",
-    "tradingPartners": "Trading Partners",
-    "channels": "Channels",
-    "flows": "Flows",
+    "tradingPartners": "Handelspartner",
+    "channels": "Alle Verbindungen",
+    "flows": "Alle Belegwege",
     "mappings": "Mappings",
     "documentStructures": "Datenformate",
     "codeTranslations": "Code-Übersetzungen",
@@ -149,7 +149,7 @@
     },
     "firstSteps": {
       "label": "Erste Schritte",
-      "hint": "Ihren Workspace Schritt für Schritt einrichten, von der GLN bis zum Livebetrieb"
+      "hint": "Ihren Arbeitsbereich Schritt für Schritt einrichten, von der GLN bis zum Livebetrieb"
     }
   },
   "NotFound": {
@@ -367,7 +367,7 @@
       "next": "Als Nächstes",
       "done": "Erledigt",
       "open": "Offen",
-      "viewer": "Diesen Schritt erledigt ein Admin Ihres Workspace.",
+      "viewer": "Diesen Schritt erledigt ein Admin Ihres Arbeitsbereichs.",
       "gln": {
         "title": "Firmen-ID (GLN) eintragen",
         "effort": "2 Minuten",
@@ -1028,7 +1028,7 @@
     "technical": {
       "facts": {
         "label": "Technische Details",
-        "messageType": "Message Type",
+        "messageType": "Belegart",
         "failedStep": "Fehlgeschlagener Schritt",
         "noFailure": "Keiner",
         "errorCode": "Fehlercode",
@@ -1667,10 +1667,10 @@
       "tooLong": "Verwenden Sie höchstens {max} Zeichen.",
       "range": "Geben Sie eine ganze Zahl von {min} bis {max} Stunden ein.",
       "gln": {
-        "taken": "Ein anderer Trading Partner verwendet diese GLN bereits.",
+        "taken": "Ein anderer Handelspartner verwendet diese GLN bereits.",
         "stillNeeded": "Geben Sie die GLN ein. Die mit diesem Partner ausgetauschten Belege sind an sie adressiert, deshalb lässt sie sich nicht entfernen."
       },
-      "saveFailed": "Der Trading Partner konnte nicht gespeichert werden. Versuchen Sie es erneut."
+      "saveFailed": "Der Handelspartner konnte nicht gespeichert werden. Versuchen Sie es erneut."
     },
     "save": "Änderungen speichern",
     "saving": "Wird gespeichert…"
@@ -1859,48 +1859,48 @@
     "retry": "Erneut versuchen"
   },
   "Channels": {
-    "new": "Neuer Channel",
-    "caption": "Channels, nach Name",
-    "loading": "Channels werden geladen",
-    "count": "{count, plural, one {# Channel} other {# Channels}}",
-    "filteredCount": "{count} von {total} Channels",
-    "search": "Nach Name, Trading Partner oder Adresse suchen",
-    "noMatch": "Kein Channel passt zur Suche.",
+    "new": "Neue Verbindung",
+    "caption": "Verbindungen, nach Name",
+    "loading": "Verbindungen werden geladen",
+    "count": "{count, plural, one {# Verbindung} other {# Verbindungen}}",
+    "filteredCount": "{count} von {total} Verbindungen",
+    "search": "Nach Name, Handelspartner oder Adresse suchen",
+    "noMatch": "Keine Verbindung passt zur Suche.",
     "ownSystems": "Eigene Systeme",
-    "unknownTradingPartner": "Unbekannter Trading Partner",
+    "unknownTradingPartner": "Unbekannter Handelspartner",
     "columns": {
       "name": "Name",
       "kind": "Art",
-      "tradingPartner": "Trading Partner",
+      "tradingPartner": "Handelspartner",
       "address": "Adresse"
     },
     "empty": {
-      "title": "Noch keine Channels",
-      "description": "Legen Sie einen Channel an, um Documents zu empfangen oder zuzustellen.",
-      "viewOnlyDescription": "Channels erscheinen hier, sobald ein Admin einen anlegt."
+      "title": "Noch keine Verbindungen",
+      "description": "Legen Sie eine Verbindung an, um Belege zu empfangen oder zuzustellen.",
+      "viewOnlyDescription": "Verbindungen erscheinen hier, sobald ein Admin eine anlegt."
     },
     "error": {
-      "title": "Channels nicht verfügbar",
-      "description": "Die Channels konnten nicht geladen werden. Versuchen Sie es erneut.",
+      "title": "Verbindungen nicht verfügbar",
+      "description": "Die Verbindungen konnten nicht geladen werden. Versuchen Sie es erneut.",
       "retry": "Erneut versuchen"
     }
   },
   "Channel": {
-    "title": "Channel",
-    "loading": "Channel wird geladen",
+    "title": "Verbindung",
+    "loading": "Verbindung wird geladen",
     "notFound": {
-      "title": "Channel nicht gefunden",
-      "description": "In diesem Workspace gibt es keinen Channel mit dieser ID."
+      "title": "Verbindung nicht gefunden",
+      "description": "In diesem Arbeitsbereich gibt es keine Verbindung mit dieser ID."
     },
     "error": {
-      "title": "Channel nicht verfügbar",
-      "description": "Der Channel konnte nicht geladen werden. Versuchen Sie es erneut.",
+      "title": "Verbindung nicht verfügbar",
+      "description": "Die Verbindung konnte nicht geladen werden. Versuchen Sie es erneut.",
       "retry": "Erneut versuchen"
     },
     "facts": {
-      "label": "Channel-Details",
+      "label": "Details zur Verbindung",
       "kind": "Art",
-      "tradingPartner": "Trading Partner",
+      "tradingPartner": "Handelspartner",
       "host": "Host",
       "port": "Port",
       "username": "Benutzername",
@@ -1990,7 +1990,7 @@
     },
     "webhook": {
       "title": "Webhook",
-      "description": "Absender schicken Documents per POST an diese URL und übergeben den Token im <header></header>-Header.",
+      "description": "Absender schicken Belege per POST an diese URL und übergeben den Token im <header></header>-Header.",
       "url": "Webhook-URL",
       "header": "Header-Format",
       "token": "Token",
@@ -2014,8 +2014,8 @@
   "ChannelForm": {
     "createTitle": "Neue Verbindung",
     "editTitle": "{name} bearbeiten",
-    "editPageTitle": "Channel bearbeiten",
-    "webhookNotice": "EDI Bridge erzeugt Webhook-URL und Token, wenn Sie den Channel anlegen.",
+    "editPageTitle": "Verbindung bearbeiten",
+    "webhookNotice": "EDI Bridge erzeugt Webhook-URL und Token, wenn Sie die Verbindung anlegen.",
     "sections": {
       "sftp": "SFTP-Verbindung",
       "webhook": "Webhook",
@@ -2025,15 +2025,15 @@
       "kind": {
         "label": "Art",
         "description": "Die Art lässt sich nach dem Anlegen nicht mehr ändern.",
-        "fixed": "Die Art lässt sich nicht ändern. Legen Sie für eine andere Art einen neuen Channel an."
+        "fixed": "Die Art lässt sich nicht ändern. Legen Sie für eine andere Art eine neue Verbindung an."
       },
       "name": {
         "label": "Name",
-        "description": "Wird in Flows und Runs angezeigt."
+        "description": "Wird in Belegwegen und Belegen angezeigt."
       },
       "tradingPartner": {
-        "label": "Trading Partner",
-        "description": "Der Trading Partner auf der Gegenseite. Wählen Sie Eigene Systeme für Ihr ERP.",
+        "label": "Handelspartner",
+        "description": "Der Handelspartner auf der Gegenseite. Wählen Sie Eigene Systeme für Ihr ERP.",
         "none": "Eigene Systeme"
       },
       "host": {
@@ -2109,16 +2109,16 @@
         "url": "Geben Sie eine vollständige URL ein, die mit https:// oder http:// beginnt."
       },
       "invalid": "Prüfen Sie diesen Wert.",
-      "kindChanged": "Die Art eines Channels lässt sich nicht ändern.",
-      "saveFailed": "Der Channel konnte nicht gespeichert werden. Versuchen Sie es erneut."
+      "kindChanged": "Die Art einer Verbindung lässt sich nicht ändern.",
+      "saveFailed": "Die Verbindung konnte nicht gespeichert werden. Versuchen Sie es erneut."
     },
     "created": {
       "title": "{name} angelegt",
-      "status": "Der Channel {name} ist angelegt.",
+      "status": "Die Verbindung {name} ist angelegt.",
       "url": "Webhook-URL",
-      "continue": "Zum Channel"
+      "continue": "Zur Verbindung"
     },
-    "create": "Channel anlegen",
+    "create": "Verbindung anlegen",
     "save": "Änderungen speichern",
     "saving": "Wird gespeichert…",
     "cancel": "Abbrechen"
@@ -2126,75 +2126,75 @@
   "ChannelKind": {
     "sftp-inbound": {
       "label": "Eingehend per SFTP",
-      "description": "Fragt einen Ordner auf einem SFTP-Server nach neuen Documents ab."
+      "description": "Fragt einen Ordner auf einem SFTP-Server nach neuen Belegen ab."
     },
     "sftp-outbound": {
       "label": "Ausgehend per SFTP",
-      "description": "Lädt Documents in einen Ordner auf einem SFTP-Server hoch."
+      "description": "Lädt Belege in einen Ordner auf einem SFTP-Server hoch."
     },
     "webhook-inbound": {
       "label": "Eingehender Webhook",
-      "description": "Empfängt Documents, die ein Absender per POST an EDI Bridge schickt."
+      "description": "Empfängt Belege, die ein Absender per POST an EDI Bridge schickt."
     },
     "http-outbound": {
       "label": "Ausgehend per HTTP",
-      "description": "Schickt Documents per POST an eine URL, etwa Ihr ERP."
+      "description": "Schickt Belege per POST an eine URL, etwa Ihr ERP."
     }
   },
   "Flows": {
-    "new": "Neuer Flow",
-    "caption": "Flows, nach Name",
-    "loading": "Flows werden geladen",
-    "count": "{count, plural, one {# Flow} other {# Flows}}",
-    "filteredCount": "{count} von {total} Flows",
-    "search": "Nach Name, Trading Partner, Channel oder Mapping suchen",
-    "noMatch": "Kein Flow passt zur Suche.",
+    "new": "Neuer Belegweg",
+    "caption": "Belegwege, nach Name",
+    "loading": "Belegwege werden geladen",
+    "count": "{count, plural, one {# Belegweg} other {# Belegwege}}",
+    "filteredCount": "{count} von {total} Belegwegen",
+    "search": "Nach Name, Handelspartner, Verbindung oder Mapping suchen",
+    "noMatch": "Kein Belegweg passt zur Suche.",
     "toDestination": "nach",
     "version": "Version {version}",
     "newerAvailable": "Neuere Version verfügbar",
     "columns": {
       "name": "Name",
-      "tradingPartner": "Trading Partner",
-      "messageType": "Message Type",
-      "channels": "Channels",
-      "mappingVersion": "Mapping Version"
+      "tradingPartner": "Handelspartner",
+      "messageType": "Belegart",
+      "channels": "Verbindungen",
+      "mappingVersion": "Version"
     },
     "empty": {
-      "title": "Noch keine Flows",
-      "description": "Legen Sie einen Flow an, um Documents eines Message Types von einem Trading Partner an einen Ziel-Channel zu leiten.",
-      "viewOnlyDescription": "Flows erscheinen hier, sobald ein Admin einen anlegt."
+      "title": "Noch keine Belegwege",
+      "description": "Legen Sie einen Belegweg an, um Belege einer Belegart von einem Handelspartner an eine Zielverbindung zu leiten.",
+      "viewOnlyDescription": "Belegwege erscheinen hier, sobald ein Admin einen anlegt."
     },
     "error": {
-      "title": "Flows nicht verfügbar",
-      "description": "Die Flows konnten nicht geladen werden. Versuchen Sie es erneut.",
+      "title": "Belegwege nicht verfügbar",
+      "description": "Die Belegwege konnten nicht geladen werden. Versuchen Sie es erneut.",
       "retry": "Erneut versuchen"
     }
   },
   "Flow": {
-    "title": "Flow",
-    "loading": "Flow wird geladen",
-    "unknownChannel": "Unbekannter Channel",
+    "title": "Belegweg",
+    "loading": "Belegweg wird geladen",
+    "unknownChannel": "Unbekannte Verbindung",
     "notFound": {
-      "title": "Flow nicht gefunden",
-      "description": "In diesem Workspace gibt es keinen Flow mit dieser ID."
+      "title": "Belegweg nicht gefunden",
+      "description": "In diesem Arbeitsbereich gibt es keinen Belegweg mit dieser ID."
     },
     "error": {
-      "title": "Flow nicht verfügbar",
-      "description": "Der Flow konnte nicht geladen werden. Versuchen Sie es erneut.",
+      "title": "Belegweg nicht verfügbar",
+      "description": "Der Belegweg konnte nicht geladen werden. Versuchen Sie es erneut.",
       "retry": "Erneut versuchen"
     },
     "facts": {
-      "label": "Details zum Flow",
-      "messageType": "Message Type",
-      "tradingPartner": "Trading Partner",
-      "inboundChannel": "Eingehender Channel",
-      "destinationChannel": "Ziel-Channel"
+      "label": "Details zum Belegweg",
+      "messageType": "Belegart",
+      "tradingPartner": "Handelspartner",
+      "inboundChannel": "Eingehende Verbindung",
+      "destinationChannel": "Zielverbindung"
     },
     "mappingVersion": "{mappingName}, Version {version}",
     "versionOption": "Version {version}, veröffentlicht am {publishedAt}",
     "pinned": {
-      "title": "Mapping Version",
-      "description": "Jeder Run dieses Flows verwendet die festgelegte Version. Der Flow wechselt nie von selbst auf eine neuere Version.",
+      "title": "Version",
+      "description": "Jeder Beleg auf diesem Belegweg verwendet die festgelegte Version. Der Belegweg wechselt nie von selbst auf eine neuere Version.",
       "published": "Veröffentlicht am {publishedAt}",
       "newest": "Dies ist die neueste veröffentlichte Version.",
       "newer": "{count, plural, one {Eine neuere Version ist verfügbar: Version {latest}.} other {# neuere Versionen sind verfügbar, bis Version {latest}.}}"
@@ -2202,75 +2202,75 @@
     "move": {
       "button": "Auf neuere Version umstellen",
       "legend": "Neue Version",
-      "confirmation": "Runs, die nach der Umstellung starten, verwenden die gewählte Version. Bereits verarbeitete Runs behalten ihre Version.",
+      "confirmation": "Belege, die nach der Umstellung ankommen, verwenden die gewählte Version. Bereits verarbeitete Belege behalten ihre Version.",
       "confirm": "Auf Version {version} umstellen",
       "cancel": "Abbrechen",
       "pending": "Wird umgestellt…",
-      "failed": "Der Flow konnte nicht umgestellt werden. Versuchen Sie es erneut.",
-      "done": "Der Flow verwendet jetzt Version {version}."
+      "failed": "Der Belegweg konnte nicht umgestellt werden. Versuchen Sie es erneut.",
+      "done": "Der Belegweg verwendet jetzt Version {version}."
     }
   },
   "FlowForm": {
     "createTitle": "Neuer Belegweg",
     "editTitle": "{name} bearbeiten",
-    "editPageTitle": "Flow bearbeiten",
+    "editPageTitle": "Belegweg bearbeiten",
     "sections": {
-      "channels": "Channels",
-      "mappingVersion": "Mapping Version"
+      "channels": "Verbindungen",
+      "mappingVersion": "Version"
     },
     "fields": {
       "name": {
         "label": "Name",
-        "description": "Erscheint in Runs und beim Trading Partner."
+        "description": "Erscheint in Belegen und beim Handelspartner."
       },
       "tradingPartner": {
-        "label": "Trading Partner",
-        "description": "Der Trading Partner, dessen Documents dieser Flow verarbeitet.",
-        "placeholder": "Trading Partner wählen",
-        "fixed": "Der Trading Partner lässt sich nicht ändern. Legen Sie für einen anderen einen neuen Flow an."
+        "label": "Handelspartner",
+        "description": "Der Handelspartner, dessen Belege dieser Belegweg verarbeitet.",
+        "placeholder": "Handelspartner wählen",
+        "fixed": "Der Handelspartner lässt sich nicht ändern. Legen Sie für einen anderen einen neuen Belegweg an."
       },
       "messageType": {
-        "label": "Message Type",
-        "description": "Die Art von Document, die dieser Flow verarbeitet.",
-        "fixed": "Der Message Type lässt sich nicht ändern. Legen Sie für einen anderen einen neuen Flow an."
+        "label": "Belegart",
+        "description": "Die Art von Beleg, die dieser Belegweg verarbeitet.",
+        "fixed": "Die Belegart lässt sich nicht ändern. Legen Sie für eine andere einen neuen Belegweg an."
       },
       "inboundChannel": {
-        "label": "Eingehender Channel",
-        "description": "Wo die Documents ankommen: bei einem eingehenden Message Type ein Channel dieses Trading Partners, bei einem ausgehenden ein Channel Ihrer eigenen Systeme.",
-        "placeholder": "Eingehenden Channel wählen",
-        "none": "Kein eingehender Channel passt zu diesem Trading Partner und Message Type. Legen Sie zuerst einen an."
+        "label": "Eingehende Verbindung",
+        "description": "Wo die Belege ankommen: bei einer eingehenden Belegart eine Verbindung dieses Handelspartners, bei einer ausgehenden eine Verbindung Ihrer eigenen Systeme.",
+        "placeholder": "Eingehende Verbindung wählen",
+        "none": "Keine eingehende Verbindung passt zu diesem Handelspartner und dieser Belegart. Legen Sie zuerst eine an."
       },
       "destinationChannel": {
-        "label": "Ziel-Channel",
-        "description": "Wohin EDI Bridge das gemappte Document zustellt: bei einem eingehenden Message Type ein Channel Ihrer eigenen Systeme, bei einem ausgehenden ein Channel dieses Trading Partners.",
-        "placeholder": "Ziel-Channel wählen",
-        "none": "Kein ausgehender Channel passt zu diesem Trading Partner und Message Type. Legen Sie zuerst einen an."
+        "label": "Zielverbindung",
+        "description": "Wohin EDI Bridge den gemappten Beleg zustellt: bei einer eingehenden Belegart eine Verbindung Ihrer eigenen Systeme, bei einer ausgehenden eine Verbindung dieses Handelspartners.",
+        "placeholder": "Zielverbindung wählen",
+        "none": "Keine ausgehende Verbindung passt zu diesem Handelspartner und dieser Belegart. Legen Sie zuerst eine an."
       },
-      "channelsLoading": "Channels werden geladen…",
+      "channelsLoading": "Verbindungen werden geladen…",
       "mappingVersion": {
-        "label": "Mapping Version",
-        "description": "Festlegen lässt sich nur eine veröffentlichte Mapping Version, nie ein Draft. Der Flow behält diese Version, bis Sie ihn auf eine neuere umstellen.",
-        "placeholder": "Mapping Version wählen",
-        "loading": "Mapping Versions werden geladen…",
-        "none": "Für {messageType} ist noch keine Mapping Version veröffentlicht.",
-        "failed": "Die Mapping Versions konnten nicht geladen werden.",
-        "fixed": "Um eine neuere Version zu verwenden, stellen Sie den Flow auf seiner Seite um."
+        "label": "Version",
+        "description": "Festlegen lässt sich nur eine veröffentlichte Mapping-Version, nie ein Entwurf. Der Belegweg behält diese Version, bis Sie ihn auf eine neuere umstellen.",
+        "placeholder": "Version wählen",
+        "loading": "Versionen werden geladen…",
+        "none": "Für {messageType} ist noch keine Mapping-Version veröffentlicht.",
+        "failed": "Die Versionen konnten nicht geladen werden.",
+        "fixed": "Um eine neuere Version zu verwenden, stellen Sie den Belegweg auf seiner Seite um."
       }
     },
     "errors": {
       "required": {
         "name": "Geben Sie einen Namen ein.",
-        "tradingPartnerId": "Wählen Sie einen Trading Partner.",
-        "messageType": "Wählen Sie einen Message Type.",
-        "inboundChannelId": "Wählen Sie einen eingehenden Channel.",
-        "destinationChannelId": "Wählen Sie einen Ziel-Channel.",
-        "mappingVersionId": "Wählen Sie eine Mapping Version."
+        "tradingPartnerId": "Wählen Sie einen Handelspartner.",
+        "messageType": "Wählen Sie eine Belegart.",
+        "inboundChannelId": "Wählen Sie eine eingehende Verbindung.",
+        "destinationChannelId": "Wählen Sie eine Zielverbindung.",
+        "mappingVersionId": "Wählen Sie eine Version."
       },
       "tooLong": "Dieser Wert ist zu lang.",
-      "invalidReference": "Ein gewählter Channel oder die Mapping Version passt nicht mehr zu diesem Flow. Prüfen Sie die Auswahl und speichern Sie erneut.",
-      "saveFailed": "Der Flow konnte nicht gespeichert werden. Versuchen Sie es erneut."
+      "invalidReference": "Eine gewählte Verbindung oder die Version passt nicht mehr zu diesem Belegweg. Prüfen Sie die Auswahl und speichern Sie erneut.",
+      "saveFailed": "Der Belegweg konnte nicht gespeichert werden. Versuchen Sie es erneut."
     },
-    "create": "Flow anlegen",
+    "create": "Belegweg anlegen",
     "save": "Änderungen speichern",
     "saving": "Wird gespeichert…",
     "cancel": "Abbrechen"
@@ -2367,7 +2367,7 @@
     "loading": "Mapping wird geladen",
     "notFound": {
       "title": "Mapping nicht gefunden",
-      "description": "In diesem Workspace gibt es kein Mapping mit dieser ID."
+      "description": "In diesem Arbeitsbereich gibt es kein Mapping mit dieser ID."
     },
     "error": {
       "title": "Mapping nicht verfügbar",
@@ -2426,7 +2426,7 @@
       "stillInUse": "Version {version} wird noch von {partners} genutzt.",
       "heading": "Versionen",
       "loading": "Versionen werden geladen",
-      "empty": "Noch nichts veröffentlicht. Sobald der Draft veröffentlicht ist, erscheint hier jede Version mit ihrem Änderungshinweis und wer sie veröffentlicht hat.",
+      "empty": "Noch nichts veröffentlicht. Sobald der Entwurf veröffentlicht ist, erscheint hier jede Version mit ihrem Änderungshinweis und wer sie veröffentlicht hat.",
       "error": {
         "title": "Versionen nicht verfügbar",
         "description": "Die Versionen konnten nicht geladen werden. Versuchen Sie es erneut.",
@@ -2442,14 +2442,14 @@
       "unused": "Kein Belegweg nutzt diese Version.",
       "compare": "Mit vorheriger vergleichen<hidden> (Version {previous} zu {version})</hidden>",
       "restore": {
-        "button": "In Draft wiederherstellen<hidden> (Version {version})</hidden>",
+        "button": "Im Entwurf wiederherstellen<hidden> (Version {version})</hidden>",
         "reviewOpen": "Eine Version lässt sich wiederherstellen, sobald die Durchsicht des KI-Entwurfs abgeschlossen ist.",
-        "title": "Version {version} im Draft wiederherstellen?",
-        "description": "Die Verknüpfungen und Transforms des Drafts werden durch die von Version {version} überschrieben. Live geht nichts, bis Sie veröffentlichen.",
+        "title": "Version {version} im Entwurf wiederherstellen?",
+        "description": "Die Verknüpfungen und Transforms des Entwurfs werden durch die von Version {version} überschrieben. Live geht nichts, bis Sie veröffentlichen.",
         "confirm": "Version {version} wiederherstellen",
         "pending": "Wird wiederhergestellt…",
         "cancel": "Abbrechen",
-        "done": "Version {version} im Draft wiederhergestellt. Live geht sie, sobald Sie veröffentlichen.",
+        "done": "Version {version} im Entwurf wiederhergestellt. Live geht sie, sobald Sie veröffentlichen.",
         "problem": {
           "reviewOpen": "Solange die Durchsicht des KI-Entwurfs offen ist, lässt sich keine Version wiederherstellen. Übernehmen Sie zuerst den KI-Entwurf und stellen Sie dann wieder her.",
           "failed": "Die Version konnte nicht wiederhergestellt werden. Versuchen Sie es erneut."
@@ -2471,13 +2471,13 @@
     "aiDraft": {
       "button": "Mit KI entwerfen",
       "title": "Mit KI entwerfen",
-      "description": "Die KI entwirft Verknüpfungen aus einem Beispiel-Document und prüft sie daran. Das dauert einige Minuten. Die Verknüpfungen erscheinen erst auf der Zeichenfläche, wenn sie die Prüfung bestehen.",
+      "description": "Die KI entwirft Verknüpfungen aus einem Beispielbeleg und prüft sie daran. Das dauert einige Minuten. Die Verknüpfungen erscheinen erst auf der Zeichenfläche, wenn sie die Prüfung bestehen.",
       "samples": {
-        "label": "Beispiel-Document",
-        "loading": "Beispiel-Documents werden geladen",
-        "error": "Die Beispiel-Documents konnten nicht geladen werden.",
+        "label": "Beispielbeleg",
+        "loading": "Beispielbelege werden geladen",
+        "error": "Die Beispielbelege konnten nicht geladen werden.",
         "retry": "Erneut versuchen",
-        "empty": "Dieses Mapping hat noch keine Beispiel-Documents. Die KI braucht eines, um daraus Verknüpfungen zu entwerfen und sie daran zu prüfen."
+        "empty": "Dieses Mapping hat noch keine Beispielbelege. Die KI braucht einen, um daraus Verknüpfungen zu entwerfen und sie daran zu prüfen."
       },
       "source": "Quelle",
       "target": "Ziel",
@@ -2488,7 +2488,7 @@
         "retry": "Erneut versuchen",
         "remaining": "Heute noch {remaining} von {limit} Tokens übrig.",
         "exhausted": "Das KI-Token-Budget für heute ist aufgebraucht. KI-Entwürfe sind morgen wieder verfügbar.",
-        "turnedOff": "KI ist für diesen Workspace ausgeschaltet. Der Operator legt das KI-Token-Budget fest."
+        "turnedOff": "KI ist für diesen Arbeitsbereich ausgeschaltet. Der Operator legt das KI-Token-Budget fest."
       },
       "start": "KI-Entwurf starten",
       "cancel": "Abbrechen",
@@ -2505,25 +2505,25 @@
         "stopped": "Abgebrochen"
       },
       "step": {
-        "readingSample": "Beispiel-Document wird gelesen",
+        "readingSample": "Beispielbeleg wird gelesen",
         "lookingUpSegments": "Segmente werden nachgeschlagen: {tags}",
         "lookingUpManySegments": "Segmente werden nachgeschlagen: {tags} und {count} weitere",
         "linksDrafted": "{count, plural, =0 {Keine Verknüpfungen entworfen} one {# Verknüpfung entworfen} other {# Verknüpfungen entworfen}}",
-        "checkingAgainstSample": "Prüfung am Beispiel-Document",
+        "checkingAgainstSample": "Prüfung am Beispielbeleg",
         "fixingErrors": "{count, plural, one {# Fehler wird behoben} other {# Fehler werden behoben}}"
       },
       "outcome": {
         "drafted": {
           "title": "Verknüpfungen zur Zeichenfläche hinzugefügt",
-          "description": "Die von der KI vorgeschlagenen Verknüpfungen haben die Prüfung am Beispiel-Document bestanden: {links, plural, one {# Verknüpfung} other {# Verknüpfungen}} und {transforms, plural, one {# Transform} other {# Transforms}} sind jetzt auf der Zeichenfläche."
+          "description": "Die von der KI vorgeschlagenen Verknüpfungen haben die Prüfung am Beispielbeleg bestanden: {links, plural, one {# Verknüpfung} other {# Verknüpfungen}} und {transforms, plural, one {# Transform} other {# Transforms}} sind jetzt auf der Zeichenfläche."
         },
         "empty": {
           "title": "Die KI hat keine Verknüpfungen gefunden",
-          "description": "Die KI hat im Beispiel-Document nichts gefunden, das sie mit einem freien Ziel verknüpfen könnte. Der Draft bleibt unverändert. Versuchen Sie es mit einem anderen Beispiel-Document."
+          "description": "Die KI hat im Beispielbeleg nichts gefunden, das sie mit einem freien Ziel verknüpfen könnte. Der Entwurf bleibt unverändert. Versuchen Sie es mit einem anderen Beispielbeleg."
         },
         "checkFailed": {
           "title": "Die Verknüpfungen haben die Prüfung nicht bestanden",
-          "description": "Die KI konnte in {rounds, plural, one {# Runde} other {# Runden}} nicht alle Fehler beheben, die die Prüfung am Beispiel-Document gefunden hat. Es wurden keine Verknüpfungen hinzugefügt. Versuchen Sie es erneut oder wählen Sie ein anderes Beispiel-Document."
+          "description": "Die KI konnte in {rounds, plural, one {# Runde} other {# Runden}} nicht alle Fehler beheben, die die Prüfung am Beispielbeleg gefunden hat. Es wurden keine Verknüpfungen hinzugefügt. Versuchen Sie es erneut oder wählen Sie einen anderen Beispielbeleg."
         },
         "budgetExhausted": {
           "title": "KI-Token-Budget aufgebraucht",
@@ -2535,7 +2535,7 @@
         },
         "reviewOpen": {
           "title": "Durchsicht des KI-Entwurfs noch offen",
-          "description": "Dieser Draft hat bereits von der KI vorgeschlagene Verknüpfungen, die Sie durchsehen müssen. Schließen Sie diese Durchsicht ab, bevor Sie einen weiteren KI-Entwurf anfordern."
+          "description": "Dieser Entwurf hat bereits von der KI vorgeschlagene Verknüpfungen, die Sie durchsehen müssen. Schließen Sie diese Durchsicht ab, bevor Sie einen weiteren KI-Entwurf anfordern."
         },
         "interrupted": {
           "title": "KI-Entwurf unterbrochen",
@@ -2563,7 +2563,7 @@
       "openSummary": "{count, plural, one {# KI-Vorschlag zu prüfen} other {# KI-Vorschläge zu prüfen}}",
       "accept": "KI-Entwurf übernehmen",
       "accepting": "Wird übernommen…",
-      "accepted": "KI-Entwurf übernommen. Der Draft bleibt bearbeitbar und lässt sich jetzt veröffentlichen.",
+      "accepted": "KI-Entwurf übernommen. Der Entwurf bleibt bearbeitbar und lässt sich jetzt veröffentlichen.",
       "acceptFailed": "Der KI-Entwurf konnte nicht übernommen werden. Versuchen Sie es erneut.",
       "acceptLink": "Verknüpfung übernehmen",
       "acceptChain": "Verknüpfungen und Transforms übernehmen",
@@ -2632,13 +2632,13 @@
       "transforms": "Transforms"
     },
     "direction": {
-      "inbound": "Eingehend: Message Type zu Datenformat",
-      "outbound": "Ausgehend: Datenformat zu Message Type"
+      "inbound": "Eingehend: Belegart zu Datenformat",
+      "outbound": "Ausgehend: Datenformat zu Belegart"
     },
     "linkCount": "{count, plural, =0 {Noch keine Verknüpfungen} one {# Verknüpfung} other {# Verknüpfungen}}",
     "side": {
       "documentStructure": "Datenformat {name}",
-      "messageType": "Message Type {messageType}"
+      "messageType": "Belegart {messageType}"
     },
     "canvas": {
       "label": "Mapping-Zeichenfläche: {source} zu {target}",
@@ -2782,7 +2782,7 @@
         "substring": "Teilzeichenfolge",
         "dateFormat": "Datumsformat",
         "numberFormat": "Zahlenformat",
-        "lookupTable": "Lookup Table",
+        "lookupTable": "Code-Übersetzung",
         "conditional": "Bedingung",
         "loop": "Schleife über Positionen",
         "jsonata": "JSONata-Ausdruck"
@@ -2794,10 +2794,10 @@
         "substring": "Schneidet einen Teil eines Werts aus, in Zeichen gezählt.",
         "dateFormat": "Wandelt ein Datum von einem Muster in ein anderes um.",
         "numberFormat": "Rundet eine Zahl und legt ihr Dezimaltrennzeichen fest.",
-        "lookupTable": "Übersetzt einen Wert mit einer Lookup Table.",
+        "lookupTable": "Übersetzt einen Wert mit einer Code-Übersetzung.",
         "conditional": "Wählt anhand einer Bedingung zwischen zwei Werten.",
         "loop": "Wiederholt die Verknüpfungen unter einem wiederholten Teil einmal je Eintrag. Verknüpfen Sie einen wiederholten Teil der Quelle wie lines[] mit „Einträge“ und „Einträge“ mit einem wiederholten Teil des Ziels wie SG25; verknüpfen Sie dann die Felder darunter.",
-        "jsonata": "Berechnet einen Wert aus dem ganzen Quell-Document."
+        "jsonata": "Berechnet einen Wert aus dem ganzen Quellbeleg."
       },
       "name": "{kind} {number}",
       "port": "{transform} ({port})",
@@ -2841,9 +2841,9 @@
         "substring": "{length, select, all {Ab Zeichen {start} bis zum Ende} other {{length} Zeichen ab Zeichen {start}}}",
         "dateFormat": "{from} → {to}",
         "numberFormat": "{places, select, keep {Nachkommastellen unverändert} other {{places} Nachkommastellen}}, Trennzeichen „{separator}“",
-        "lookupTableNone": "Keine Lookup Table gewählt",
-        "lookupTableChosen": "Lookup Table gewählt",
-        "lookupTableMissing": "Lookup Table nicht gefunden",
+        "lookupTableNone": "Keine Code-Übersetzung gewählt",
+        "lookupTableChosen": "Code-Übersetzung gewählt",
+        "lookupTableMissing": "Code-Übersetzung nicht gefunden",
         "conditional": "Wenn der Wert {operator}",
         "loop": "Zähler beginnt bei {start}",
         "jsonata": "{expression}"
@@ -2887,7 +2887,7 @@
           "decimalSeparator": "Dezimaltrennzeichen"
         },
         "lookupTable": {
-          "lookupTableId": "Lookup Table",
+          "lookupTableId": "Code-Übersetzung",
           "fallback": "Wenn kein Eintrag passt"
         },
         "conditional": {
@@ -2926,8 +2926,8 @@
           "decimalSeparator": "Das Zeichen zwischen der ganzen Zahl und ihren Nachkommastellen."
         },
         "lookupTable": {
-          "lookupTableId": "Die Lookup Table, die den Wert übersetzt. Eine Tabelle des Workspace gilt für alle Trading Partner, die eines Trading Partners nur für diesen.",
-          "fallback": "Was geschieht, wenn die Lookup Table keinen Eintrag für den Wert hat."
+          "lookupTableId": "Die Code-Übersetzung, die den Wert übersetzt. Eine Liste des Arbeitsbereichs gilt für alle Handelspartner, die eines Handelspartners nur für diesen.",
+          "fallback": "Was geschieht, wenn die Code-Übersetzung keinen Eintrag für den Wert hat."
         },
         "conditional": {
           "operator": "Wie der Eingang „Wert“ geprüft wird. Trifft die Bedingung zu, wird „Dann“ geschrieben, sonst „Sonst“.",
@@ -2937,7 +2937,7 @@
           "counterStart": "Die Nummer des ersten Eintrags; der Ausgang „Zähler“ nummeriert die Einträge ab hier, z. B. für LIN."
         },
         "jsonata": {
-          "expression": "Ein JSONata-Ausdruck über das ganze Quell-Document, z. B. $sum(lines.lineAmount). Verlassen des Felds oder Strg+Enter speichert ihn; Enter beginnt eine neue Zeile."
+          "expression": "Ein JSONata-Ausdruck über den ganzen Quellbeleg, z. B. $sum(lines.lineAmount). Verlassen des Felds oder Strg+Enter speichert ihn; Enter beginnt eine neue Zeile."
         }
       },
       "separators": {
@@ -2947,16 +2947,16 @@
       "fallbacks": {
         "keepValue": "Eingehenden Wert behalten",
         "empty": "Ziel leer lassen",
-        "fail": "Run scheitern lassen"
+        "fail": "Beleg scheitern lassen"
       },
       "lookupTables": {
-        "placeholder": "Lookup Table wählen",
-        "loading": "Lookup Tables werden geladen …",
-        "error": "Die Lookup Tables konnten nicht geladen werden.",
+        "placeholder": "Code-Übersetzung wählen",
+        "loading": "Code-Übersetzungen werden geladen …",
+        "error": "Die Code-Übersetzungen konnten nicht geladen werden.",
         "retry": "Erneut versuchen",
-        "empty": "In diesem Workspace gibt es noch keine Lookup Tables.",
-        "workspace": "Workspace",
-        "tradingPartner": "Trading Partner {name}",
+        "empty": "In diesem Arbeitsbereich gibt es noch keine Code-Übersetzungen.",
+        "workspace": "Arbeitsbereich",
+        "tradingPartner": "Handelspartner {name}",
         "scope": "Gehört zu: {scope}"
       },
       "expression": {
@@ -3013,7 +3013,7 @@
         "invalidConfig": "Die Einstellungen sind ungültig.",
         "notWholeNumber": "{field}: Geben Sie eine ganze Zahl ein.",
         "unconnected": "Der Eingang {input} ist nicht verknüpft.",
-        "unknownLookupTable": "Die gewählte Lookup Table gibt es nicht mehr. Wählen Sie eine andere.",
+        "unknownLookupTable": "Die gewählte Code-Übersetzung gibt es nicht mehr. Wählen Sie eine andere.",
         "outsideLoop": "Die Verknüpfung von {source} nach {target} verlässt die Schleife: Nur Verknüpfungen zwischen Feldern unterhalb der Schleifenteile laufen einmal pro Position."
       },
       "details": {
@@ -3045,10 +3045,10 @@
       "title": "Vorschau",
       "sample": "Beispielbeleg",
       "source": "Beispielbeleg",
-      "target": "Ziel-Document",
-      "shown": "Angezeigtes Document",
+      "target": "Zielbeleg",
+      "shown": "Angezeigter Beleg",
       "sourceLabel": "Beispielbeleg {name}",
-      "targetLabel": "Ziel-Document für {name}",
+      "targetLabel": "Zielbeleg für {name}",
       "size": "{format}, {count, plural, one {# Zeile} other {# Zeilen}}",
       "loading": "Beispielbelege werden geladen",
       "building": "Vorschau wird erstellt",
@@ -3057,7 +3057,7 @@
       "updated": "Vorschau für {name} aktualisiert",
       "empty": {
         "title": "Noch keine Beispielbelege",
-        "description": "Die Vorschau zeigt das Ziel-Document für einen Beispielbeleg der Quelle. Dieses Mapping hat noch keine Beispielbelege."
+        "description": "Die Vorschau zeigt den Zielbeleg für einen Beispielbeleg der Quelle. Dieses Mapping hat noch keine Beispielbelege."
       },
       "error": {
         "samples": "Die Beispielbelege konnten nicht geladen werden.",
@@ -3066,9 +3066,9 @@
       },
       "notes": {
         "title": "{count, plural, one {# Ziel bleibt leer} other {# Ziele bleiben leer}}",
-        "stopped": "Die Vorschau hat angehalten und kein Ziel-Document erstellt",
+        "stopped": "Die Vorschau hat angehalten und keinen Zielbeleg erstellt",
         "invalidTransform": "{transform} ist ungültig konfiguriert.",
-        "noLookupMatch": "{transform} hat in seiner Lookup Table keinen Treffer gefunden.",
+        "noLookupMatch": "{transform} hat in seiner Code-Übersetzung keinen Treffer gefunden.",
         "expressionFailed": "{transform} ist bei diesem Beispielbeleg fehlgeschlagen.",
         "expressionNotPreviewed": "{transform} wird bei EDIFACT-Beispielbelegen noch nicht in der Vorschau berechnet.",
         "brokenLink": "Eine Verknüpfung hier führt zu einem Feld oder Element, das ihre Seite nicht hat; die Vorschau überspringt sie.",
@@ -3076,23 +3076,23 @@
         "outsideLoop": "Eine Verknüpfung hier liest einen wiederholten Teil außerhalb einer Schleife über Positionen.",
         "invalidDate": "{transform} kann das Datum in diesem Beispielbeleg nicht lesen.",
         "invalidNumber": "Der Wert hier ist keine gültige Zahl.",
-        "unknownLookupTable": "{transform} nutzt eine Lookup Table, die es nicht gibt."
+        "unknownLookupTable": "{transform} nutzt eine Code-Übersetzung, die es nicht gibt."
       },
-      "description": "Das Ziel-Document, das dieses Mapping aus einem Beispielbeleg macht, mit den Verknüpfungen in ihrem aktuellen Stand.",
+      "description": "Der Zielbeleg, den dieses Mapping aus einem Beispielbeleg macht, mit den Verknüpfungen in ihrem aktuellen Stand.",
       "close": "Vorschau schließen"
     }
   },
   "MappingComparison": {
-    "title": "Mapping Versions vergleichen",
+    "title": "Versionen vergleichen",
     "heading": "Versionen von {name} vergleichen",
     "loading": "Vergleich wird geladen",
-    "openDraft": "Draft öffnen",
+    "openDraft": "Entwurf öffnen",
     "from": "Von",
     "to": "Nach",
     "swap": "Versionen tauschen",
-    "sample": "Beispiel-Document",
+    "sample": "Beispielbeleg",
     "chooseVersion": "Version wählen",
-    "chooseSample": "Beispiel-Document wählen",
+    "chooseSample": "Beispielbeleg wählen",
     "version": "Version {version}",
     "latestVersion": "Version {version} (neueste)",
     "retry": "Erneut versuchen",
@@ -3108,11 +3108,11 @@
     },
     "tooFew": {
       "title": "Noch nichts zu vergleichen",
-      "description": "Ein Vergleich braucht mindestens zwei Mapping Versions. Veröffentlichen Sie den Draft im Canvas, um eine weitere zu erstellen.",
-      "viewOnlyDescription": "Ein Vergleich braucht mindestens zwei Mapping Versions. Eine weitere erscheint hier, sobald ein Admin den Draft veröffentlicht."
+      "description": "Ein Vergleich braucht mindestens zwei Versionen. Veröffentlichen Sie den Entwurf im Canvas, um eine weitere zu erstellen.",
+      "viewOnlyDescription": "Ein Vergleich braucht mindestens zwei Versionen. Eine weitere erscheint hier, sobald ein Admin den Entwurf veröffentlicht."
     },
     "unknownVersion": {
-      "title": "Mapping Version nicht gefunden",
+      "title": "Version nicht gefunden",
       "description": "Eine gewählte Version gehört nicht zu diesem Mapping. Wählen Sie oben zwei seiner Versionen."
     },
     "sameVersion": {
@@ -3121,8 +3121,8 @@
     },
     "versions": {
       "error": {
-        "title": "Mapping Versions nicht verfügbar",
-        "description": "Die Mapping Versions konnten nicht geladen werden. Versuchen Sie es erneut."
+        "title": "Versionen nicht verfügbar",
+        "description": "Die Versionen konnten nicht geladen werden. Versuchen Sie es erneut."
       }
     },
     "differences": {
@@ -3159,8 +3159,8 @@
     },
     "outputs": {
       "title": "Unterschiede in der Ausgabe",
-      "description": "Die Ziel-Documents, die beide Versionen für dasselbe Beispiel-Document erzeugen, und die Werte, die sich unterscheiden.",
-      "loadingSamples": "Beispiel-Documents werden geladen",
+      "description": "Die Zielbelege, die beide Versionen für denselben Beispielbeleg erzeugen, und die Werte, die sich unterscheiden.",
+      "loadingSamples": "Beispielbelege werden geladen",
       "loading": "Ausgaben für {name} werden erstellt",
       "summary": "{count, plural, one {# Wert unterscheidet sich} other {# Werte unterscheiden sich}} für {name}",
       "caption": "Unterschiedliche Werte nach Ziel und Wiederholung",
@@ -3173,23 +3173,23 @@
       "repetitionPlain": "Nr. {number}",
       "notSet": "Nicht gesetzt",
       "emptyValue": "Leer",
-      "documents": "Ziel-Documents",
-      "document": "Ziel-Document von Version {version}",
+      "documents": "Zielbelege",
+      "document": "Zielbeleg von Version {version}",
       "empty": {
         "title": "Gleiche Ausgabe",
-        "description": "Version {from} und Version {to} erzeugen für {name} dasselbe Ziel-Document."
+        "description": "Version {from} und Version {to} erzeugen für {name} denselben Zielbeleg."
       },
       "noSamples": {
-        "title": "Noch keine Beispiel-Documents",
-        "description": "Unterschiede in der Ausgabe brauchen ein Beispiel-Document dieses Mappings, und es hat noch keine."
+        "title": "Noch keine Beispielbelege",
+        "description": "Unterschiede in der Ausgabe brauchen einen Beispielbeleg dieses Mappings, und es hat noch keinen."
       },
       "unknownSample": {
-        "title": "Beispiel-Document nicht gefunden",
-        "description": "Das gewählte Beispiel-Document gehört nicht zu diesem Mapping. Wählen Sie oben ein anderes."
+        "title": "Beispielbeleg nicht gefunden",
+        "description": "Der gewählte Beispielbeleg gehört nicht zu diesem Mapping. Wählen Sie oben einen anderen."
       },
       "error": {
         "title": "Ausgaben nicht verfügbar",
-        "description": "Die Ausgaben für dieses Beispiel-Document konnten nicht erstellt werden. Versuchen Sie es erneut."
+        "description": "Die Ausgaben für diesen Beispielbeleg konnten nicht erstellt werden. Versuchen Sie es erneut."
       }
     }
   },
@@ -3250,14 +3250,14 @@
       "mappings": "Gelesen von",
       "mappingsLoading": "Mappings werden geladen"
     },
-    "usedNote": "Veröffentlichte Mapping Versions ändern sich nie, deshalb lehnt EDI Bridge Änderungen an Feldern ab, die sie verwenden. Felder, die nur ein Draft verknüpft, lassen sich ändern, solange sie ihren Platz behalten.",
+    "usedNote": "Veröffentlichte Versionen ändern sich nie, deshalb lehnt EDI Bridge Änderungen an Feldern ab, die sie verwenden. Felder, die nur ein Entwurf verknüpft, lassen sich ändern, solange sie ihren Platz behalten.",
     "name": {
       "label": "Name",
       "description": "Erscheint in der Mapping-Liste und auf dem Mapping-Canvas."
     },
     "fields": "Felder",
     "fieldsDescription": "Markieren Sie Felder und Objekte als Pflicht oder optional, als wiederholend oder nicht, und passen Sie den Typ eines Felds an. Die Änderungen gelten, sobald Sie speichern.",
-    "csvFieldsDescription": "Markieren Sie Spalten als Pflicht oder optional und passen Sie ihren Typ an. Die Zeilen eines CSV-Documents wiederholen sich immer, seine Spalten nie.",
+    "csvFieldsDescription": "Markieren Sie Spalten als Pflicht oder optional und passen Sie ihren Typ an. Die Zeilen einer CSV-Datei wiederholen sich immer, ihre Spalten nie.",
     "unsaved": "{count, plural, =0 {Keine ungespeicherten Änderungen} one {# ungespeicherte Änderung} other {# ungespeicherte Änderungen}}",
     "save": "Speichern",
     "saving": "Wird gespeichert…",
@@ -3268,20 +3268,20 @@
       "nameRequired": "Geben Sie einen Namen ein."
     },
     "csv": {
-      "description": "EDI Bridge liest CSV-Documents dieses Datenformats mit diesen Einstellungen. Um sie zu ändern, wählen Sie ein CSV-Document: EDI Bridge liest es mit den neuen Einstellungen erneut und zeigt die abgeleiteten Felder, bevor Sie speichern.",
+      "description": "EDI Bridge liest CSV-Dateien dieses Datenformats mit diesen Einstellungen. Um sie zu ändern, wählen Sie eine CSV-Datei: EDI Bridge liest sie mit den neuen Einstellungen erneut und zeigt die abgeleiteten Felder, bevor Sie speichern.",
       "document": {
-        "label": "CSV-Document",
+        "label": "CSV-Datei",
         "description": "Ein aktueller Export aus Ihren eigenen Systemen. Beim Speichern ersetzen die daraus gelesenen Felder die bisherigen. Höchstens 5 MB."
       },
       "blocked": {
-        "documentNeeded": "Wählen Sie ein CSV-Document, um es mit den neuen Einstellungen erneut zu lesen.",
-        "unread": "Zum Speichern muss EDI Bridge das CSV-Document mit diesen Einstellungen lesen können."
+        "documentNeeded": "Wählen Sie eine CSV-Datei, um sie mit den neuen Einstellungen erneut zu lesen.",
+        "unread": "Zum Speichern muss EDI Bridge die CSV-Datei mit diesen Einstellungen lesen können."
       },
       "rereadFieldsDescription": "Die Felder, die EDI Bridge mit den Einstellungen oben aus {fileName} liest. Beim Speichern ersetzen sie die bisherigen Felder. Markieren Sie Spalten als Pflicht oder optional und passen Sie ihren Typ an.",
-      "reading": "CSV-Document wird gelesen…",
-      "unread": "Die Felder erscheinen, sobald EDI Bridge das CSV-Document lesen kann. Passen Sie die CSV-Einstellungen an oder wählen Sie ein anderes CSV-Document."
+      "reading": "CSV-Datei wird gelesen…",
+      "unread": "Die Felder erscheinen, sobald EDI Bridge die CSV-Datei lesen kann. Passen Sie die CSV-Einstellungen an oder wählen Sie eine andere CSV-Datei."
     },
-    "viewOnlyFieldsDescription": "Die Felder, die EDI Bridge in Documents dieses Datenformats erwartet, mit ihrem Typ und ob sie Pflicht sind oder sich wiederholen.",
+    "viewOnlyFieldsDescription": "Die Felder, die EDI Bridge in Belegen dieses Datenformats erwartet, mit ihrem Typ und ob sie Pflicht sind oder sich wiederholen.",
     "sample": {
       "title": "Beispieldatei",
       "takenAt": "Beispiel vom {date}",
@@ -3426,7 +3426,7 @@
     },
     "file": {
       "label": "Datei",
-      "description": "Ein Beispiel-Document aus Ihren eigenen Systemen oder das JSON Schema, das sie bereitstellen. Höchstens 5 MB.",
+      "description": "Ein Beispielbeleg aus Ihren eigenen Systemen oder das JSON Schema, das sie bereitstellen. Höchstens 5 MB.",
       "drop": "Datei hier ablegen oder auswählen."
     },
     "errors": {
@@ -3491,10 +3491,10 @@
       "title": "Erste Zeilen",
       "description": "So liest EDI Bridge sie mit {encoding} und dem Trennzeichen oben.",
       "label": "Erste Zeilen von {fileName}",
-      "none": "Das CSV-Document hat keine Zeilen unter der Kopfzeile.",
+      "none": "Die CSV-Datei hat keine Zeilen unter der Kopfzeile.",
       "column": "Spalte {number}"
     },
-    "viewOnlyDescription": "EDI Bridge liest CSV-Documents dieses Datenformats mit diesen Einstellungen.",
+    "viewOnlyDescription": "EDI Bridge liest CSV-Dateien dieses Datenformats mit diesen Einstellungen.",
     "headerRowFact": "Kopfzeile",
     "headerRowPresent": "Die erste Zeile benennt die Spalten",
     "headerRowAbsent": "Keine, die Spalten heißen column1, column2 und so weiter"
@@ -3510,26 +3510,26 @@
     "codes": {
       "unreadableContent": "Die Datei lässt sich mit ihrer Zeichenkodierung nicht lesen. Ältere ERP-Exporte verwenden oft Windows-1252.",
       "invalidJson": "Die Datei ist kein gültiges JSON.",
-      "invalidCsv": "Die Datei ist kein gültiges CSV-Document.",
+      "invalidCsv": "Die Datei ist keine gültige CSV-Datei.",
       "invalidJsonSchema": "Die Datei ist kein gültiges JSON Schema.",
-      "unsupportedJson": "Das JSON-Document hat eine Form, die ein Datenformat nicht beschreiben kann.",
+      "unsupportedJson": "Die JSON-Datei hat eine Form, die ein Datenformat nicht beschreiben kann.",
       "unsupportedJsonSchema": "Das JSON Schema verwendet etwas, das ein Datenformat nicht beschreiben kann.",
-      "emptyDocument": "Das Document hat keine Felder, aus denen sich ein Datenformat ableiten lässt.",
-      "inconsistentCsvRows": "Die Zeilen des CSV-Documents haben nicht gleich viele Spalten.",
+      "emptyDocument": "Die Datei hat keine Felder, aus denen sich ein Datenformat ableiten lässt.",
+      "inconsistentCsvRows": "Die Zeilen der CSV-Datei haben nicht gleich viele Spalten.",
       "unknownPath": "Das Datenformat hat sich inzwischen geändert. Laden Sie die Seite neu und passen Sie es erneut an.",
       "notAdjustable": "Dieser Teil des Datenformats lässt sich so nicht ändern.",
-      "csvDocumentRequired": "Für andere CSV-Einstellungen braucht es ein CSV-Document, das EDI Bridge mit den neuen Einstellungen erneut liest.",
+      "csvDocumentRequired": "Für andere CSV-Einstellungen braucht es eine CSV-Datei, die EDI Bridge mit den neuen Einstellungen erneut liest.",
       "linkedByMapping": "Ein Entwurf eines Mappings verknüpft ein Feld, das diese Änderung entfernen würde. Entfernen Sie zuerst die Verknüpfung auf dem Mapping-Canvas oder machen Sie die Änderung rückgängig.",
       "usedByMappingVersion": "Veröffentlichte Versionen von Mappings verwenden diesen Teil, und eine veröffentlichte Version ändert sich nie. Machen Sie die Änderung rückgängig oder erstellen Sie ein neues Datenformat für die neue Form."
     },
-    "csvSettingsUsedByMappingVersion": "Veröffentlichte Versionen von Mappings lesen CSV-Documents mit diesen Einstellungen, und eine veröffentlichte Version ändert sich nie. Behalten Sie die gespeicherten CSV-Einstellungen oder erstellen Sie ein neues Datenformat mit den neuen."
+    "csvSettingsUsedByMappingVersion": "Veröffentlichte Versionen von Mappings lesen CSV-Dateien mit diesen Einstellungen, und eine veröffentlichte Version ändert sich nie. Behalten Sie die gespeicherten CSV-Einstellungen oder erstellen Sie ein neues Datenformat mit den neuen."
   },
   "CodeTranslation": {
     "title": "Code-Übersetzung",
     "loading": "Liste wird geladen",
     "notFound": {
       "title": "Liste nicht gefunden",
-      "description": "In diesem Workspace gibt es keine Code-Übersetzungsliste mit dieser ID."
+      "description": "In diesem Arbeitsbereich gibt es keine Code-Übersetzungsliste mit dieser ID."
     },
     "error": {
       "title": "Liste nicht verfügbar",
@@ -3927,8 +3927,8 @@
   "Settings": {
     "loading": "Einstellungen werden geladen",
     "notFound": {
-      "title": "Workspace nicht gefunden",
-      "description": "Diesen Workspace gibt es nicht."
+      "title": "Arbeitsbereich nicht gefunden",
+      "description": "Diesen Arbeitsbereich gibt es nicht."
     },
     "error": {
       "title": "Einstellungen nicht verfügbar",
@@ -3961,8 +3961,8 @@
     },
     "members": {
       "title": "Mitglieder",
-      "description": "Alle, die sich in diesem Workspace anmelden können.",
-      "empty": "Noch niemand hat Zugriff auf diesen Workspace.",
+      "description": "Alle, die sich in diesem Arbeitsbereich anmelden können.",
+      "empty": "Noch niemand hat Zugriff auf diesen Arbeitsbereich.",
       "askOperator": {
         "title": "Neue Mitglieder fügt der Operator hinzu",
         "admin": "Der Operator erstellt die Einladungen und ändert Rollen. Sagen Sie dem Operator, wer dazukommen soll und ob als Admin oder Viewer.",

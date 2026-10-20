@@ -94,14 +94,14 @@ export const ReviewOpen = meta.story({
       canvas.getAllByRole('group', { name: proposedEdge }).length,
     )
 
-    const lookup = transformNodeOf(canvasElement, 'Lookup Table 1')
+    const lookup = transformNodeOf(canvasElement, 'Code translation 1')
 
     await expect(within(lookup).getByRole('group')).toHaveAttribute('data-ai-proposed', 'true')
     await expect(
-      within(lookup).getByRole('button', { name: 'Lookup Table 1 AI-proposed Transform' }),
+      within(lookup).getByRole('button', { name: 'Code translation 1 AI-proposed Transform' }),
     ).toBeVisible()
     await expect(
-      within(lookup).getByRole('button', { name: 'Reject the AI-proposed Lookup Table 1' }),
+      within(lookup).getByRole('button', { name: 'Reject the AI-proposed Code translation 1' }),
     ).toBeVisible()
 
     const publish = canvas.getByRole('button', { name: 'Publish' })
@@ -142,24 +142,27 @@ export const InboundWithLookupTable = meta.story({
   beforeEach: reviewing(inbound),
   async play({ canvas, canvasElement }) {
     await findSummary(canvasElement)
-    await userEvent.click(await canvas.findByRole('button', { name: /^Lookup Table 1/ }))
+    await userEvent.click(await canvas.findByRole('button', { name: /^Code translation 1/ }))
 
     const panel = await detailsPanel(canvasElement)
 
     await expect(
-      panel.getByRole('heading', { name: 'Lookup Table 1 AI-proposed Transform' }),
+      panel.getByRole('heading', { name: 'Code translation 1 AI-proposed Transform' }),
     ).toBeVisible()
     await expect(panel.getAllByText('AI-proposed').length).toBeGreaterThan(0)
     await expect(
       panel.getAllByRole('button', { name: /^Reject the AI-proposed link from/ }).length,
     ).toBeGreaterThan(0)
 
-    const lookupTables = () => canvas.queryAllByRole('group', { name: /^Transform Lookup Table/ })
+    const lookupTables = () =>
+      canvas.queryAllByRole('group', { name: /^Transform Code translation/ })
     const before = lookupTables().length
 
-    await userEvent.click(panel.getByRole('button', { name: 'Reject Lookup Table 1' }))
+    await userEvent.click(panel.getByRole('button', { name: 'Reject Code translation 1' }))
     await waitFor(() =>
-      expect(liveStatus(canvasElement)).toHaveTextContent('AI-proposed Lookup Table 1 rejected.'),
+      expect(liveStatus(canvasElement)).toHaveTextContent(
+        'AI-proposed Code translation 1 rejected.',
+      ),
     )
     await expect(lookupTables()).toHaveLength(before - 1)
     await expect(await findSaveStatus(canvasElement, 'Saved')).toBeVisible()
@@ -244,9 +247,13 @@ export const AcceptDraft = meta.story({
     await expect(canvas.queryByText('Accept the draft before publishing.')).toBeNull()
     await expect(canvas.getByRole('button', { name: 'Publish' })).toBeEnabled()
 
-    await userEvent.click(transformNodeOf(canvasElement, 'Lookup Table 1').querySelector('button')!)
+    await userEvent.click(
+      transformNodeOf(canvasElement, 'Code translation 1').querySelector('button')!,
+    )
     await expect(
-      (await detailsPanel(canvasElement)).getByRole('button', { name: 'Remove Lookup Table 1' }),
+      (await detailsPanel(canvasElement)).getByRole('button', {
+        name: 'Remove Code translation 1',
+      }),
     ).toBeVisible()
     await expect(canvas.getByRole('button', { name: 'Draft with AI' })).toBeVisible()
     await expect(done).toBeVisible()
@@ -377,9 +384,9 @@ export const Viewer = meta.story({
       await expect(canvas.queryAllByRole('group', { name: proposedEdge })).toHaveLength(0)
       await expect(aiMarks(canvasElement)).toHaveLength(0)
 
-      await userEvent.click(canvas.getByRole('button', { name: 'Lookup Table 1' }))
+      await userEvent.click(canvas.getByRole('button', { name: 'Code translation 1' }))
       await expect(
-        (await detailsPanel(canvasElement)).getByRole('heading', { name: 'Lookup Table 1' }),
+        (await detailsPanel(canvasElement)).getByRole('heading', { name: 'Code translation 1' }),
       ).toBeVisible()
       await expect((await detailsPanel(canvasElement)).queryByText(/AI-proposed/)).toBeNull()
 

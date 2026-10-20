@@ -518,7 +518,7 @@ export const TabletCsvReread = meta.story({
   args: { id: csv!.id },
   decorators: [besideSidebar, german],
   async play({ canvas, canvasElement }) {
-    await chooseCsvDocument(canvasElement, 'CSV-Document', 'Technische Einstellungen')
+    await chooseCsvDocument(canvasElement, 'CSV-Datei', 'Technische Einstellungen')
     await expect(
       await canvas.findByRole('region', { name: 'Erste Zeilen von lieferscheine-oktober.csv' }),
     ).toBeVisible()

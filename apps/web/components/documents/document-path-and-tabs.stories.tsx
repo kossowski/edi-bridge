@@ -457,7 +457,7 @@ export const TechnicalUnreadable = meta.story({
       ),
     ).toBeVisible()
     const facts = within(canvas.getByLabelText('Technical details', { selector: 'dl' }))
-    await expect(facts.getByText('Message type').nextElementSibling).toHaveTextContent('ORDERS')
+    await expect(facts.getByText('Document type').nextElementSibling).toHaveTextContent('ORDERS')
   },
 })
 

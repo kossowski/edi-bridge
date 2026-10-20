@@ -43,13 +43,15 @@ export const New = meta.story({
     await expect(
       canvas.getByRole('heading', { level: 1, name: 'New document route' }),
     ).toBeInTheDocument()
-    await expect(canvas.getByRole('combobox', { name: 'Trading Partner' })).toHaveTextContent(
-      'Choose a Trading Partner',
+    await expect(canvas.getByRole('combobox', { name: 'Trading partner' })).toHaveTextContent(
+      'Choose a trading partner',
     )
-    await expect(canvas.getByRole('combobox', { name: 'Message Type' })).toHaveTextContent('ORDERS')
+    await expect(canvas.getByRole('combobox', { name: 'Document type' })).toHaveTextContent(
+      'ORDERS',
+    )
     await waitFor(() =>
-      expect(canvas.getByRole('combobox', { name: 'Mapping Version' })).toHaveTextContent(
-        'Choose a Mapping Version',
+      expect(canvas.getByRole('combobox', { name: 'Version' })).toHaveTextContent(
+        'Choose a version',
       ),
     )
   },
@@ -59,22 +61,22 @@ export const CreateFlow = meta.story({
   async play({ canvas }) {
     await userEvent.type(canvas.getByLabelText('Name'), 'Hansemarkt ORDERS from the shop')
     await waitFor(() =>
-      expect(canvas.getByRole('combobox', { name: 'Trading Partner' })).toBeEnabled(),
+      expect(canvas.getByRole('combobox', { name: 'Trading partner' })).toBeEnabled(),
     )
-    await choose(canvas.getByRole('combobox', { name: 'Trading Partner' }), 'Hansemarkt GmbH')
+    await choose(canvas.getByRole('combobox', { name: 'Trading partner' }), 'Hansemarkt GmbH')
     await choose(
-      canvas.getByRole('combobox', { name: 'Inbound Channel' }),
+      canvas.getByRole('combobox', { name: 'Inbound connection' }),
       /^Hansemarkt SFTP inbox/,
     )
     await choose(
-      canvas.getByRole('combobox', { name: 'Destination Channel' }),
+      canvas.getByRole('combobox', { name: 'Destination connection' }),
       /^ERP HTTP delivery/,
     )
     await choose(
-      canvas.getByRole('combobox', { name: 'Mapping Version' }),
+      canvas.getByRole('combobox', { name: 'Version' }),
       'Hansemarkt: ORDERS to ERP JSON, version 3',
     )
-    await userEvent.click(canvas.getByRole('button', { name: 'Create Flow' }))
+    await userEvent.click(canvas.getByRole('button', { name: 'Create document route' }))
     await waitFor(() =>
       expect(getRouter().push).toHaveBeenCalledWith(
         expect.stringMatching(/^\/flows\/[\da-f-]{36}$/),
@@ -86,26 +88,26 @@ export const CreateFlow = meta.story({
 export const OutboundMessageType = meta.story({
   async play({ canvas }) {
     await waitFor(() =>
-      expect(canvas.getByRole('combobox', { name: 'Trading Partner' })).toBeEnabled(),
+      expect(canvas.getByRole('combobox', { name: 'Trading partner' })).toBeEnabled(),
     )
-    await choose(canvas.getByRole('combobox', { name: 'Trading Partner' }), 'Hansemarkt GmbH')
+    await choose(canvas.getByRole('combobox', { name: 'Trading partner' }), 'Hansemarkt GmbH')
     await choose(
-      canvas.getByRole('combobox', { name: 'Inbound Channel' }),
+      canvas.getByRole('combobox', { name: 'Inbound connection' }),
       /^Hansemarkt SFTP inbox/,
     )
-    await choose(canvas.getByRole('combobox', { name: 'Message Type' }), 'DESADV')
-    await expect(canvas.getByRole('combobox', { name: 'Inbound Channel' })).toHaveTextContent(
-      'Choose an inbound Channel',
+    await choose(canvas.getByRole('combobox', { name: 'Document type' }), 'DESADV')
+    await expect(canvas.getByRole('combobox', { name: 'Inbound connection' })).toHaveTextContent(
+      'Choose an inbound connection',
     )
 
-    await userEvent.click(canvas.getByRole('combobox', { name: 'Inbound Channel' }))
+    await userEvent.click(canvas.getByRole('combobox', { name: 'Inbound connection' }))
     await expect(
       (await screen.findAllByRole('option')).map((option) => option.textContent),
     ).toEqual([expect.stringMatching(/^ERP webhook/)])
     await userEvent.keyboard('{Escape}')
     await waitFor(() => expect(screen.queryByRole('listbox')).toBeNull())
 
-    await userEvent.click(canvas.getByRole('combobox', { name: 'Destination Channel' }))
+    await userEvent.click(canvas.getByRole('combobox', { name: 'Destination connection' }))
     await expect(
       (await screen.findAllByRole('option')).map((option) => option.textContent),
     ).toEqual([expect.stringMatching(/^Hansemarkt SFTP outbox/)])
@@ -116,11 +118,11 @@ export const OutboundMessageType = meta.story({
 
 export const ValidationErrors = meta.story({
   async play({ canvas }) {
-    await userEvent.click(canvas.getByRole('button', { name: 'Create Flow' }))
+    await userEvent.click(canvas.getByRole('button', { name: 'Create document route' }))
     await expect(canvas.getByLabelText('Name')).toHaveFocus()
-    await expect(canvas.getByText('Choose a Trading Partner.')).toBeVisible()
-    await expect(canvas.getByText('Choose a destination Channel.')).toBeVisible()
-    await expect(canvas.getByText('Choose a Mapping Version.')).toBeVisible()
+    await expect(canvas.getByText('Choose a trading partner.')).toBeVisible()
+    await expect(canvas.getByText('Choose a destination connection.')).toBeVisible()
+    await expect(canvas.getByText('Choose a version.')).toBeVisible()
   },
 })
 
@@ -132,7 +134,7 @@ export const NoPublishedMappingVersion = meta.story({
   },
   async play({ canvas }) {
     await expect(
-      await canvas.findByText('No Mapping Version is published for ORDERS yet.'),
+      await canvas.findByText('No mapping version is published for ORDERS yet.'),
     ).toBeVisible()
   },
 })
@@ -146,7 +148,7 @@ export const MappingVersionsUnavailable = meta.story({
     )
   },
   async play({ canvas }) {
-    await expect(await canvas.findByText('The Mapping Versions could not be loaded.')).toBeVisible()
+    await expect(await canvas.findByText('The versions could not be loaded.')).toBeVisible()
   },
 })
 
@@ -155,10 +157,10 @@ export const Edit = meta.story({
   async play({ canvas }) {
     await expect(await canvas.findByLabelText('Name')).toHaveValue('Hansemarkt ORDERS inbound')
     await expect(canvas.getByText('Hansemarkt: ORDERS to ERP JSON, version 3')).toBeVisible()
-    await expect(canvas.getByText(/move the Flow to it on the Flow's page/)).toBeVisible()
-    await expect(canvas.queryByRole('combobox', { name: 'Mapping Version' })).toBeNull()
+    await expect(canvas.getByText(/move the document route to it on its page/)).toBeVisible()
+    await expect(canvas.queryByRole('combobox', { name: 'Version' })).toBeNull()
     await waitFor(() =>
-      expect(canvas.getByRole('combobox', { name: 'Inbound Channel' })).toHaveTextContent(
+      expect(canvas.getByRole('combobox', { name: 'Inbound connection' })).toHaveTextContent(
         'Hansemarkt SFTP inbox',
       ),
     )
@@ -172,7 +174,9 @@ export const SaveFails = meta.story({
   },
   async play({ canvas }) {
     await userEvent.click(await canvas.findByRole('button', { name: 'Save changes' }))
-    await expect(await canvas.findByRole('alert')).toHaveTextContent('The Flow could not be saved.')
+    await expect(await canvas.findByRole('alert')).toHaveTextContent(
+      'The document route could not be saved.',
+    )
   },
 })
 
@@ -184,7 +188,7 @@ export const ReferenceNoLongerFits = meta.story({
   async play({ canvas }) {
     await userEvent.click(await canvas.findByRole('button', { name: 'Save changes' }))
     await expect(await canvas.findByRole('alert')).toHaveTextContent(
-      'A chosen Channel or Mapping Version no longer fits this Flow.',
+      'A chosen connection or version no longer fits this document route.',
     )
   },
 })
@@ -192,7 +196,7 @@ export const ReferenceNoLongerFits = meta.story({
 export const EditNotFound = meta.story({
   render: () => <EditFlowScreen id="20000000-0000-4000-8000-0000000000ff" />,
   async play({ canvas }) {
-    await expect(await canvas.findByText('Flow not found')).toBeVisible()
+    await expect(await canvas.findByText('Document route not found')).toBeVisible()
   },
 })
 
@@ -206,7 +210,7 @@ export const EditLoading = meta.story({
     )
   },
   async play({ canvas }) {
-    await expect(canvas.getByText('Loading Flow')).toBeInTheDocument()
+    await expect(canvas.getByText('Loading document route')).toBeInTheDocument()
   },
 })
 
@@ -221,12 +225,12 @@ export const EditChannelsLoading = meta.story({
   },
   async play({ canvas, canvasElement }) {
     await expect(await canvas.findByLabelText('Name')).toHaveValue('Hansemarkt ORDERS inbound')
-    await expect(canvas.getByRole('combobox', { name: 'Inbound Channel' })).toHaveTextContent(
-      'Loading Channels…',
+    await expect(canvas.getByRole('combobox', { name: 'Inbound connection' })).toHaveTextContent(
+      'Loading connections…',
     )
-    await expect(canvas.getByRole('combobox', { name: 'Destination Channel' })).toHaveTextContent(
-      'Loading Channels…',
-    )
+    await expect(
+      canvas.getByRole('combobox', { name: 'Destination connection' }),
+    ).toHaveTextContent('Loading connections…')
     await expect(canvasElement.querySelector('[aria-busy="true"]')).not.toBeNull()
   },
 })
@@ -241,7 +245,7 @@ export const EditUnavailable = meta.story({
     )
   },
   async play({ canvas }) {
-    await expect(await canvas.findByText('Flow unavailable')).toBeVisible()
+    await expect(await canvas.findByText('Document route unavailable')).toBeVisible()
   },
 })
 
@@ -254,7 +258,7 @@ export const German = meta.story({
     ),
   ],
   async play({ canvas }) {
-    await expect(canvas.getByRole('button', { name: 'Flow anlegen' })).toBeVisible()
+    await expect(canvas.getByRole('button', { name: 'Belegweg anlegen' })).toBeVisible()
   },
 })
 

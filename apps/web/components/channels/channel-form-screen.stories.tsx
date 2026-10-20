@@ -67,7 +67,7 @@ export const NewOutboundHttp = meta.story({
 
 export const ValidationErrors = meta.story({
   async play({ canvas }) {
-    await userEvent.click(canvas.getByRole('button', { name: 'Create Channel' }))
+    await userEvent.click(canvas.getByRole('button', { name: 'Create connection' }))
     await expect(canvas.getByLabelText('Name')).toHaveFocus()
     await expect(canvas.getByText('Enter a host.')).toBeVisible()
     await expect(canvas.getByText('Enter the password or private key.')).toBeVisible()
@@ -78,12 +78,12 @@ export const CreatedWebhook = meta.story({
   async play({ canvas }) {
     await userEvent.click(canvas.getByRole('radio', { name: /^Inbound webhook/ }))
     await userEvent.type(canvas.getByLabelText('Name'), 'Shop webhook')
-    await userEvent.click(canvas.getByRole('button', { name: 'Create Channel' }))
+    await userEvent.click(canvas.getByRole('button', { name: 'Create connection' }))
     await waitFor(() =>
       expect(canvas.getByRole('heading', { name: 'Copy the webhook token now' })).toHaveFocus(),
     )
     await expect(canvas.getByText(/^whk_[A-Za-z0-9]{32}$/)).toBeVisible()
-    await expect(canvas.getByRole('link', { name: 'Go to the Channel' })).toBeVisible()
+    await expect(canvas.getByRole('link', { name: 'Go to the connection' })).toBeVisible()
   },
 })
 
@@ -107,7 +107,7 @@ export const PasteHostKey = meta.story({
       canvas.getByText(/host key \(usually Ed25519\), as ssh-keygen -lf prints it/),
     ).toBeVisible()
     await userEvent.type(field, '16:27:ac:a5')
-    await userEvent.click(canvas.getByRole('button', { name: 'Create Channel' }))
+    await userEvent.click(canvas.getByRole('button', { name: 'Create connection' }))
     await expect(
       canvas.getByText('Enter the fingerprint as SHA256: followed by 43 characters.'),
     ).toBeVisible()
@@ -119,7 +119,7 @@ export const InvalidHostKey = meta.story({
     const field = canvas.getByLabelText('Host key fingerprint (optional)')
     await expect(field).toHaveAttribute('aria-invalid', 'false')
     await userEvent.type(field, 'SHA256:abc')
-    await userEvent.click(canvas.getByRole('button', { name: 'Create Channel' }))
+    await userEvent.click(canvas.getByRole('button', { name: 'Create connection' }))
     await expect(
       canvas.getByText('Enter the fingerprint as SHA256: followed by 43 characters.'),
     ).toBeVisible()
@@ -167,7 +167,7 @@ export const SaveFails = meta.story({
   async play({ canvas }) {
     await userEvent.click(await canvas.findByRole('button', { name: 'Save changes' }))
     await expect(await canvas.findByRole('alert')).toHaveTextContent(
-      'The Channel could not be saved.',
+      'The connection could not be saved.',
     )
   },
 })
@@ -180,7 +180,7 @@ export const KindConflict = meta.story({
   async play({ canvas }) {
     await userEvent.click(await canvas.findByRole('button', { name: 'Save changes' }))
     await expect(await canvas.findByRole('alert')).toHaveTextContent(
-      'The kind of a Channel cannot change.',
+      'The kind of a connection cannot change.',
     )
   },
 })
@@ -188,7 +188,7 @@ export const KindConflict = meta.story({
 export const EditNotFound = meta.story({
   render: () => <EditChannelScreen id="10000000-0000-4000-8000-0000000000ff" />,
   async play({ canvas }) {
-    await expect(await canvas.findByText('Channel not found')).toBeVisible()
+    await expect(await canvas.findByText('Connection not found')).toBeVisible()
   },
 })
 
@@ -202,7 +202,7 @@ export const EditLoading = meta.story({
     )
   },
   async play({ canvas }) {
-    await expect(canvas.getByText('Loading Channel')).toBeInTheDocument()
+    await expect(canvas.getByText('Loading connection')).toBeInTheDocument()
   },
 })
 
@@ -216,7 +216,7 @@ export const EditUnavailable = meta.story({
     )
   },
   async play({ canvas }) {
-    await expect(await canvas.findByText('Channel unavailable')).toBeVisible()
+    await expect(await canvas.findByText('Connection unavailable')).toBeVisible()
   },
 })
 
@@ -229,7 +229,7 @@ export const German = meta.story({
     ),
   ],
   async play({ canvas }) {
-    await expect(canvas.getByRole('button', { name: 'Channel anlegen' })).toBeVisible()
+    await expect(canvas.getByRole('button', { name: 'Verbindung anlegen' })).toBeVisible()
     await expect(
       canvas.getByLabelText('Fingerabdruck des Serverschlüssels (optional)'),
     ).toBeVisible()

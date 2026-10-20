@@ -186,7 +186,7 @@ export const ViewerTooFewVersions = meta.story({
     async play({ canvas }) {
       await expect(
         await canvas.findByText(
-          'A comparison needs at least two Mapping Versions. Another one appears here once an Admin publishes the Draft.',
+          'A comparison needs at least two versions. Another one appears here once an Admin publishes the draft.',
         ),
       ).toBeVisible()
       await expect(canvas.getByRole('link', { name: 'Open the Draft' })).toBeVisible()
@@ -199,14 +199,14 @@ export const NoSampleDocuments = meta.story({
     msw.use(...createHandlers(apiUrl, { mappingSamples: [] }))
   },
   async play({ canvas }) {
-    await expect(await canvas.findByText('No Sample Documents yet')).toBeVisible()
+    await expect(await canvas.findByText('No example documents yet')).toBeVisible()
   },
 })
 
 export const UnknownVersion = meta.story({
   args: { from: unknownId },
   async play({ canvas }) {
-    await expect(await canvas.findByText('Mapping Version not found')).toBeVisible()
+    await expect(await canvas.findByText('Version not found')).toBeVisible()
   },
 })
 
@@ -220,7 +220,7 @@ export const SameVersion = meta.story({
 export const UnknownSampleDocument = meta.story({
   args: { sample: unknownId },
   async play({ canvas }) {
-    await expect(await canvas.findByText('Sample Document not found')).toBeVisible()
+    await expect(await canvas.findByText('Example document not found')).toBeVisible()
     await expect(
       await canvas.findByText(/differences: \d+ added/, {}, { timeout: 5000 }),
     ).toBeVisible()

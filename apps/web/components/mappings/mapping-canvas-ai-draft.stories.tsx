@@ -114,7 +114,7 @@ async function openAiDraft(canvasElement: HTMLElement, action: string | RegExp =
 async function startAiDraft(canvasElement: HTMLElement, budgetText = /tokens left today/) {
   const dialog = await openAiDraft(canvasElement)
 
-  await expect(await dialog.findByRole('combobox', { name: 'Sample Document' })).toBeVisible()
+  await expect(await dialog.findByRole('combobox', { name: 'Example document' })).toBeVisible()
   await expect(await dialog.findByText(budgetText)).toBeVisible()
   await userEvent.click(dialog.getByRole('button', { name: 'Start the AI draft' }))
 
@@ -155,10 +155,10 @@ export const Idle = meta.story({
     const dialog = await openAiDraft(canvasElement)
 
     await expect(
-      await dialog.findByRole('combobox', { name: 'Sample Document' }),
+      await dialog.findByRole('combobox', { name: 'Example document' }),
     ).toHaveTextContent(sample.name)
     await expect(dialog.getByText('Data format', { exact: false })).toBeVisible()
-    await expect(dialog.getByText('Message Type INVOIC')).toBeVisible()
+    await expect(dialog.getByText('Document type INVOIC')).toBeVisible()
     await expect(await dialog.findByText('151,650 of 200,000 tokens left today.')).toBeVisible()
     await expect(dialog.getByRole('button', { name: 'Start the AI draft' })).not.toHaveAttribute(
       'aria-disabled',
@@ -178,7 +178,7 @@ export const InProgress = meta.story({
     const current = await (await findProgress(dialog)).findByText(/^Looking up segments:/)
 
     await expect(current.closest('li')).toHaveAttribute('data-state', 'current')
-    await expect(dialog.getByText('Reading the Sample Document').closest('li')).toHaveAttribute(
+    await expect(dialog.getByText('Reading the example document').closest('li')).toHaveAttribute(
       'data-state',
       'done',
     )
@@ -195,7 +195,7 @@ export const RunningDialogStaysOpen = meta.story({
   async play({ canvas, canvasElement }) {
     const dialog = await startAiDraft(canvasElement)
 
-    await (await findProgress(dialog)).findByText('Reading the Sample Document')
+    await (await findProgress(dialog)).findByText('Reading the example document')
     await userEvent.keyboard('{Escape}')
     await userEvent.click(
       canvasElement.ownerDocument.querySelector<HTMLElement>('[data-slot="dialog-overlay"]')!,
@@ -250,7 +250,7 @@ export const Drafted = meta.story({
     await expect(dialog.getByText('Round 2')).toBeVisible()
     await expect(dialog.getByText('Fixing 2 errors')).toBeVisible()
     await expect(
-      within(outcome.parentElement!).getByText(/passed the check against the Sample Document/),
+      within(outcome.parentElement!).getByText(/passed the check against the example document/),
     ).toBeVisible()
     await waitFor(() =>
       expect(canvasElement.querySelectorAll('.react-flow__edge').length).toBeGreaterThan(0),
@@ -296,7 +296,7 @@ export const CheckFailed = meta.story({
 
     await userEvent.click(dialog.getByRole('button', { name: 'Try again' }))
     await waitFor(() =>
-      expect(dialog.getByRole('combobox', { name: 'Sample Document' })).toHaveFocus(),
+      expect(dialog.getByRole('combobox', { name: 'Example document' })).toHaveFocus(),
     )
   },
 })
@@ -338,7 +338,7 @@ export const NoSampleDocument = meta.story({
   ],
   async play({ canvasElement }) {
     const dialog = await openAiDraft(canvasElement)
-    const notice = /has no Sample Documents yet/
+    const notice = /has no example documents yet/
 
     await expect(await dialog.findByText(notice)).toBeVisible()
 
@@ -465,7 +465,7 @@ export const StartLinkStartedByHand = meta.story({
   async play({ canvasElement }) {
     const dialog = await findSheet(canvasElement, 'Draft with AI')
 
-    await dialog.findByRole('combobox', { name: 'Sample Document' })
+    await dialog.findByRole('combobox', { name: 'Example document' })
     await userEvent.click(dialog.getByRole('button', { name: 'Start the AI draft' }))
     await (await findProgress(dialog)).findByText(/^Looking up segments:/)
     heldBudget.release()

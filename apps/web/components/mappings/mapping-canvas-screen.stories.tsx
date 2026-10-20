@@ -140,7 +140,7 @@ export const Outbound = meta.story({
 
     const details = await openDetails(canvasElement)
 
-    await expect(details.getByText('Outbound: data format to Message Type')).toBeVisible()
+    await expect(details.getByText('Outbound: data format to document type')).toBeVisible()
     await expect(details.getByText('32 links')).toBeVisible()
     await expect(details.getByRole('button', { name: 'Close details' })).toBeVisible()
   },
@@ -159,7 +159,7 @@ export const Inbound = meta.story({
 
     const details = await openDetails(canvasElement)
 
-    await expect(details.getByText('Inbound: Message Type to data format')).toBeVisible()
+    await expect(details.getByText('Inbound: document type to data format')).toBeVisible()
   },
 })
 
@@ -494,7 +494,7 @@ export const German = meta.story({
     const row = await findRow(canvasElement, { side: 'source', path: 'DTM+137' })
     const panel = await openDetails(canvasElement)
 
-    await expect(panel.getByText('Eingehend: Message Type zu Datenformat')).toBeVisible()
+    await expect(panel.getByText('Eingehend: Belegart zu Datenformat')).toBeVisible()
     await userEvent.click(row)
     await expect(panel.getByText('Quelle')).toBeVisible()
     await expect(panel.getByText('Dokumenten-/Nachrichtendatum/-zeit')).toBeVisible()
