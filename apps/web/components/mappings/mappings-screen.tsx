@@ -11,7 +11,7 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
-import { useId, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 
 import { AppPage } from '@/components/app-page'
 import { LoadError } from '@/components/load-error'
@@ -158,21 +158,28 @@ export function MappingsScreen({
   const [sheetOpen, setSheetOpen] = useState(newMessageType !== null)
   const [sheetDirection, setSheetDirection] = useState<Direction | null>(null)
   const [sheetMessageType, setSheetMessageType] = useState(newMessageType)
+  const [shownMessageType, setShownMessageType] = useState(newMessageType)
 
-  function openSheet(direction: Direction | null) {
+  function openSheet(direction: Direction | null, messageType: NewMappingMessageType | null) {
     setSheetDirection(direction)
-    setSheetMessageType(null)
+    setSheetMessageType(messageType)
     setSheetOpen(true)
   }
 
-  // The link from elsewhere leaves the address once the sheet closes, so a reload does not open it.
-  function changeSheetOpen(open: boolean) {
-    setSheetOpen(open)
+  if (newMessageType !== shownMessageType) {
+    setShownMessageType(newMessageType)
 
-    if (!open && newMessageType !== null) {
-      router.replace(navigationItems.mappings.href, { scroll: false })
+    if (newMessageType !== null) {
+      openSheet(null, newMessageType)
     }
   }
+
+  // The create link leaves the address once used, so a reload or going back does not reopen it.
+  useEffect(() => {
+    if (newMessageType !== null) {
+      router.replace(navigationItems.mappings.href, { scroll: false })
+    }
+  }, [newMessageType, router])
 
   if (mappings.isError) {
     return (
@@ -194,7 +201,7 @@ export function MappingsScreen({
   if (mappings.isSuccess && all.length === 0) {
     return (
       <AppPage title={t('Sidebar.items.mappings.label')}>
-        <FirstMapping canChange={canChange} messageType={newMessageType} />
+        <FirstMapping canChange={canChange} messageType={sheetMessageType} />
       </AppPage>
     )
   }
@@ -203,7 +210,7 @@ export function MappingsScreen({
     <AppPage
       busy={mappings.isPending}
       changeActions={
-        <Button onClick={() => openSheet(null)}>
+        <Button onClick={() => openSheet(null, null)}>
           <HugeiconsIcon icon={AiMagicIcon} strokeWidth={2} data-icon="inline-start" />
           {tMappings('new.button')}
         </Button>
@@ -241,7 +248,7 @@ export function MappingsScreen({
             direction={direction}
             loading={mappings.isPending}
             mappings={sorted.filter((mapping) => mapping.direction === direction)}
-            onAddAnother={canChange ? () => openSheet(direction) : null}
+            onAddAnother={canChange ? () => openSheet(direction, null) : null}
           />
         ))}
       </div>
@@ -249,7 +256,7 @@ export function MappingsScreen({
         direction={sheetDirection}
         messageType={sheetMessageType}
         open={sheetOpen && canChange}
-        onOpenChange={changeSheetOpen}
+        onOpenChange={setSheetOpen}
       />
     </AppPage>
   )
