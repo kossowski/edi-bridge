@@ -2,7 +2,7 @@
 
 import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
-import { type ReactNode, useEffect } from 'react'
+import { type ReactNode, useEffect, useSyncExternalStore } from 'react'
 
 import { useSession } from '@/hooks/use-session'
 
@@ -17,15 +17,29 @@ export function SessionGate({ children }: { children: ReactNode }) {
     }
   }, [router, signedOut])
 
+  const serverOrHydrating = useSyncExternalStore(
+    subscribeToNothing,
+    () => false,
+    () => true,
+  )
+
   if (isPending || signedOut) {
     return (
-      <div aria-busy>
-        <p role="status" className="text-muted-foreground p-6 text-sm">
-          {t(signedOut ? 'redirecting' : 'loading')}
-        </p>
-      </div>
+      <>
+        <div aria-busy>
+          <p role="status" className="text-muted-foreground p-6 text-sm">
+            {t(signedOut ? 'redirecting' : 'loading')}
+          </p>
+        </div>
+        {/* The server render needs the page, so that its notFound() answers 404. */}
+        {serverOrHydrating && <div hidden>{children}</div>}
+      </>
     )
   }
 
   return children
+}
+
+function subscribeToNothing() {
+  return () => {}
 }
