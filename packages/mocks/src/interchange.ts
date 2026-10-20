@@ -2,6 +2,7 @@ import type { Faker } from '@faker-js/faker'
 
 import {
   directionOf,
+  type Direction,
   type ErrorPosition,
   type FailureStage,
   type FixTarget,
@@ -162,26 +163,38 @@ export type GeneratedMessage = Failure & {
   fault: Fault | null
 }
 
-const missingUnit = { kind: 'lookupTable', name: 'Units of measure', code: 'KRT' } as const
+type MissingUnit = Extract<BrokenPiece, { kind: 'lookupTable' }>
 
-const missingUnitError = {
-  code: 'lookupMissing',
-  message: `The Lookup Table "${missingUnit.name}" has no entry for "${missingUnit.code}".`,
-  position: null,
-  details: null,
-} as const
+const missingUnits = {
+  outbound: { kind: 'lookupTable', name: 'Units of measure', code: 'KRT' },
+  inbound: { kind: 'lookupTable', name: 'Elbtal order units', code: 'KGM' },
+} as const satisfies Record<Direction, MissingUnit>
 
-let unitReadingFlowIds: ReadonlySet<string> | undefined
-
-// Only outbound Mappings translate your units for the partner, so only their Runs miss one.
-function readsUnits(run: Pick<RunSummary, 'flow'>) {
-  unitReadingFlowIds ??= unitReadingFlows()
-
-  return unitReadingFlowIds.has(run.flow.id)
+function missingUnitError({ name, code }: MissingUnit) {
+  return {
+    code: 'lookupMissing',
+    message: `The Lookup Table "${name}" has no entry for "${code}".`,
+    position: null,
+    details: null,
+  } as const
 }
 
-function unitReadingFlows() {
-  const units = seedLookupTableNamed(missingUnit.name).id
+const unitReadingFlowIds = new Map<string, ReadonlySet<string>>()
+
+function missingUnitOf(run: Pick<RunSummary, 'flow' | 'messageType'>): MissingUnit | null {
+  const missing = missingUnits[directionOf(run)]
+  let flowIds = unitReadingFlowIds.get(missing.name)
+
+  if (flowIds === undefined) {
+    flowIds = flowsReading(missing.name)
+    unitReadingFlowIds.set(missing.name, flowIds)
+  }
+
+  return flowIds.has(run.flow.id) ? missing : null
+}
+
+function flowsReading(lookupTableName: string) {
+  const tableId = seedLookupTableNamed(lookupTableName).id
   const versions = publishedVersionsByMapping(seedMappingDrafts)
 
   const mappingIds = new Set(
@@ -189,7 +202,7 @@ function unitReadingFlows() {
       .filter(({ transforms }) =>
         transforms.some(
           (transform) =>
-            transform.kind === 'lookupTable' && transform.config.lookupTableId === units,
+            transform.kind === 'lookupTable' && transform.config.lookupTableId === tableId,
         ),
       )
       .map(({ id }) => id),
@@ -205,12 +218,13 @@ function unitReadingFlows() {
 }
 
 export function lookupTableFailureOf(run: RunSummary): Failure | null {
+  const missing = missingUnitOf(run)
+
   return run.status === 'failed' &&
     run.failureStage === 'mapping' &&
-    directionOf(run) === 'outbound' &&
-    readsUnits(run) &&
+    missing !== null &&
     !isDefect(run)
-    ? { error: missingUnitError, broken: missingUnit }
+    ? { error: missingUnitError(missing), broken: missing }
     : null
 }
 
@@ -232,7 +246,7 @@ export function problemReasonOf(
         return 'defect'
       }
 
-      return directionOf(run) === 'outbound' && readsUnits(run) ? 'missingCode' : 'missingField'
+      return missingUnitOf(run) === null ? 'missingField' : 'missingCode'
     }
 
     case 'delivery': {
@@ -513,38 +527,41 @@ function injectFault(faker: Faker, run: RunSummary, segments: Segment[]): Faulty
     }
 
     case 'mapping': {
-      if (!outbound) {
-        const lin = indexOf(segments, 'LIN')
+      const missing = missingUnitOf(run)
+
+      if (missing !== null) {
+        const qty = indexOf(segments, 'QTY')
+        const error = missingUnitError(missing)
 
         return {
-          segments: segments.with(lin, setComponent(segments[lin]!, 3, 1, '')),
+          segments: segments.with(qty, setComponent(segments[qty]!, 1, 3, missing.code)),
           fault: {
-            segment: lin,
-            element: 3,
-            component: 1,
-            code: 'missingSourceField',
-            message: 'The required source field "lines[1].gtin" is missing.',
+            segment: qty,
+            element: 1,
+            component: 3,
+            code: error.code,
+            message: error.message,
           },
-          broken: { kind: 'mapping', fieldPath: 'lines[].gtin' },
+          broken: missing,
         }
       }
 
-      if (!readsUnits(run)) {
+      if (outbound) {
         return intact
       }
 
-      const qty = indexOf(segments, 'QTY')
+      const lin = indexOf(segments, 'LIN')
 
       return {
-        segments: segments.with(qty, setComponent(segments[qty]!, 1, 3, missingUnit.code)),
+        segments: segments.with(lin, setComponent(segments[lin]!, 3, 1, '')),
         fault: {
-          segment: qty,
-          element: 1,
-          component: 3,
-          code: missingUnitError.code,
-          message: missingUnitError.message,
+          segment: lin,
+          element: 3,
+          component: 1,
+          code: 'missingSourceField',
+          message: 'The required source field "lines[1].gtin" is missing.',
         },
-        broken: missingUnit,
+        broken: { kind: 'mapping', fieldPath: 'lines[].gtin' },
       }
     }
 

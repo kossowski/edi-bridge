@@ -463,6 +463,28 @@ describe('the problem of a failed Run', () => {
     })
   })
 
+  it('seeds an inbound document whose lines show the unit that its Lookup Table lacks', async () => {
+    const run = seedRuns().find(
+      (candidate) =>
+        candidate.tradingPartner.name === 'Elbtal Warenhaus KG' &&
+        candidate.messageType === 'ORDERS' &&
+        candidate.problem?.reason === 'missingCode',
+    )!
+
+    server.use(...runDetailHandlers(apiUrl))
+
+    const { body } = await getRun(run.id)
+    const qty = body?.message?.segments.find(({ tag }) => tag === 'QTY')
+    const units = seedLookupTableNamed('Elbtal order units')
+
+    expect(body?.problem).toEqual({
+      reason: 'missingCode',
+      whoFixes: 'you',
+      fixTarget: { kind: 'lookupTable', lookupTableId: units.id, name: units.name, code: 'KGM' },
+    })
+    expect(qty?.elements[0]?.[2]).toBe('KGM')
+  })
+
   it('points an inbound document without a GTIN at the Mapping field that reads it', async () => {
     const run = inboundOrders('00000000-0000-4000-8000-000000000001', { failureStage: 'mapping' })
     server.use(...runDetailHandlers(apiUrl, { runs: [run] }))

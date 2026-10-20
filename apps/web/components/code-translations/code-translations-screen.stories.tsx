@@ -94,7 +94,11 @@ export const Default = meta.story({
     await expect(
       storeNumbers.getByRole('button', { name: 'Actions for Hansemarkt store numbers' }),
     ).toBeVisible()
-    await expect(canvas.getByText('1 list blocks documents', { exact: false })).toBeVisible()
+    const elbtal = within(canvas.getByRole('region', { name: 'Only for Elbtal Warenhaus KG (1)' }))
+    const orderUnits = card(elbtal.getByRole('link', { name: 'Elbtal order units' }))
+
+    await expect(orderUnits.getByText('KGM missing')).toBeVisible()
+    await expect(canvas.getByText('2 lists block documents', { exact: false })).toBeVisible()
   },
 })
 
