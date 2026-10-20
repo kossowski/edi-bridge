@@ -40,7 +40,7 @@ describe('orderVerdictOf', () => {
     })
   })
 
-  it('needs attention for a not-sent receipt confirmation while another one is pending', () => {
+  it('needs attention for a not-sent CONTRL while another one is pending', () => {
     expect(verdictOf(orderLifecycleReferences.partial)).toMatchObject({
       status: 'needs-attention',
       reason: 'confirmationPending',
