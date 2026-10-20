@@ -12,11 +12,12 @@ export type OrderVerdictReason =
   | 'failed'
   | 'rejected'
   | 'overdue'
+  | 'confirmationNotSent'
   | 'resendAwaited'
   | 'confirmationPending'
   | 'inProgress'
-  | 'sentUnconfirmed'
   | 'nextDocument'
+  | 'confirmationNotTracked'
   | 'done'
 
 type MessageReason = Exclude<OrderVerdictReason, 'nextDocument' | 'done'>
@@ -36,15 +37,20 @@ const messageReasons: ReadonlyArray<[MessageReason, (message: OrderLifecycleMess
     ['failed', ({ run }) => run.status === 'failed' && run.waitingForTradingPartnerSince === null],
     ['rejected', ({ interchange }) => interchange?.acknowledgement === 'rejected'],
     ['overdue', ({ interchange }) => interchange?.acknowledgement === 'overdue'],
+    ['confirmationNotSent', ({ interchange }) => interchange?.notSentReason != null],
     ['resendAwaited', ({ run }) => run.status === 'failed'],
     ['confirmationPending', ({ interchange }) => interchange?.acknowledgement === 'pending'],
     ['inProgress', ({ run }) => run.status === 'received' || run.status === 'processing'],
-    [
-      'sentUnconfirmed',
-      ({ direction, run, interchange }) =>
-        direction === 'outbound' && run.status === 'delivered' && !interchange?.acknowledgement,
-    ],
   ]
+
+export function confirmationNotTracked({ direction, run, interchange }: OrderLifecycleMessage) {
+  return (
+    direction === 'outbound' &&
+    run.status === 'delivered' &&
+    interchange !== null &&
+    interchange.acknowledgement === null
+  )
+}
 
 function inStepOrder(messages: ReadonlyArray<OrderLifecycleMessage>) {
   return messages.toSorted(
@@ -74,8 +80,19 @@ export function orderVerdictOf(lifecycle: OrderLifecycle): OrderVerdict {
 
   const next = steps.find(({ state }) => state !== 'done')
 
-  return next
-    ? { ...counts, reason: 'nextDocument', messageType: next.messageType, direction: null }
+  if (next) {
+    return { ...counts, reason: 'nextDocument', messageType: next.messageType, direction: null }
+  }
+
+  const untracked = current.find(confirmationNotTracked)
+
+  return untracked
+    ? {
+        ...counts,
+        reason: 'confirmationNotTracked',
+        messageType: untracked.messageType,
+        direction: untracked.direction,
+      }
     : { ...counts, reason: 'done', messageType: null, direction: null }
 }
 

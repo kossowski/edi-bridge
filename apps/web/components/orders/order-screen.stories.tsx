@@ -81,24 +81,43 @@ export const Complete = meta.story({
   },
 })
 
-export const WaitingForConfirmation = meta.story({
+export const ReceiptConfirmationPendingBesideNotSent = meta.story({
   args: { businessReference: orderLifecycleReferences.partial },
   async play({ canvas, canvasElement }) {
     await expect(
       await canvas.findByRole('heading', {
         level: 3,
-        name: 'Waiting for Rheinkauf eG to confirm the dispatch advice',
+        name: 'Rheinkauf eG got no receipt confirmation for the purchase order',
       }),
     ).toBeVisible()
-    await expect(canvas.getAllByText('Waiting for partner')).toHaveLength(1)
+    await expect(canvas.getByText('0 of 3 documents done', { exact: false })).toBeVisible()
 
     const timeline = await timelineOf(canvasElement, 'Rheinkauf eG')
+    const orders = within(stepOf(timeline, 'Purchase order'))
     const desadv = within(stepOf(timeline, 'Dispatch advice'))
 
+    await expect(orders.getByText('Needs attention')).toBeVisible()
+    await expect(orders.queryByText('Done')).not.toBeInTheDocument()
+    await expect(desadv.getByText('Waiting for partner')).toBeVisible()
     await expect(desadv.getByText('Pending')).toBeVisible()
     await expect(desadv.getByText('Waiting 3 h — limit 24 h')).toBeVisible()
     await expect(within(stepOf(timeline, 'Invoice')).getByText('Not yet')).toBeVisible()
     await expect(within(stepOf(timeline, 'Invoice')).getByText('No invoice yet.')).toBeVisible()
+  },
+})
+
+export const ReceiptConfirmationNotSentVerdictGerman = meta.story({
+  args: { businessReference: orderLifecycleReferences.partial },
+  decorators: [german],
+  async play({ canvas }) {
+    await expect(
+      await canvas.findByRole('heading', {
+        level: 3,
+        name: 'Rheinkauf eG hat für die Bestellung keine Empfangsbestätigung erhalten',
+      }),
+    ).toBeVisible()
+    await expect(canvas.getAllByText('Handlungsbedarf').length).toBeGreaterThan(0)
+    await expect(canvas.queryByText('Erledigt')).not.toBeInTheDocument()
   },
 })
 
@@ -225,7 +244,7 @@ export const TwoTradingPartnersWithOverdue = meta.story({
     await expect(
       canvas.getByRole('heading', {
         level: 3,
-        name: 'The dispatch advice was sent to Hansemarkt GmbH, with no receipt confirmation yet',
+        name: 'The dispatch advice was sent to Hansemarkt GmbH before receipt confirmations were tracked',
       }),
     ).toBeVisible()
 
@@ -429,6 +448,48 @@ export const German = meta.story({
     await expect(canvas.getByText('Wartet seit 10 h — Frist 4 h')).toBeVisible()
     await expect(canvas.getAllByText('Empfangsbestätigung').length).toBeGreaterThan(0)
     await expect(canvas.getByRole('button', { name: 'Partner fragen' })).toBeVisible()
+  },
+})
+
+export const ReceiptConfirmationNotTracked = meta.story({
+  args: { businessReference: orderLifecycleReferences.multiPartner },
+  async play({ canvasElement }) {
+    const desadv = within(
+      stepOf(await timelineOf(canvasElement, 'Hansemarkt GmbH'), 'Dispatch advice'),
+    )
+
+    await expect(desadv.getByText('Not tracked')).toBeVisible()
+    await expect(
+      desadv.getByText('Sent before receipt confirmations were tracked.', { exact: false }),
+    ).toBeVisible()
+    await expect(desadv.queryByText(/Pending|Waiting|no receipt confirmation yet/)).toBeNull()
+  },
+})
+
+export const ReceiptConfirmationNotTrackedGerman = meta.story({
+  args: { businessReference: orderLifecycleReferences.multiPartner },
+  decorators: [german],
+  async play({ canvas, canvasElement }) {
+    await expect(
+      await canvas.findByRole('heading', {
+        level: 3,
+        name: 'Das Lieferavis wurde an Hansemarkt GmbH gesendet, bevor Empfangsbestätigungen erfasst wurden',
+      }),
+    ).toBeVisible()
+
+    const desadv = within(
+      stepOf(
+        await within(canvasElement).findByRole('list', {
+          name: 'Belege mit Hansemarkt GmbH, von der Bestellung bis zur Rechnung',
+        }),
+        'Lieferavis',
+      ),
+    )
+
+    await expect(desadv.getByText('Nicht erfasst')).toBeVisible()
+    await expect(
+      desadv.getByText('Gesendet, bevor Empfangsbestätigungen erfasst wurden.', { exact: false }),
+    ).toBeVisible()
   },
 })
 

@@ -59,6 +59,23 @@ export const FilteredByStatus = meta.story({
   },
 })
 
+export const ReceiptConfirmationNotSent = meta.story({
+  parameters: ordersAt({ q: orderLifecycleReferences.partial }),
+  async play({ canvas }) {
+    const list = await canvas.findByRole('list', { name: 'Orders, latest activity first' })
+
+    const link = await within(list).findByRole('link', {
+      name: `Order ${orderLifecycleReferences.partial}`,
+    })
+
+    const row = within(link.closest('li')!)
+
+    await expect(row.getByText('Needs attention')).toBeVisible()
+    await expect(row.getByText('Purchase order: Needs attention')).toBeInTheDocument()
+    await expect(row.queryByText(/: Done$/)).toBeNull()
+  },
+})
+
 export const BackUndoesStatusFilter = meta.story({
   decorators: [withMemoryHistory],
   async play({ canvas }) {

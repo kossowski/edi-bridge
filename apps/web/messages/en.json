@@ -1129,11 +1129,12 @@
       "failed": "{direction, select, inbound {The {document} from {tradingPartner} could not be processed} other {The {document} to {tradingPartner} could not be processed}}",
       "rejected": "{tradingPartner} rejected the {document}",
       "overdue": "{tradingPartner} has not confirmed the {document}",
+      "confirmationNotSent": "{tradingPartner} got no receipt confirmation for the {document}",
       "resendAwaited": "Waiting for {tradingPartner} to send the {document} again",
       "confirmationPending": "Waiting for {tradingPartner} to confirm the {document}",
       "inProgress": "The {document} is being processed",
-      "sentUnconfirmed": "The {document} was sent to {tradingPartner}, with no receipt confirmation yet",
       "nextDocument": "Waiting for the {document}",
+      "confirmationNotTracked": "The {document} was sent to {tradingPartner} before receipt confirmations were tracked",
       "done": "Everything for this order is done",
       "progress": "{done, number} of {total, number} documents done"
     },
@@ -1164,6 +1165,8 @@
     "message": {
       "at": "{kind, select, received {Received} sent {Sent} other {Created}} <time>{date}</time>",
       "receiptConfirmation": "Receipt confirmation",
+      "notTracked": "Not tracked",
+      "notTrackedReason": "Sent before receipt confirmations were tracked.",
       "waiting": "{unit, select, days {Waiting {value, plural, one {# day} other {# days}}} other {Waiting {value, number} h}} — limit {limit, number} h",
       "replaced": "Replaced",
       "replacedBy": "Processed again:",

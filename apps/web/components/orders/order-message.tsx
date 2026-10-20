@@ -5,6 +5,7 @@ import {
   Clock01Icon,
   Mail01Icon,
   MailBlock01Icon,
+  MinusSignCircleIcon,
   RepeatIcon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
@@ -16,7 +17,7 @@ import { CopyButton } from '@/components/copy-button'
 import { linkClass } from '@/components/detail-parts'
 import { RunStatusBadge } from '@/components/documents/run-status'
 import { AcknowledgementStateBadge } from '@/components/orders/acknowledgement-state'
-import { waitingTimeOf } from '@/components/orders/order-verdict'
+import { confirmationNotTracked, waitingTimeOf } from '@/components/orders/order-verdict'
 import { usePlainNames } from '@/components/plain-names'
 import { Term } from '@/components/term'
 import { documentHref, navigationItems, tradingPartnerHref } from '@/lib/navigation'
@@ -185,6 +186,23 @@ function NotSentHelp({
   )
 }
 
+function NotTracked() {
+  const t = useTranslations('Orders.message')
+
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+      <span className="flex items-center gap-1.5">
+        <span className="text-muted-foreground">{t('receiptConfirmation')}</span>
+        <Badge variant="outline" className="text-muted-foreground gap-1">
+          <HugeiconsIcon icon={MinusSignCircleIcon} strokeWidth={2} aria-hidden />
+          {t('notTracked')}
+        </Badge>
+      </span>
+      <span className="text-muted-foreground">{t('notTrackedReason')}</span>
+    </div>
+  )
+}
+
 function sentKind({ direction, run }: OrderLifecycleMessage) {
   if (direction === 'inbound') {
     return 'received'
@@ -275,6 +293,7 @@ export function OrderMessage({
           )}
         </div>
       )}
+      {confirmationNotTracked(message) && !replaced && <NotTracked />}
       {notSentReason && !replaced && (
         <NotSentHelp message={message} reason={notSentReason} tradingPartner={tradingPartner} />
       )}
