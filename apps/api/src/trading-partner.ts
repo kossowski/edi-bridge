@@ -3,6 +3,7 @@ import { Effect } from 'effect'
 
 import {
   activityDays,
+  directions,
   type TradingPartner,
   type TradingPartnerActivity,
   type TradingPartnerActivityDetail,
@@ -112,6 +113,9 @@ const noRuns = (tradingPartnerId: string) => ({
   lastActivityAt: null,
 })
 
+// Until the api reports the Channel directions (#235).
+const noDirections = { channelDirections: [], neededDirections: [...directions] }
+
 export const listTradingPartnerActivities = Effect.gen(function* () {
   const db = yield* Db
   const workspace = yield* CurrentWorkspace
@@ -128,7 +132,7 @@ export const listTradingPartnerActivities = Effect.gen(function* () {
 
   return rows
     .toSorted(byName)
-    .map(({ id }): TradingPartnerActivity => ({ ...noRuns(id), ...countsOf(id) }))
+    .map(({ id }): TradingPartnerActivity => ({ ...noRuns(id), ...countsOf(id), ...noDirections }))
 })
 
 const rejectingDuplicateGln = <A>(query: () => Promise<A>) =>
@@ -242,6 +246,7 @@ export const loadTradingPartnerActivity = (id: string) =>
     return {
       ...noRuns(tradingPartnerId),
       ...countsOf(tradingPartnerId),
+      ...noDirections,
       days: lastUtcDays(now),
       flows: flowsOfPartner.toSorted(byName).map((flow) => ({ flow, runs: 0 })),
       problems: [],

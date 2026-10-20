@@ -57,16 +57,19 @@ const invoicFlow = { id: '20000000-0000-4000-8000-000000000002', name: 'Hansemar
 
 const desadvFlow = { id: '20000000-0000-4000-8000-000000000003', name: 'Hansemarkt DESADV' }
 
-const flows = [ordersFlow, invoicFlow, desadvFlow].map((flow) => ({
-  ...flow,
-  tradingPartnerId: hansemarkt.id,
-}))
+const flows = (
+  [
+    { ...ordersFlow, messageType: 'ORDERS' },
+    { ...invoicFlow, messageType: 'INVOIC' },
+    { ...desadvFlow, messageType: 'DESADV' },
+  ] as const
+).map((flow) => ({ ...flow, tradingPartnerId: hansemarkt.id }))
 
 const channels = [
-  { tradingPartnerId: hansemarkt.id },
-  { tradingPartnerId: hansemarkt.id },
-  { tradingPartnerId: null },
-]
+  { tradingPartnerId: hansemarkt.id, direction: 'inbound' },
+  { tradingPartnerId: hansemarkt.id, direction: 'inbound' },
+  { tradingPartnerId: null, direction: 'outbound' },
+] as const
 
 type Outcome =
   | { status: 'delivered'; failureStage: null }
@@ -144,6 +147,8 @@ describe('GET /trading-partners/activity', () => {
         lastActivityAt: '2026-10-10T11:30:00.000Z',
         channelCount: 2,
         flowCount: 3,
+        channelDirections: ['inbound'],
+        neededDirections: ['inbound', 'outbound'],
       },
       {
         tradingPartnerId: rheinkauf.id,
@@ -152,8 +157,30 @@ describe('GET /trading-partners/activity', () => {
         lastActivityAt: null,
         channelCount: 0,
         flowCount: 0,
+        channelDirections: [],
+        neededDirections: ['inbound', 'outbound'],
       },
     ])
+  })
+
+  it('needs the directions of the Message Types chosen for a Trading Partner without Flows', async () => {
+    server.use(
+      ...tradingPartnerActivityHandlers(apiUrl, {
+        tradingPartners: [{ ...rheinkauf, messageTypes: ['DESADV', 'INVOIC'] }],
+        runs: [],
+        overdueAcknowledgements: [],
+        flows: [],
+        channels: [],
+      }),
+    )
+
+    expect(await listActivities()).toMatchObject([
+      { channelDirections: [], neededDirections: ['outbound'] },
+    ])
+    expect(await activityOf(rheinkauf.id)).toMatchObject({
+      channelDirections: [],
+      neededDirections: ['outbound'],
+    })
   })
 
   it('gives the partners with Runs a Channel and their Flows in the large-volume state', async () => {
@@ -165,6 +192,11 @@ describe('GET /trading-partners/activity', () => {
     expect(active.every(({ channelCount, flowCount }) => channelCount > 0 && flowCount > 0)).toBe(
       true,
     )
+    expect(
+      active.every(({ channelDirections, neededDirections }) =>
+        neededDirections.every((direction) => channelDirections.includes(direction)),
+      ),
+    ).toBe(true)
   })
 
   it('serves an empty list', async () => {
@@ -312,6 +344,20 @@ describe('createHandlers', () => {
     )
 
     expect(activities.some(({ flowCount }) => flowCount > 0)).toBe(true)
+  })
+
+  it('gives a seed Trading Partner a Channel in one needed direction only', async () => {
+    server.use(...createHandlers(apiUrl))
+
+    const activities = await listActivities()
+
+    expect(
+      activities.some(
+        ({ channelDirections, neededDirections }) =>
+          channelDirections.length === 1 &&
+          neededDirections.some((direction) => !channelDirections.includes(direction)),
+      ),
+    ).toBe(true)
   })
 
   it('follows the Trading Partners of the Workspace', async () => {

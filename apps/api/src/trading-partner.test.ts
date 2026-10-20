@@ -439,6 +439,8 @@ describe('GET /trading-partners/activity', () => {
         lastActivityAt: null,
         channelCount: 0,
         flowCount: 0,
+        channelDirections: [],
+        neededDirections: ['inbound', 'outbound'],
       },
     ])
   })
@@ -466,6 +468,8 @@ describe('GET /trading-partners/:id/activity', () => {
       lastActivityAt: null,
       channelCount: 0,
       flowCount: 0,
+      channelDirections: [],
+      neededDirections: ['inbound', 'outbound'],
       days: ['08', '09', '10', '11', '12', '13', '14'].map((day) => ({
         date: `2026-10-${day}`,
         runs: 0,

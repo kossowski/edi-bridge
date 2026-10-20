@@ -47,13 +47,17 @@ const newestOfBehind = seedMappings[behindIndex]!.versions[0]!
 
 const behindPartner = seedTradingPartners.find(({ id }) => id === behind.tradingPartnerId)!
 
-const untouchedInbox = {
-  ...createChannel(channelKinds[0]),
-  name: 'Mainfranken SFTP inbox',
+const untouchedOutbox = {
+  ...createChannel(channelKinds[1]),
+  name: 'Mainfranken SFTP outbox',
   tradingPartnerId: untouched.id,
 }
 
-const withUntouchedInbox = [...seedChannels, untouchedInbox]
+const withUntouchedOutbox = [...seedChannels, untouchedOutbox]
+
+const withoutUntouchedConnections = seedChannels.filter(
+  ({ tradingPartnerId }) => tradingPartnerId !== untouched.id,
+)
 
 const oneDocumentStructure = (messageType: 'DESADV' | 'INVOIC') =>
   documentStructureHandlers(apiUrl, { documentStructures: [seedDocumentStructureOf[messageType]] })
@@ -334,7 +338,7 @@ export const AddDocumentWithAiChoosesDocumentStructure = meta.story({
 export const AddDocumentFromSetup = meta.story({
   ...at(untouched),
   beforeEach({ msw }) {
-    msw.use(...createHandlers(apiUrl, { channels: withUntouchedInbox }))
+    msw.use(...createHandlers(apiUrl, { channels: withUntouchedOutbox }))
   },
   async play({ canvas, canvasElement }) {
     const current = await canvas.findByRole('listitem', { current: 'step' })
@@ -360,6 +364,9 @@ export const AddDocumentFromSetup = meta.story({
 
 export const AddDocumentWithoutConnection = meta.story({
   ...at(untouched, 'documents'),
+  beforeEach({ msw }) {
+    msw.use(...createHandlers(apiUrl, { channels: withoutUntouchedConnections }))
+  },
   async play({ canvasElement }) {
     const sheet = within(await openSheet(canvasElement))
     await userEvent.click(sheet.getByRole('radio', { name: /^Purchase orders/ }))

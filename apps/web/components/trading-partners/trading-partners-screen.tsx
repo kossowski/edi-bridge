@@ -19,6 +19,7 @@ import {
   tradingPartnerActivitiesQuery,
   tradingPartnersQuery,
 } from '@/lib/api/queries'
+import { directions, type TradingPartner, type TradingPartnerActivity } from '@edi-bridge/contracts'
 import { buttonVariants } from '@edi-bridge/ui/components/button'
 import {
   Card,
@@ -32,8 +33,6 @@ import { Progress, ProgressLabel } from '@edi-bridge/ui/components/progress'
 import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 import { cn } from '@edi-bridge/ui/lib/utils'
 
-import type { TradingPartner, TradingPartnerActivity } from '@edi-bridge/contracts'
-
 type PartnerActivity = Omit<TradingPartnerActivity, 'tradingPartnerId'>
 
 const noActivity: PartnerActivity = {
@@ -42,6 +41,8 @@ const noActivity: PartnerActivity = {
   lastActivityAt: null,
   channelCount: 0,
   flowCount: 0,
+  channelDirections: [],
+  neededDirections: [...directions],
 }
 
 function SetupProgress({

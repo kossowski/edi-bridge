@@ -1,9 +1,17 @@
 import { z } from 'zod'
 
-import { flowSummarySchema } from './flow'
+import { type FlowSummary, flowSummarySchema } from './flow'
+import {
+  type Direction,
+  directionOf,
+  directions,
+  directionSchema,
+  type MessageType,
+} from './message-type'
 import { overdueAcknowledgementSchema } from './overdue-acknowledgement'
 import { runSummarySchema } from './run'
 
+import type { ChannelSummary } from './channel'
 import type { Endpoint } from './endpoint'
 
 const countSchema = z.number().int().min(0)
@@ -19,9 +27,38 @@ export const tradingPartnerActivitySchema = z.object({
   lastActivityAt: z.iso.datetime().nullable(),
   channelCount: countSchema,
   flowCount: countSchema,
+  channelDirections: z.array(directionSchema),
+  neededDirections: z.array(directionSchema).min(1),
 })
 
 export type TradingPartnerActivity = z.infer<typeof tradingPartnerActivitySchema>
+
+// Without chosen Message Types or Flows, nothing narrows what the Trading Partner exchanges.
+export function neededDirectionsOf({
+  messageTypes,
+  flows,
+}: {
+  messageTypes: ReadonlyArray<MessageType> | null | undefined
+  flows: ReadonlyArray<Pick<FlowSummary, 'messageType'>>
+}): Direction[] {
+  const needed = new Set(
+    [...(messageTypes ?? []), ...flows.map(({ messageType }) => messageType)].map((messageType) =>
+      directionOf({ messageType }),
+    ),
+  )
+
+  return needed.size === 0
+    ? [...directions]
+    : directions.filter((direction) => needed.has(direction))
+}
+
+export function channelDirectionsOf(
+  channels: ReadonlyArray<Pick<ChannelSummary, 'direction'>>,
+): Direction[] {
+  return directions.filter((direction) =>
+    channels.some((channel) => channel.direction === direction),
+  )
+}
 
 export const activityDaySchema = z.object({
   date: z.iso.date(),
