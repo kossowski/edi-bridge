@@ -33,7 +33,7 @@ export function aiReviewKeys(graph: GraphParts) {
 }
 
 // While the review is open, the marks name the AI-proposed parts the Admin has neither rejected
-// nor edited; accepting the Draft ends the review and leaves `aiReview` null.
+// nor edited; once none is left, however the Admin resolved each one, `aiReview` is null.
 export const aiReviewSchema = z.object({
   sampleId: z.uuid(),
   proposedLinks: z.array(z.string().min(1)),
@@ -84,9 +84,13 @@ function keptKeys<Part>(
 }
 
 // A rejected part is gone and an edited one differs, so both lose their mark; moving a transform
-// on the canvas is no edit.
-export function remainingAiReview(review: AiReview, before: GraphParts, after: GraphParts) {
-  return {
+// on the canvas is no edit. Once no mark is left the review closes, as it does on accept.
+export function remainingAiReview(
+  review: AiReview,
+  before: GraphParts,
+  after: GraphParts,
+): AiReview | null {
+  return openAiReview({
     ...review,
     proposedLinks: keptKeys(
       review.proposedLinks,
@@ -109,7 +113,7 @@ export function remainingAiReview(review: AiReview, before: GraphParts, after: G
       transformLinkKey,
       sameStart,
     ),
-  }
+  })
 }
 
 export const aiReviewPartsSchema = z.object({
@@ -129,6 +133,11 @@ export const aiReviewMarks = (review: AiReview): AiReviewParts => ({
   transforms: review.proposedTransforms,
   transformLinks: review.proposedTransformLinks,
 })
+
+// A review without a mark is closed.
+function openAiReview(review: AiReview): AiReview | null {
+  return aiReviewPartsSize(aiReviewMarks(review)) === 0 ? null : review
+}
 
 export function proposedAiReview(sampleId: string, proposal: GraphParts): AiReview | null {
   const keys = aiReviewKeys(proposal)
@@ -167,12 +176,10 @@ export function acceptedAiReview(review: AiReview, accepted: AiReviewParts): AiR
     return marked.filter((key) => !gone.has(key))
   }
 
-  const remaining = {
+  return openAiReview({
     ...review,
     proposedLinks: without(review.proposedLinks, accepted.links),
     proposedTransforms: without(review.proposedTransforms, accepted.transforms),
     proposedTransformLinks: without(review.proposedTransformLinks, accepted.transformLinks),
-  }
-
-  return aiReviewPartsSize(aiReviewMarks(remaining)) === 0 ? null : remaining
+  })
 }

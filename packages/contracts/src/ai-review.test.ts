@@ -71,7 +71,7 @@ describe('remainingAiReview', () => {
   it('drops the mark of a rejected link', () => {
     const after = { ...proposed, links: proposed.links.slice(1) }
 
-    expect(remainingAiReview(review, proposed, after).proposedLinks).toEqual([
+    expect(remainingAiReview(review, proposed, after)?.proposedLinks).toEqual([
       'SG2+BY/NAD+BY/C082/3039',
     ])
   })
@@ -82,7 +82,7 @@ describe('remainingAiReview', () => {
       links: [{ sourcePath: 'orderNumber', targetPath: 'BGM/1004' }, proposed.links[1]!],
     }
 
-    expect(remainingAiReview(review, proposed, after).proposedLinks).toEqual([
+    expect(remainingAiReview(review, proposed, after)?.proposedLinks).toEqual([
       'SG2+BY/NAD+BY/C082/3039',
     ])
   })
@@ -92,11 +92,11 @@ describe('remainingAiReview', () => {
     const reconfigured = { ...dateFormat, config: { from: 'dd.MM.yyyy', to: 'yyyyMMdd' } }
 
     expect(
-      remainingAiReview(review, proposed, { ...proposed, transforms: [moved] }).proposedTransforms,
+      remainingAiReview(review, proposed, { ...proposed, transforms: [moved] })?.proposedTransforms,
     ).toEqual([dateFormat.id])
     expect(
       remainingAiReview(review, proposed, { ...proposed, transforms: [reconfigured] })
-        .proposedTransforms,
+        ?.proposedTransforms,
     ).toEqual([])
   })
 
@@ -109,7 +109,7 @@ describe('remainingAiReview', () => {
       ],
     }
 
-    expect(remainingAiReview(review, proposed, after).proposedTransformLinks).toEqual([
+    expect(remainingAiReview(review, proposed, after)?.proposedTransformLinks).toEqual([
       'target:DTM+137/C507/2380',
     ])
   })
@@ -137,6 +137,24 @@ describe('remainingAiReview', () => {
     }
 
     expect(remainingAiReview(review, proposed, after)).toEqual(review)
+  })
+
+  it('closes the review once every AI-proposed part is rejected', () => {
+    expect(
+      remainingAiReview(review, proposed, { links: [], transforms: [], transformLinks: [] }),
+    ).toBeNull()
+  })
+
+  it('closes the review once every AI-proposed part is rejected or edited', () => {
+    const after = {
+      links: [{ sourcePath: 'orderNumber', targetPath: 'BGM/1004' }],
+      transforms: [{ ...dateFormat, config: { from: 'dd.MM.yyyy', to: 'yyyyMMdd' } }],
+      transformLinks: [
+        { ...intoDateFormat, from: { kind: 'source', path: 'despatchDate' } } as const,
+      ],
+    }
+
+    expect(remainingAiReview(review, proposed, after)).toBeNull()
   })
 })
 
