@@ -128,6 +128,24 @@ export const NarrowedToMappingGerman = meta.story({
   },
 })
 
+export const NarrowedToMappingMobile = meta.story({
+  ...mobile,
+  parameters: { ...mobile.parameters, ...narrowedToMapping },
+  beforeEach({ msw }) {
+    msw.use(...createHandlers(apiUrl))
+  },
+  async play({ canvas, canvasElement }) {
+    const mapping = await canvas.findByRole('button', {
+      name: /^Mapping: Purchase orders from .+, remove filter$/,
+    })
+
+    await expect(mapping).toBeVisible()
+    await expect(outsideOf(mapping)).toEqual([])
+    await expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(window.innerWidth)
+    await expect(overflowingWrappers(canvasElement)).toEqual([])
+  },
+})
+
 export const Loading = meta.story({
   beforeEach({ msw }) {
     msw.use(
@@ -290,6 +308,15 @@ function overflowingWrappers(canvasElement: HTMLElement) {
 
     return overflows ? [selectorOf(element)] : []
   })
+}
+
+// A part of an element that sticks out of it widens the page, even when it is hidden.
+function outsideOf(element: HTMLElement) {
+  const { right } = element.getBoundingClientRect()
+
+  return [...element.querySelectorAll<HTMLElement>('*')].flatMap((part) =>
+    part.getBoundingClientRect().right > right ? [selectorOf(part)] : [],
+  )
 }
 
 function selectorOf(element: HTMLElement) {

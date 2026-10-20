@@ -37,26 +37,36 @@ import { Button } from '@edi-bridge/ui/components/button'
 import { NativeSelect, NativeSelectOption } from '@edi-bridge/ui/components/native-select'
 import { ToggleGroup, ToggleGroupItem } from '@edi-bridge/ui/components/toggle-group'
 
-function MappingTitle({ mapping }: { mapping: MappingSummary }) {
-  return useMappingTitle(mapping)
-}
-
-function MappingFilter({ mappingId, onRemove }: { mappingId: string; onRemove: () => void }) {
+function MappingFilterButton({ name, onRemove }: { name: string; onRemove: () => void }) {
   const t = useTranslations('Documents.filters')
-  const { data: mappings } = useQuery(mappingsQuery)
-  const mapping = mappings?.find(({ id }) => id === mappingId)
 
   return (
-    <Button variant="secondary" onClick={onRemove}>
-      <span className="max-w-64 truncate">
-        {t.rich('mapping', {
-          name: () => (mapping ? <MappingTitle mapping={mapping} /> : '…'),
-          hidden: (chunks) => <span className="sr-only">{chunks}</span>,
-        })}
-      </span>
+    <Button variant="secondary" aria-label={t('removeMapping', { name })} onClick={onRemove}>
+      <span className="max-w-64 truncate">{t('mapping', { name })}</span>
       <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} aria-hidden data-icon="inline-end" />
     </Button>
   )
+}
+
+function KnownMappingFilter({
+  mapping,
+  onRemove,
+}: {
+  mapping: MappingSummary
+  onRemove: () => void
+}) {
+  return <MappingFilterButton name={useMappingTitle(mapping)} onRemove={onRemove} />
+}
+
+function MappingFilter({ mappingId, onRemove }: { mappingId: string; onRemove: () => void }) {
+  const { data: mappings } = useQuery(mappingsQuery)
+  const mapping = mappings?.find(({ id }) => id === mappingId)
+
+  if (mapping) {
+    return <KnownMappingFilter mapping={mapping} onRemove={onRemove} />
+  }
+
+  return <MappingFilterButton name="…" onRemove={onRemove} />
 }
 
 function Filters({
