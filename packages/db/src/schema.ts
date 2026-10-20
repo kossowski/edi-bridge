@@ -205,6 +205,8 @@ export const invites = pgTable(
 
 export const characterSet = pgEnum('character_set', characterSets)
 
+export const messageType = pgEnum('message_type', messageTypes)
+
 export const tradingPartnerGlnUnique = 'trading_partners_workspace_id_gln_unique'
 
 export const tradingPartners = pgTable(
@@ -218,6 +220,7 @@ export const tradingPartners = pgTable(
     gln: text(),
     characterSet: characterSet().notNull(),
     acknowledgementTimeLimitHours: integer().notNull(),
+    messageTypes: messageType().array(),
     testMode: boolean().notNull().default(true),
     testInterchangeSentAt: timestamp({ withTimezone: true, mode: 'date' }),
     contrlReceivedAt: timestamp({ withTimezone: true, mode: 'date' }),
@@ -325,8 +328,6 @@ export const documentStructures = pgTable(
     ),
   ],
 )
-
-export const messageType = pgEnum('message_type', messageTypes)
 
 export const mappingNameUnique = 'mappings_workspace_id_name_unique'
 

@@ -1,4 +1,4 @@
-import { withCheckDigit } from '@edi-bridge/contracts'
+import { type MessageType, withCheckDigit } from '@edi-bridge/contracts'
 
 // GS1 keeps the prefixes 020 to 029 for restricted circulation, so no seeded number is a real one.
 // Each seeded VAT ID fails the ISO 7064 MOD 11,10 check digit, so no company can hold it.
@@ -107,18 +107,18 @@ export const seedTradingPartners: SeedTradingPartner[] = [
       'delivered',
     ],
   },
-  {
-    name: 'Kaiserstein Warenhaus KG',
-    slug: 'kaiserstein-warenhaus',
-    gln: withCheckDigit('023300400000'),
-    vatId: 'DE900000004',
-    contact: 'Mira Kaiser',
-    acknowledgementTimeLimitHours: 24,
-    testMode: true,
-    stores: [],
-    orders: [],
-  },
 ]
+
+// Still in setup: it has no Channel for the INVOIC it was created for.
+export const seedOnboardingTradingPartner = {
+  name: 'Kaiserstein Warenhaus KG',
+  slug: 'kaiserstein-warenhaus',
+  gln: withCheckDigit('023300400000'),
+  acknowledgementTimeLimitHours: 24,
+  messageTypes: ['ORDERS', 'INVOIC'],
+} satisfies Pick<SeedTradingPartner, 'name' | 'slug' | 'gln' | 'acknowledgementTimeLimitHours'> & {
+  messageTypes: MessageType[]
+}
 
 const yyyymmdd = (date: Date) => date.toISOString().slice(0, 10).replaceAll('-', '')
 

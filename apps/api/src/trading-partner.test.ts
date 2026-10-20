@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { eq, inArray } from 'drizzle-orm'
 import {
   afterAll,
   afterEach,
@@ -29,6 +29,7 @@ import {
   withCheckDigit,
 } from '@edi-bridge/contracts'
 import {
+  channels,
   type Connection,
   documents,
   documentStructures,
@@ -44,18 +45,21 @@ import { type InvoiceWorkspace, seedInvoiceWorkspace } from '@edi-bridge/pipelin
 import {
   addMember,
   type Client,
+  otherWorkspace,
   ownWorkspace,
   signIn,
   startTestApi,
+  seedWorkspaceWithAdmin,
   type TestApi,
 } from './testing.js'
 
 type TradingPartnerBody = Omit<
   TradingPartnerInput,
-  'characterSet' | 'acknowledgementTimeLimitHours'
+  'characterSet' | 'acknowledgementTimeLimitHours' | 'messageTypes'
 > & {
   characterSet: string
   acknowledgementTimeLimitHours: number | undefined
+  messageTypes?: string[] | undefined
 }
 
 const hansemarkt: TradingPartnerInput = {
@@ -132,12 +136,20 @@ describe('POST /trading-partners', () => {
     expect(read.json()).toEqual(created)
   })
 
+  it('stores the Message Types chosen for the Trading Partner', async () => {
+    const created = await postedTradingPartner({ ...hansemarkt, messageTypes: ['ORDERS'] })
+
+    expect(created).toMatchObject({ messageTypes: ['ORDERS'] })
+    expect((await get(created.id)).json()).toEqual(created)
+  })
+
   it.each([
     ['an empty name', { ...hansemarkt, name: ' ' }],
     ['a GLN with a wrong check digit', { ...hansemarkt, gln: '4000000000010' }],
     ['an unknown character set', { ...hansemarkt, characterSet: 'UTF8' }],
     ['a time limit above a week', { ...hansemarkt, acknowledgementTimeLimitHours: 169 }],
     ['no time limit', { ...hansemarkt, acknowledgementTimeLimitHours: undefined }],
+    ['an unknown Message Type', { ...hansemarkt, messageTypes: ['PRICAT'] }],
   ])('rejects %s', async (_case, body) => {
     const response = await post(body)
 
@@ -443,6 +455,106 @@ describe('GET /trading-partners/activity', () => {
         neededDirections: ['inbound', 'outbound'],
       },
     ])
+  })
+})
+
+describe('the Channel directions of a Trading Partner', () => {
+  let seeded: string | undefined
+
+  afterEach(async () => {
+    await connection.db
+      .delete(channels)
+      .where(inArray(channels.workspaceId, [ownWorkspace.id, otherWorkspace.id]))
+
+    if (seeded !== undefined) {
+      await connection.db.delete(workspaces).where(eq(workspaces.id, seeded))
+      seeded = undefined
+    }
+  })
+
+  const getActivities = (target = admin) =>
+    target.inject({ method: 'GET', url: tradingPartnerActivitiesEndpoint.path })
+
+  const getActivity = (id: string, target = admin) =>
+    target.inject({ method: 'GET', url: tradingPartnerActivityEndpoint.path.replace(':id', id) })
+
+  const addOutboundChannel = (tradingPartnerId: string | null, workspaceId = ownWorkspace.id) =>
+    connection.db.insert(channels).values({
+      workspaceId,
+      tradingPartnerId,
+      type: 'http',
+      direction: 'outbound',
+      name: `Inbox ${crypto.randomUUID()}`,
+      url: 'https://edi.example.com/inbox',
+    })
+
+  it('needs the directions of the chosen Message Types and names the own Channels', async () => {
+    const created = await postedTradingPartner({
+      ...hansemarkt,
+      messageTypes: ['ORDERS', 'INVOIC'],
+    })
+
+    const other = await postedTradingPartner({ ...hansemarkt, name: 'Rheinkauf eG', gln: null })
+    await addOutboundChannel(created.id)
+    await addOutboundChannel(null)
+
+    const directions = {
+      channelCount: 1,
+      channelDirections: ['outbound'],
+      neededDirections: ['inbound', 'outbound'],
+    }
+
+    expect(tradingPartnerActivitiesEndpoint.response.parse((await getActivities()).json())).toEqual(
+      [
+        expect.objectContaining({ tradingPartnerId: created.id, ...directions }),
+        expect.objectContaining({
+          tradingPartnerId: other.id,
+          channelCount: 0,
+          channelDirections: [],
+          neededDirections: ['inbound', 'outbound'],
+        }),
+      ],
+    )
+    expect(
+      tradingPartnerActivityEndpoint.response.parse((await getActivity(created.id)).json()),
+    ).toMatchObject(directions)
+  })
+
+  it('leaves out a Channel of another Workspace', async () => {
+    const created = await postedTradingPartner(hansemarkt)
+    await addOutboundChannel(created.id, otherWorkspace.id)
+
+    const directions = { channelCount: 0, channelDirections: [] }
+
+    expect(tradingPartnerActivitiesEndpoint.response.parse((await getActivities()).json())).toEqual(
+      [expect.objectContaining({ tradingPartnerId: created.id, ...directions })],
+    )
+    expect(
+      tradingPartnerActivityEndpoint.response.parse((await getActivity(created.id)).json()),
+    ).toMatchObject(directions)
+  })
+
+  it('needs the direction of each Flow of the Trading Partner', async () => {
+    const { workspace, admin: seededAdmin } = await seedWorkspaceWithAdmin(
+      api,
+      'Flow Directions AG',
+    )
+
+    seeded = workspace.id
+
+    // The seeded INVOIC Flow takes its Documents from a shared inbound webhook.
+    const directions = { channelDirections: ['outbound'], neededDirections: ['outbound'] }
+
+    expect(
+      tradingPartnerActivitiesEndpoint.response.parse((await getActivities(seededAdmin)).json()),
+    ).toEqual([
+      expect.objectContaining({ tradingPartnerId: workspace.tradingPartnerId, ...directions }),
+    ])
+    expect(
+      tradingPartnerActivityEndpoint.response.parse(
+        (await getActivity(workspace.tradingPartnerId, seededAdmin)).json(),
+      ),
+    ).toMatchObject(directions)
   })
 })
 

@@ -232,6 +232,13 @@
       "when": 1792510139544,
       "tag": "0032_channel_host_key_fingerprint",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1792527801908,
+      "tag": "0033_trading_partner_message_types",
+      "breakpoints": true
     }
   ]
 }
