@@ -1,0 +1,1 @@
+ALTER TABLE "trading_partners" ADD COLUMN "message_types" "message_type"[];
