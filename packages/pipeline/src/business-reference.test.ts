@@ -72,6 +72,17 @@ describe('the Business Reference of a Message', () => {
     expect(businessReferenceOf(messageOf('INVOIC', without(invoic, /^RFF\+ON/)))).toBe('87441')
   })
 
+  it('is the BGM document number of a Message whose order number is empty', () => {
+    const [bgm = '', ...rest] = without(desadv, /^RFF\+ON/)
+
+    expect(businessReferenceOf(messageOf('DESADV', [bgm, "RFF+ON'", ...rest]))).toBe(
+      '73000152018851234',
+    )
+    expect(businessReferenceOf(messageOf('DESADV', [bgm, "RFF+ON:'", ...rest]))).toBe(
+      '73000152018851234',
+    )
+  })
+
   it('is missing from a Message with neither an order number nor a document number', () => {
     expect(businessReferenceOf(messageOf('INVOIC', without(invoic, /^(RFF\+ON|BGM)/)))).toBeNull()
   })
