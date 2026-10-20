@@ -46,7 +46,7 @@ import { CurrentWorkspace } from './workspace.js'
 // A Duplicate is never mapped, so it shows the Business Reference of its original Run.
 const originalRuns = alias(runs, 'original_runs')
 
-const businessReferenceOfRun = sql<
+export const businessReferenceOfRun = sql<
   string | null
 >`coalesce(${runs.businessReference}, ${originalRuns.businessReference})`
 
@@ -66,7 +66,7 @@ const summaryFields = {
 }
 
 // Drizzle types the joins only with a known field; the list and its counts both select the status.
-const fromRuns = <Fields extends SelectedFields>(db: Database, fields: Fields) =>
+export const fromRuns = <Fields extends SelectedFields>(db: Database, fields: Fields) =>
   db
     .select({ status: runs.status, ...fields })
     .from(runs)
@@ -79,23 +79,42 @@ const selectRuns = <Fields extends SelectedFields>(db: Database, fields: Fields)
 
 type SummaryRow = Awaited<ReturnType<typeof selectRuns<Record<never, never>>>>[number]
 
+type Failure =
+  | { status: 'failed'; failureStage: FailureStage }
+  | { status: Exclude<RunStatus, 'failed'>; failureStage: null }
+
+type FailureRow = { id: string; status: RunStatus; failureStage: FailureStage | null }
+
+// The database sets a Failure Stage exactly on a failed Run.
+export const failureOf = ({ id, status, failureStage }: FailureRow): Failure => {
+  if (status === 'failed' && failureStage !== null) {
+    return { status, failureStage }
+  }
+
+  if (status !== 'failed' && failureStage === null) {
+    return { status, failureStage }
+  }
+
+  throw new Error(`Run ${id} has status ${status} with Failure Stage ${String(failureStage)}`)
+}
+
 type Outcome =
   | { status: 'failed'; failureStage: FailureStage; problem: { reason: ProblemReason } }
   | { status: Exclude<RunStatus, 'failed'>; failureStage: null; problem: null }
 
-// The database sets a Failure Stage and a problem exactly on a failed Run.
-const outcomeOf = ({ id, status, failureStage, problem }: SummaryRow): Outcome => {
-  if (status === 'failed' && failureStage !== null && problem !== null) {
-    return { status, failureStage, problem: { reason: problem.reason } }
+// The database sets a problem exactly on a failed Run.
+const outcomeOf = (row: SummaryRow): Outcome => {
+  const failure = failureOf(row)
+
+  if (failure.status !== 'failed') {
+    return { ...failure, problem: null }
   }
 
-  if (status !== 'failed' && failureStage === null) {
-    return { status, failureStage, problem: null }
+  if (row.problem === null) {
+    throw new Error(`Failed Run ${row.id} has no problem`)
   }
 
-  throw new Error(
-    `Run ${id} has status ${status} with Failure Stage ${String(failureStage)} and ${problem === null ? 'no problem' : 'a problem'}`,
-  )
+  return { ...failure, problem: { reason: row.problem.reason } }
 }
 
 const toSummary = (row: SummaryRow): RunSummary => ({
@@ -125,10 +144,20 @@ export const listRunSummaries = async (db: Database, ids: readonly string[]) => 
 // A Run not yet processed will be mapped with the Mapping Version its Flow pins.
 const mappingVersionOfRun = sql`coalesce(${runs.mappingVersionId}, ${flows.mappingVersionId})`
 
-const filtersExceptStatus = (db: Database, workspaceId: string, query: RunListQuery) => {
-  const text = query.q?.toLowerCase() ?? ''
+// A search term matches the Business Reference or the Trading Partner of a Run.
+export const matchingSearchTerm = (q: string | undefined) => {
+  const searchTerm = q?.toLowerCase() ?? ''
 
-  return inWorkspace(
+  return searchTerm === ''
+    ? undefined
+    : or(
+        sql`strpos(lower(${businessReferenceOfRun}), ${searchTerm}) > 0`,
+        sql`strpos(lower(${tradingPartners.name}), ${searchTerm}) > 0`,
+      )
+}
+
+const filtersExceptStatus = (db: Database, workspaceId: string, query: RunListQuery) =>
+  inWorkspace(
     runs,
     workspaceId,
     query.failureStage?.length ? inArray(runs.failureStage, query.failureStage) : undefined,
@@ -153,14 +182,8 @@ const filtersExceptStatus = (db: Database, workspaceId: string, query: RunListQu
     query.manualSubmission === undefined
       ? undefined
       : eq(runs.manualSubmission, query.manualSubmission),
-    text === ''
-      ? undefined
-      : or(
-          sql`strpos(lower(${businessReferenceOfRun}), ${text}) > 0`,
-          sql`strpos(lower(${tradingPartners.name}), ${text}) > 0`,
-        ),
+    matchingSearchTerm(query.q),
   )
-}
 
 export const listRuns = (query: RunListQuery) =>
   Effect.gen(function* () {

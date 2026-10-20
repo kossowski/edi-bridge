@@ -57,6 +57,8 @@ import {
   moveFlowMappingVersionEndpoint,
   operatorWorkspaceMembersEndpoint,
   operatorWorkspaceSettingsEndpoint,
+  orderLifecycleEndpoint,
+  orderLifecyclesEndpoint,
   publishedMappingVersionsEndpoint,
   publishMappingDraftEndpoint,
   removeWorkspaceMemberEndpoint,
@@ -141,6 +143,7 @@ import {
 } from './mapping-version.js'
 import { createMapping, listMappings, loadMappingDraft, saveMappingDraft } from './mapping.js'
 import { loadMessageTypeStructure } from './message-type.js'
+import { listOrderLifecycles, loadOrderLifecycles } from './order-lifecycle.js'
 import { parse, type ValidationError } from './parse.js'
 import {
   endWaitingForTradingPartnerRun,
@@ -614,6 +617,20 @@ function registerRoutes(
 
     done()
   })
+
+  app.get(orderLifecyclesEndpoint.path, (request, reply) =>
+    respond(
+      request,
+      reply,
+      Effect.flatMap(parse(orderLifecyclesEndpoint.query, request.query), listOrderLifecycles),
+    ),
+  )
+
+  app.get<{ Params: { businessReference: string } }>(
+    orderLifecycleEndpoint.path,
+    (request, reply) =>
+      respond(request, reply, loadOrderLifecycles(request.params.businessReference)),
+  )
 
   app.get(runsEndpoint.path, (request, reply) =>
     respond(request, reply, Effect.flatMap(parse(runsEndpoint.query, request.query), listRuns)),
