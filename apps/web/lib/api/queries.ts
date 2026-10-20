@@ -520,9 +520,12 @@ export function storePublishedMappingVersion(
 export const lookupTableKeys = {
   all: () => ['lookup-tables'] as const,
   list: () => [...lookupTableKeys.all(), 'list'] as const,
-  detail: (id: string) => [...lookupTableKeys.all(), 'detail', id] as const,
-  import: (id: string) => [...lookupTableKeys.detail(id), 'import'] as const,
-  missingCodes: (id: string) => [...lookupTableKeys.all(), 'missing-codes', id] as const,
+  details: (id: string) => [...lookupTableKeys.all(), 'detail', id] as const,
+  detail: (id: string, language: Language) => [...lookupTableKeys.details(id), language] as const,
+  import: (id: string) => [...lookupTableKeys.details(id), 'import'] as const,
+  allMissingCodes: (id: string) => [...lookupTableKeys.all(), 'missing-codes', id] as const,
+  missingCodes: (id: string, language: Language) =>
+    [...lookupTableKeys.allMissingCodes(id), language] as const,
   suggestions: (query: LookupTableSuggestionsQuery) =>
     [...lookupTableKeys.all(), 'suggestions', query] as const,
 }
@@ -534,14 +537,14 @@ export const lookupTablesQuery = queryOptions({
 
 export function lookupTableQuery(id: string, language: Language) {
   return queryOptions({
-    queryKey: [...lookupTableKeys.detail(id), language] as const,
+    queryKey: lookupTableKeys.detail(id, language),
     queryFn: () => getLookupTable(id, language),
   })
 }
 
 export function lookupTableMissingCodesQuery(id: string, language: Language) {
   return queryOptions({
-    queryKey: [...lookupTableKeys.missingCodes(id), language] as const,
+    queryKey: lookupTableKeys.missingCodes(id, language),
     queryFn: () => listLookupTableMissingCodes(id, language),
   })
 }
@@ -577,12 +580,12 @@ export function storeSavedLookupTable(queryClient: QueryClient, saved: LookupTab
   }
 
   void queryClient.invalidateQueries({ queryKey: lookupTableKeys.list() })
-  void queryClient.invalidateQueries({ queryKey: lookupTableKeys.missingCodes(saved.id) })
+  void queryClient.invalidateQueries({ queryKey: lookupTableKeys.allMissingCodes(saved.id) })
 }
 
 export function forgetDeletedLookupTable(queryClient: QueryClient, id: string) {
-  queryClient.removeQueries({ queryKey: lookupTableKeys.detail(id) })
-  queryClient.removeQueries({ queryKey: lookupTableKeys.missingCodes(id) })
+  queryClient.removeQueries({ queryKey: lookupTableKeys.details(id) })
+  queryClient.removeQueries({ queryKey: lookupTableKeys.allMissingCodes(id) })
   queryClient.setQueryData<LookupTableSummary[]>(lookupTablesQuery.queryKey, (tables) =>
     tables?.filter((table) => table.id !== id),
   )
