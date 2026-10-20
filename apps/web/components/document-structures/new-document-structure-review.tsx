@@ -164,7 +164,7 @@ export function Review({
             id={`${id}-title`}
             ref={focusOnMount}
             tabIndex={-1}
-            className="font-semibold break-all outline-hidden">
+            className="font-semibold wrap-break-word outline-hidden">
             {sample ? t('review.title', { fileName: sample.fileName }) : t('review.titleNoSample')}
           </h2>
           <p className="flex flex-wrap items-center gap-x-2 text-sm">

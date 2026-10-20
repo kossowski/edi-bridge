@@ -182,7 +182,7 @@ export function Reading({
           aria-hidden
           className="text-ai-proposed mt-0.5 size-5 shrink-0"
         />
-        <span className="min-w-0 break-all">{t('title', { fileName })}</span>
+        <span className="min-w-0 wrap-break-word">{t('title', { fileName })}</span>
       </h2>
       <ol aria-live="polite" className="flex flex-col gap-3 text-sm">
         {readingSteps(progress).map(({ key, state }) => (
@@ -249,7 +249,7 @@ export function ReadFailed({
       tabIndex={-1}
       aria-labelledby={id}
       className="mx-auto flex w-full max-w-2xl flex-col gap-4 rounded-2xl border p-6 outline-hidden">
-      <h2 id={id} className="font-medium break-all">
+      <h2 id={id} className="font-medium wrap-break-word">
         {t('failed.title', { fileName })}
       </h2>
       {problem ? (
