@@ -20,6 +20,7 @@ import {
 } from '@edi-bridge/db'
 
 import { TestInterchangeRefused } from './errors'
+import { publishRunChanges } from './live-events'
 import { queueReceived, type ReceivedRun, storeRun } from './receive'
 import { Database } from './services'
 
@@ -225,6 +226,7 @@ export const sendTestInterchange = (send: TestInterchangeToSend) =>
       return yield* new TestInterchangeRefused({ refusal: outcome.refusal })
     }
 
+    yield* publishRunChanges([outcome.run.id])
     yield* queueReceived([outcome.run])
 
     return outcome.run

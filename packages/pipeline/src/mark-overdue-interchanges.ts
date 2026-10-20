@@ -3,13 +3,14 @@ import { DateTime, Effect } from 'effect'
 
 import { runs, tradingPartners } from '@edi-bridge/db'
 
+import { publishRunChanges } from './live-events'
 import { Database } from './services'
 
 export const markOverdueInterchanges = Effect.gen(function* () {
   const db = yield* Database
   const now = yield* DateTime.nowAsDate
 
-  yield* Effect.promise(() =>
+  const marked = yield* Effect.promise(() =>
     db
       .update(runs)
       .set({ acknowledgementState: 'overdue' })
@@ -31,6 +32,9 @@ export const markOverdueInterchanges = Effect.gen(function* () {
               ),
           ),
         ),
-      ),
+      )
+      .returning({ id: runs.id }),
   )
+
+  yield* publishRunChanges(marked.map(({ id }) => id))
 })

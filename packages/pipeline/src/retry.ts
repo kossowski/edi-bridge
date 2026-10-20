@@ -4,6 +4,7 @@ import { Effect } from 'effect'
 import { runs, runSteps } from '@edi-bridge/db'
 
 import { RunNotRetryable } from './errors'
+import { publishRunChanges } from './live-events'
 import { queueOrLeaveToSweep } from './queue-received-runs'
 import { Database, type QueuedRun } from './services'
 
@@ -52,5 +53,6 @@ export const retryRun = (queued: QueuedRun) =>
       return yield* new RunNotRetryable({ runId: queued.runId })
     }
 
+    yield* publishRunChanges([queued.runId])
     yield* queueOrLeaveToSweep(queued, 'Retried')
   })

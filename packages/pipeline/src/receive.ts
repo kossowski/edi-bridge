@@ -18,6 +18,7 @@ import { ParseError, parseMessages, readInterchange } from '@edi-bridge/edifact'
 import { answerDocument } from './acknowledgement'
 import { carriesTestIndicator } from './envelope'
 import { ReceiptRejected } from './errors'
+import { publishRunChanges } from './live-events'
 import { Database, Documents, RunQueue } from './services'
 import { stagesOf } from './stages'
 
@@ -418,6 +419,8 @@ export const receive = (arriving: ArrivingDocument) =>
         )
       }),
     )
+
+    yield* publishRunChanges(created.map(({ id }) => id))
 
     const notQueued = yield* queueReceived(created)
 

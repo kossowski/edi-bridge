@@ -32,6 +32,7 @@ import {
 } from '@edi-bridge/db'
 
 import { RunNotQueued } from './errors'
+import { LiveEvents, type LiveEventsService, type PublishedLiveEvent } from './live-events'
 import {
   Database,
   Delivery,
@@ -106,6 +107,26 @@ export function inMemoryRunQueue({ failures = 0 }: { failures?: number } = {}) {
   }
 }
 
+export function recordingLiveEvents() {
+  const published: PublishedLiveEvent[] = []
+
+  return {
+    published,
+    service: {
+      publish: (event) =>
+        Effect.sync(() => {
+          published.push(event)
+        }),
+    } satisfies LiveEventsService,
+  }
+}
+
+// Every test publishes to one recorder, and tells its own Runs apart by their ids.
+export const testLiveEvents = recordingLiveEvents()
+
+export const liveStatusesOf = (runId: string) =>
+  testLiveEvents.published.flatMap(({ event: { run } }) => (run.id === runId ? [run.status] : []))
+
 const noDelivery: DeliveryService = () => Effect.die(new Error('This test delivers nothing'))
 
 export const pipelineServices =
@@ -116,6 +137,7 @@ export const pipelineServices =
       Effect.provideService(Documents, postgresDocumentStorage(db)),
       Effect.provideService(RunQueue, queue.service),
       Effect.provideService(Delivery, delivery),
+      Effect.provideService(LiveEvents, testLiveEvents.service),
     )
 
 export const testSecrets = secretBox(randomBytes(secretKeyBytes))

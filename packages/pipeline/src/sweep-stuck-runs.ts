@@ -3,6 +3,7 @@ import { DateTime, type Duration, Effect } from 'effect'
 
 import { runs, runSteps } from '@edi-bridge/db'
 
+import { publishRunChanges } from './live-events'
 import { failOnDefect } from './process-run'
 import { queueOrLeaveToSweep } from './queue-received-runs'
 import { Database, type QueuedRun } from './services'
@@ -76,6 +77,7 @@ const releaseOrFail = (run: QueuedRun, cutoff: Date) =>
 
     if (released !== undefined) {
       yield* Effect.logError(`Stuck Run ${run.runId} released to be processed again`)
+      yield* publishRunChanges([run.runId])
       yield* queueOrLeaveToSweep(run, 'Stuck')
 
       return
@@ -83,5 +85,6 @@ const releaseOrFail = (run: QueuedRun, cutoff: Date) =>
 
     if (yield* failOnDefect(run.runId)) {
       yield* Effect.logError(`Stuck Run ${run.runId} failed as a defect`)
+      yield* publishRunChanges([run.runId])
     }
   })

@@ -13,7 +13,13 @@ import {
 } from '@edi-bridge/channels/testing'
 import { channels, connect, type Connection, documents, mappings, runs } from '@edi-bridge/db'
 import { startTestDatabase, type TestDatabase } from '@edi-bridge/db/testing'
-import { bullmqRunQueue, receive, retryRun, type RunQueueService } from '@edi-bridge/pipeline'
+import {
+  bullmqRunQueue,
+  liveEventSubscriber,
+  receive,
+  retryRun,
+  type RunQueueService,
+} from '@edi-bridge/pipeline'
 import {
   addOrdersFlow,
   deliverOverSftp,
@@ -348,5 +354,46 @@ describe('the worker', () => {
     expect(erp.received).toMatchObject([
       { method: 'POST', headers: { 'content-type': 'application/json' } },
     ])
+  })
+
+  describe('its live events', () => {
+    let subscriber: ReturnType<typeof liveEventSubscriber>
+
+    const statuses = new Map<string, string[]>()
+
+    beforeAll(async () => {
+      subscriber = liveEventSubscriber(testRedis.url)
+      await subscriber.ready
+      subscriber.subscribe(workspace.id, ({ run }) => {
+        statuses.set(run.id, [...(statuses.get(run.id) ?? []), run.status])
+      })
+    })
+
+    afterAll(async () => {
+      await subscriber.close()
+    })
+
+    it('publishes each change of a Run it processes', async () => {
+      const runId = await arrive(goldenInvoice)
+
+      await vi.waitFor(() => {
+        expect(statuses.get(runId)).toEqual(['processing', 'delivered'])
+      })
+    })
+
+    it('publishes a stuck Run its sweep released', async () => {
+      const runId = await arrive(goldenInvoice, inMemoryRunQueue())
+
+      await connection.db.execute(
+        sql`update runs set status = 'processing', updated_at = now() - interval '2 hours' where id = ${runId}`,
+      )
+      await connection.db.execute(
+        sql`update run_steps set finished_at = now() - interval '2 hours', started_at = now() - interval '2 hours' where run_id = ${runId} and stage = 'receipt'`,
+      )
+
+      await vi.waitFor(() => {
+        expect(statuses.get(runId)).toEqual(['received', 'processing', 'delivered'])
+      })
+    })
   })
 })
