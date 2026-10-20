@@ -56,6 +56,7 @@ const seeded = {
   failedDesadv: '',
   reprocessedDesadv: '',
   waitingOrders: '',
+  expiredOrders: '',
   notSentOrders: '',
   notSentOrdersDocument: '',
   alpenfrischId: '',
@@ -166,6 +167,15 @@ async function seedLifecycles(target: InvoiceWorkspace, db = api.connection.db) 
     receivedAt: hoursAgo(70),
   })
 
+  // Retention deleted the Document of this Run.
+  const expiredOrders = await run({
+    flowId: alpenfrischOrders.id,
+    documentId: null,
+    documentDeletedAt: hoursAgo(1),
+    businessReference: '4711',
+    receivedAt: hoursAgo(110),
+  })
+
   await run({ flowId: alpenfrischOrders.id, businessReference: '4711', receivedAt: hoursAgo(60) })
 
   const failedDesadv = await run({
@@ -226,6 +236,7 @@ async function seedLifecycles(target: InvoiceWorkspace, db = api.connection.db) 
     failedDesadv: failedDesadv.id,
     reprocessedDesadv: reprocessedDesadv.id,
     waitingOrders: waitingOrders.id,
+    expiredOrders: expiredOrders.id,
     notSentOrders: notSentOrders.id,
     notSentOrdersDocument: notSentDocument.id,
     alpenfrischId: alpenfrisch.id,
@@ -482,6 +493,15 @@ describe('GET /order-lifecycles/:businessReference', () => {
         acknowledgement: null,
         notSentReason: 'noOutboundChannel',
       },
+    })
+  })
+
+  it('keeps a Run whose Document retention deleted, without its Interchange', async () => {
+    const [alpenfrisch] = await loaded('4711')
+
+    expect(alpenfrisch?.messages[0]).toMatchObject({
+      run: { id: seeded.expiredOrders, status: 'delivered' },
+      interchange: null,
     })
   })
 

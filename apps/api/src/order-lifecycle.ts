@@ -44,7 +44,8 @@ const selectLifecycleRuns = (db: Database, where: SQL | undefined) =>
     notSentReason: acknowledgements.notSentReason,
     replacedById: replacingRuns.id,
   })
-    .innerJoin(documents, eq(documents.id, runs.documentId))
+    // Retention deletes the Document of a Run but keeps the Run in its Order Lifecycle.
+    .leftJoin(documents, eq(documents.id, runs.documentId))
     .leftJoin(acknowledgements, eq(acknowledgements.documentId, runs.documentId))
     .leftJoin(replacingRuns, eq(replacingRuns.replacesRunId, runs.id))
     .where(where)
@@ -91,7 +92,7 @@ const interchangeOf = (
         }
   }
 
-  return row.receivedControlReference === null
+  return row.documentId === null || row.receivedControlReference === null
     ? null
     : {
         id: row.documentId,
