@@ -169,11 +169,15 @@ describe('POST /runs/:id/retry', () => {
 
     await retry(id)
 
-    expect(api.liveEvents.published.slice(count)).toEqual([
-      {
-        workspaceId: workspace.id,
-        event: { type: 'run.changed', run: expect.objectContaining({ id, status: 'received' }) },
-      },
+    const announced = api.liveEvents.published.slice(count).map(({ workspaceId, event }) => ({
+      workspaceId,
+      type: event.type,
+      run: event.run.id,
+      status: event.run.status,
+    }))
+
+    expect(announced).toEqual([
+      { workspaceId: workspace.id, type: 'run.changed', run: id, status: 'received' },
     ])
   })
 

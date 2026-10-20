@@ -158,7 +158,15 @@ describe('a failed inbound Run', () => {
 })
 
 const announcedSince = (id: string, count = 0) =>
-  api.liveEvents.published.filter(({ event }) => event.run.id === id).slice(count)
+  api.liveEvents.published
+    .filter(({ event }) => event.run.id === id)
+    .slice(count)
+    .map(({ workspaceId, event }) => ({
+      workspaceId,
+      type: event.type,
+      run: event.run.id,
+      status: event.run.status,
+    }))
 
 describe('POST /runs/:id/wait-for-trading-partner', () => {
   it('announces the change of the marked Run to its Workspace', async () => {
@@ -168,10 +176,7 @@ describe('POST /runs/:id/wait-for-trading-partner', () => {
     await markWaiting(id)
 
     expect(announcedSince(id, count)).toEqual([
-      {
-        workspaceId: workspace.id,
-        event: { type: 'run.changed', run: expect.objectContaining({ id, status: 'failed' }) },
-      },
+      { workspaceId: workspace.id, type: 'run.changed', run: id, status: 'failed' },
     ])
   })
 
@@ -309,10 +314,7 @@ describe('DELETE /runs/:id/wait-for-trading-partner', () => {
     await endWaiting(id)
 
     expect(announcedSince(id, count)).toEqual([
-      {
-        workspaceId: workspace.id,
-        event: { type: 'run.changed', run: expect.objectContaining({ id, status: 'failed' }) },
-      },
+      { workspaceId: workspace.id, type: 'run.changed', run: id, status: 'failed' },
     ])
   })
 
