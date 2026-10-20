@@ -42,6 +42,8 @@ export class ParseError extends Error {
   }
 }
 
+const segmentTagLength = 3
+
 const segmentTag = /^[A-Z0-9]{3}$/
 
 const serviceStringAdviceTag = 'UNA'
@@ -364,6 +366,44 @@ export const readInterchange = (text: string): Reading => {
   }
 
   return failed(endError ?? new ParseError('missing-interchange-trailer', position(0)))
+}
+
+const readDelimitersOrUndefined = (advice: string) => {
+  try {
+    return readDelimiters(advice)
+  } catch (error) {
+    if (error instanceof ParseError) {
+      return undefined
+    }
+
+    throw error
+  }
+}
+
+// Where the character after a text cut short within an Interchange stands, and in which segment.
+export const positionAfter = (text: string) => {
+  const hasServiceStringAdvice = text.startsWith(serviceStringAdviceTag)
+
+  const delimiters = hasServiceStringAdvice
+    ? readDelimitersOrUndefined(text.slice(0, serviceStringAdviceLength))
+    : defaultDelimiters
+
+  if (delimiters === undefined) {
+    return { position: serviceStringAdvicePosition, tag: serviceStringAdviceTag }
+  }
+
+  const position = interchangeSegmentPosition(hasServiceStringAdvice)
+
+  const { segments, endError, trailingText } = tokenize(
+    hasServiceStringAdvice ? text.slice(serviceStringAdviceLength) : text,
+    delimiters,
+    position,
+  )
+
+  return {
+    position: endError?.position ?? position(segments.length),
+    tag: trailingText.trim().slice(0, segmentTagLength),
+  }
 }
 
 export const parseMessages = (text: string): ParsedInterchange => {

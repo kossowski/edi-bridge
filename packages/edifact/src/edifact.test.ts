@@ -5,6 +5,7 @@ import { messageDefinitions } from './definitions/message-definitions'
 import {
   buildContrl,
   BuildContrlError,
+  decodeInterchange,
   type Delimiters,
   type Interchange,
   type Message,
@@ -707,5 +708,97 @@ describe('buildContrl', () => {
 
     expect(error).toBeInstanceOf(BuildContrlError)
     expect(error).toMatchObject({ code: 'unreadable-interchange-header' })
+  })
+})
+
+const syntaxInterchange = (syntax: string, name: Buffer) =>
+  Buffer.concat([
+    Buffer.from(
+      `UNB+${syntax}:3+4012345000016:14+4389876511114:14+261014:0930+1'UNH+1+ORDERS:D:96A:UN:EAN008'NAD+BY+`,
+    ),
+    name,
+    Buffer.from("'UNT+3+1'UNZ+1+1'"),
+  ])
+
+describe('decodeInterchange', () => {
+  it.each([
+    ['UNOC', Buffer.from([0x4b, 0x72, 0xe4, 0x6d, 0x65, 0x72, 0x80]), 'Kr\u00e4mer\u0080'],
+    ['UNOD', Buffer.from([0xa3, 0xf3, 0x64, 0xbc]), '\u0141\u00f3d\u017a'],
+    ['UNOE', Buffer.from([0xb8, 0xd2, 0xd0]), '\u0418\u0432\u0430'],
+    ['UNOF', Buffer.from([0xc1, 0xe8, 0xde, 0xed, 0xe1]), '\u0391\u03b8\u03ae\u03bd\u03b1'],
+    ['UNOW', Buffer.from('Fr\u00fch'), 'Fr\u00fch'],
+    ['UNOY', Buffer.from('\u{1f600}'), '\u{1f600}'],
+    ['UNOA', Buffer.from('KRAMER'), 'KRAMER'],
+  ])('decodes an Interchange in %s with the character set its UNB names', (syntax, name, text) => {
+    const decoded = decodeInterchange(syntaxInterchange(syntax, name))
+
+    expect(decoded).toEqual({
+      characterSet: syntax,
+      text: syntaxInterchange(syntax, Buffer.from(''))
+        .toString('latin1')
+        .replace("NAD+BY+'", `NAD+BY+${text}'`),
+    })
+  })
+
+  it('reads the syntax identifier behind a UNA and a UTF-8 byte order mark', () => {
+    const decoded = decodeInterchange(
+      Buffer.concat([
+        Buffer.from([0xef, 0xbb, 0xbf]),
+        Buffer.from("UNA:+.? '"),
+        syntaxInterchange('UNOW', Buffer.from('Fr\u00fch')),
+      ]),
+    )
+
+    const behindAdvice: unknown = expect.stringMatching(/^UNA:\+\.\? 'UNB/)
+
+    expect(decoded).toMatchObject({ characterSet: 'UNOW', text: behindAdvice })
+  })
+
+  it.each([
+    ['UNOW', Buffer.from([0x4b, 0x72, 0xe4, 0x6d]), 0xe4],
+    ['UNOW', Buffer.from([0x4b, 0x72, 0xc3, 0x28]), 0xc3],
+    ['UNOA', Buffer.from([0x4b, 0x72, 0xe4, 0x6d]), 0xe4],
+    ['UNOB', Buffer.from([0x4b, 0x72, 0x80, 0x6d]), 0x80],
+    ['UNOF', Buffer.from([0x4b, 0x72, 0xae, 0x6d]), 0xae],
+  ])(
+    'names the byte and the position of the first sequence not valid in %s',
+    (syntax, name, byte) => {
+      const decoded = decodeInterchange(syntaxInterchange(syntax, name))
+
+      // UNB, UNH and NAD+BY+Kr take the 97 bytes before it.
+      expect(decoded).toMatchObject({
+        characterSet: syntax,
+        error: {
+          characterSet: syntax,
+          byte: 98,
+          value: byte,
+          position: { segment: 3, element: 2, component: 1 },
+          tag: 'NAD',
+        },
+      })
+      expect(decoded && 'error' in decoded ? decoded.readable : '').toContain('NAD+BY+Kr\ufffd')
+    },
+  )
+
+  it('names the segment that an invalid byte starts', () => {
+    const decoded = decodeInterchange(
+      Buffer.concat([
+        syntaxInterchange('UNOW', Buffer.from('X')).subarray(0, -"UNT+3+1'UNZ+1+1'".length),
+        Buffer.from([0xff]),
+      ]),
+    )
+
+    expect(decoded).toMatchObject({ error: { position: { segment: 4 }, tag: '' } })
+    expect(decoded && 'error' in decoded ? decoded.error.position.element : 0).toBeUndefined()
+  })
+
+  it.each([
+    ['a Document without a UNB', Buffer.from('order;quantity\n4711;3\n')],
+    [
+      'a UNB with a syntax identifier no character set is known for',
+      syntaxInterchange('UNOK', Buffer.from('X')),
+    ],
+  ])('decodes nothing for %s', (_case, bytes) => {
+    expect(decodeInterchange(bytes)).toBeUndefined()
   })
 })
