@@ -80,6 +80,7 @@ describe('the Document storage', () => {
       channelId,
       fileName: 'invoice.edi',
       content: invoice,
+      bytes: null,
       interchangeSender: '4012345000009',
       interchangeControlReference: '1',
       testIndicator: true,
@@ -99,6 +100,17 @@ describe('the Document storage', () => {
     })
 
     await expect(storage.read(workspaceId, stored.id)).resolves.toMatchObject({ content })
+  })
+
+  it('reads back the bytes of a Document without content unmodified', async () => {
+    const bytes = Buffer.from([0x4e, 0x41, 0x44, 0x2b, 0xe4, 0x00, 0xff])
+
+    const stored = await storage.store({ workspaceId, channelId, fileName: 'orders.edi', bytes })
+
+    await expect(storage.read(workspaceId, stored.id)).resolves.toMatchObject({
+      content: null,
+      bytes,
+    })
   })
 
   it.each([
