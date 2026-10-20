@@ -40,7 +40,7 @@ import {
 } from './mapping-version'
 import { seedRuns } from './run'
 import { problemOf } from './run-problem'
-import { stagesOf, statusOf, stepStatuses } from './run-steps'
+import { recordedMappingVersionOf, stagesOf, statusOf, stepStatuses } from './run-steps'
 import {
   bundleKeyOf,
   type Reprocessed,
@@ -85,15 +85,6 @@ function timeSteps(run: RunSummary, statuses = stepStatuses(run)): RunStep[] {
       finishedAt: status === 'running' ? null : new Date(clock).toISOString(),
     }
   })
-}
-
-function pinnedVersion(run: RunSummary) {
-  const versions = mappingVersionsForFlow(run)
-  const receivedAt = Date.parse(run.receivedAt)
-
-  return (
-    versions.find(({ publishedAt }) => Date.parse(publishedAt) <= receivedAt) ?? versions.at(-1)!
-  )
 }
 
 type GeneratedGroup = {
@@ -265,9 +256,8 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
     const message = messages.get(messageOwner)!
     const direction = directionOf(run)
 
-    const mappingVersion = ['pending', 'skipped'].includes(statusOf(run, 'mapping')!)
-      ? null
-      : (chosenVersions.get(id) ?? pinnedVersion(run))
+    const recorded = recordedMappingVersionOf(run, runs().claimed(id))
+    const mappingVersion = recorded && (chosenVersions.get(id) ?? recorded)
 
     const runError = run.status === 'failed' ? message.error : null
 

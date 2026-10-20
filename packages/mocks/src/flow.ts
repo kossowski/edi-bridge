@@ -53,7 +53,25 @@ const sharedMappingFlowIds = seedSummaries
   .slice(-2)
   .map(({ id }) => id)
 
+// Generating the versions costs too much to repeat for every seeded Run of a filtered list.
+const versionsByFlow = new Map<string, ReadonlyArray<MappingVersionSummary>>()
+
 export function mappingVersionsForFlow({
+  flow,
+  messageType,
+}: Pick<RunSummary, 'flow' | 'messageType'>): ReadonlyArray<MappingVersionSummary> {
+  const key = JSON.stringify([flow.id, flow.name, messageType])
+  let versions = versionsByFlow.get(key)
+
+  if (versions === undefined) {
+    versions = generateMappingVersions({ flow, messageType })
+    versionsByFlow.set(key, versions)
+  }
+
+  return versions
+}
+
+function generateMappingVersions({
   flow,
   messageType,
 }: Pick<RunSummary, 'flow' | 'messageType'>): MappingVersionSummary[] {

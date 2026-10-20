@@ -5,6 +5,7 @@ import {
   directionOf,
   type FailureStage,
   fromSearchParams,
+  type MappingVersionSummary,
   type MessageType,
   type RunListQuery,
   runsEndpoint,
@@ -27,6 +28,7 @@ import { hash } from './hash'
 import { problemReasonOf } from './interchange'
 import { includesText, pageOf } from './list'
 import { badRequest } from './responses'
+import { recordedMappingVersionOf as seededRecordedMappingVersionOf } from './run-steps'
 import { createRunStore, interchangeIdOf, type RunStore, toRunStore } from './run-store'
 import { seedTradingPartners } from './trading-partner'
 
@@ -275,10 +277,10 @@ function matchesExceptStatus(
   run: RunSummary,
   query: RunListQuery,
   text: string,
-  mappingOfFlow: (flowId: string) => string | undefined,
+  mappingOfRun: (run: RunSummary) => string | undefined,
 ) {
   const receivedAt = Date.parse(run.receivedAt)
-  const mappingId = query.mappingId?.length ? mappingOfFlow(run.flow.id) : undefined
+  const mappingId = query.mappingId?.length ? mappingOfRun(run) : undefined
 
   return (
     (text === '' ||
@@ -303,9 +305,11 @@ export function runsHandler(
   {
     flows = seedFlows,
     mappings = seedMappings,
+    recordedMappingVersionOf,
   }: {
     flows?: ReadonlyArray<FlowRecord> | FlowStore
     mappings?: ReadonlyArray<MappingRecord> | MappingCatalogue
+    recordedMappingVersionOf?: (run: RunSummary) => MappingVersionSummary | null
   } = {},
 ) {
   let store: RunStore | undefined
@@ -319,12 +323,21 @@ export function runsHandler(
       return badRequest(query.error.message)
     }
 
-    store ??= toRunStore(runs ?? seedRuns())
+    const runStore = (store ??= toRunStore(runs ?? seedRuns()))
     const { status } = query.data
     const text = query.data.q?.toLowerCase() ?? ''
 
-    const mappingOfFlow = (flowId: string) => {
-      const flow = flowStore.get(flowId)
+    // Mirrors the api: a Run not yet claimed falls back to the version its Flow pins now.
+    const mappingOfRun = (run: RunSummary) => {
+      const recorded = recordedMappingVersionOf
+        ? recordedMappingVersionOf(run)
+        : seededRecordedMappingVersionOf(run, runStore.claimed(run.id))
+
+      if (recorded) {
+        return recorded.mappingId
+      }
+
+      const flow = flowStore.get(run.flow.id)
 
       return flow && catalogue.find(flow.mappingVersionId)?.mapping.mappingId
     }
@@ -339,8 +352,8 @@ export function runsHandler(
 
     const filtered: RunSummary[] = []
 
-    for (const run of store.newestFirst()) {
-      if (!matchesExceptStatus(run, query.data, text, mappingOfFlow)) {
+    for (const run of runStore.newestFirst()) {
+      if (!matchesExceptStatus(run, query.data, text, mappingOfRun)) {
         continue
       }
 

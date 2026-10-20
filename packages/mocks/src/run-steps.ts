@@ -1,12 +1,14 @@
 import {
   directionOf,
   type FailureStage,
+  type MappingVersionSummary,
   type RunStatus,
   type RunStepStage,
   type RunStepStatus,
   type RunSummary,
 } from '@edi-bridge/contracts'
 
+import { mappingVersionsForFlow } from './flow'
 import { seededFaker } from './seeded-faker'
 
 export type RunOutcome =
@@ -60,4 +62,23 @@ export function stepStatuses(run: StepRun): RunStepStatus[] {
 
 export function statusOf(run: StepRun, stage: RunStepStage) {
   return stepStatuses(run)[stagesOf(run).indexOf(stage)]
+}
+
+// Like the api, which records the version when it claims a Run, before parsing.
+export function recordedMappingVersionOf(
+  run: RunSummary,
+  claimed: boolean,
+): MappingVersionSummary | null {
+  if (!claimed) {
+    return null
+  }
+
+  const receivedAt = Date.parse(run.receivedAt)
+  const versions = mappingVersionsForFlow(run)
+
+  return (
+    versions.find(({ publishedAt }) => Date.parse(publishedAt) <= receivedAt) ??
+    // SAFETY: every Flow's Mapping has at least one version, so the oldest one exists.
+    versions.at(-1)!
+  )
 }

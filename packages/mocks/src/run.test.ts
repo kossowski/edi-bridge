@@ -2,19 +2,30 @@ import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
 import {
+  type MappingVersionSummary,
+  mappingVersionSummarySchema,
+  retryRunEndpoint,
   type RunListQuery,
   runDetailSchema,
   runEndpoint,
   runListSchema,
+  runMappingFilterCase,
   runsEndpoint,
   toPath,
   toSearchParams,
 } from '@edi-bridge/contracts'
 
-import { seedFlows, seedMappings } from './flow'
+import {
+  type FlowRecord,
+  type MappingRecord,
+  mappingVersionsForFlow,
+  seedFlows,
+  seedMappings,
+} from './flow'
 import { createRun, createRuns, runsHandler, seedRuns } from './run'
 import { runDetailHandlers, seedReprocessed } from './run-detail'
 import { createRunStore } from './run-store'
+import { stableUuid } from './seed-id'
 import { seedRunsBeforeAll } from './test-helpers'
 import { seedTradingPartners } from './trading-partner'
 
@@ -170,7 +181,7 @@ describe('GET /runs', () => {
     expect(body?.runs.map((run) => run.id)).toEqual(['00000000-0000-4000-8000-000000000001'])
   })
 
-  it('filters by the Mapping that the Flow of each Run uses', async () => {
+  it('filters seeded Runs of Flows that share a Mapping by that Mapping', async () => {
     const mappingOf = (flowId: string) => {
       const versionId = seedFlows.find(({ id }) => id === flowId)!.mappingVersionId
 
@@ -205,6 +216,126 @@ describe('GET /runs', () => {
       '00000000-0000-4000-8000-000000000002',
     ])
   })
+
+  describe('filters by the Mapping Version each Run recorded, else the one its Flow pins', () => {
+    const { mappings, mappingVersions, flows, runs, filters } = runMappingFilterCase
+    const idOf = (key: string) => stableUuid(`run-mapping-filter-case:${key}`)
+    // SAFETY: the seed has a Flow for every Message Type, ORDERS among them.
+    const template = seedFlows.find(({ messageType }) => messageType === 'ORDERS')!
+
+    const mappingRecords: MappingRecord[] = mappings.map((mapping) => ({
+      mappingId: idOf(mapping),
+      messageType: 'ORDERS',
+      versions: mappingVersions
+        .filter((version) => version.mapping === mapping)
+        .map(({ key }, index) =>
+          mappingVersionSummarySchema.parse({
+            id: idOf(key),
+            mappingId: idOf(mapping),
+            mappingName: mapping,
+            version: index + 1,
+            publishedAt: new Date(Date.UTC(2026, 0, index + 1)).toISOString(),
+          }),
+        )
+        .reverse(),
+    }))
+
+    const versionById = new Map<string, MappingVersionSummary>(
+      mappingRecords.flatMap(({ versions }) => versions.map((version) => [version.id, version])),
+    )
+
+    const flowRecords: FlowRecord[] = flows.map(({ key, pinnedMappingVersion }) => ({
+      ...template,
+      id: idOf(key),
+      name: key,
+      mappingVersionId: idOf(pinnedMappingVersion),
+    }))
+
+    const recorded = new Map(
+      runs.map(({ key, recordedMappingVersion }) => [
+        idOf(key),
+        recordedMappingVersion === null
+          ? null
+          : // SAFETY: the case records only Mapping Versions it declares, and versionById holds them all.
+            versionById.get(idOf(recordedMappingVersion))!,
+      ]),
+    )
+
+    it.each(filters)('serves the Runs of the Mappings $mappings', async (filter) => {
+      server.use(
+        runsHandler(
+          apiUrl,
+          runs.map(({ key, flow }) =>
+            createRun({
+              id: idOf(key),
+              flow: { id: idOf(flow), name: flow },
+              messageType: 'ORDERS',
+            }),
+          ),
+          {
+            flows: flowRecords,
+            mappings: mappingRecords,
+            recordedMappingVersionOf: (run) => recorded.get(run.id) ?? null,
+          },
+        ),
+      )
+
+      const { body } = await listRuns({ mappingId: filter.mappings.map(idOf) })
+
+      expect(new Set(body?.runs.map((run) => run.id))).toEqual(new Set(filter.runs.map(idOf)))
+    })
+  })
+
+  it.each(['parse', 'validation'] as const)(
+    'keeps a Run failed at %s with its Mapping after its Flow moves to another Mapping',
+    async (failureStage) => {
+      // SAFETY: the seed has a Flow for every Message Type, ORDERS among them.
+      const ordersFlow = seedFlows.find(({ messageType }) => messageType === 'ORDERS')!
+
+      const [recordedMapping] = mappingVersionsForFlow({ flow: ordersFlow, messageType: 'ORDERS' })
+
+      const otherMapping = seedMappings.find(
+        ({ mappingId }) => mappingId !== recordedMapping?.mappingId,
+      )
+
+      const flow = { id: ordersFlow.id, name: ordersFlow.name }
+      const receivedAt = '2026-10-01T08:00:00.000Z'
+
+      const failed = createRun({
+        id: '00000000-0000-4000-8000-000000000001',
+        flow,
+        messageType: 'ORDERS',
+        receivedAt,
+        status: 'failed',
+        failureStage,
+      })
+
+      const received = createRun({
+        id: '00000000-0000-4000-8000-000000000002',
+        flow,
+        messageType: 'ORDERS',
+        receivedAt,
+        status: 'received',
+        failureStage: null,
+      })
+
+      server.use(
+        runsHandler(apiUrl, [failed, received], {
+          flows: seedFlows.map((flow) =>
+            flow.id === ordersFlow.id
+              ? { ...flow, mappingVersionId: otherMapping?.versions[0]?.id ?? '' }
+              : flow,
+          ),
+        }),
+      )
+
+      const byRecorded = await listRuns({ mappingId: [recordedMapping?.mappingId ?? ''] })
+      const byPinned = await listRuns({ mappingId: [otherMapping?.mappingId ?? ''] })
+
+      expect(byRecorded.body?.runs.map((run) => run.id)).toEqual([failed.id])
+      expect(byPinned.body?.runs.map((run) => run.id)).toEqual([received.id])
+    },
+  )
 
   it('filters by a time range that includes both of its ends', async () => {
     server.use(
@@ -361,6 +492,50 @@ describe('GET /runs', () => {
 })
 
 describe('GET /runs with Run detail', () => {
+  it('keeps a retried Run with its Mapping Version after its Flow moves to another Mapping', async () => {
+    // SAFETY: the seed has a Flow for every Message Type, ORDERS among them.
+    const ordersFlow = seedFlows.find(({ messageType }) => messageType === 'ORDERS')!
+    const [recordedMapping] = mappingVersionsForFlow({ flow: ordersFlow, messageType: 'ORDERS' })
+
+    const otherMapping = seedMappings.find(
+      ({ mappingId }) => mappingId !== recordedMapping?.mappingId,
+    )
+
+    const failed = createRun({
+      id: '00000000-0000-4000-8000-000000000001',
+      flow: { id: ordersFlow.id, name: ordersFlow.name },
+      messageType: 'ORDERS',
+      receivedAt: '2026-10-01T08:00:00.000Z',
+      status: 'failed',
+      failureStage: 'delivery',
+    })
+
+    const runs = createRunStore([failed])
+
+    const flows = seedFlows.map((flow) =>
+      flow.id === ordersFlow.id
+        ? { ...flow, mappingVersionId: otherMapping?.versions[0]?.id ?? '' }
+        : flow,
+    )
+
+    server.use(runsHandler(apiUrl, runs, { flows }), ...runDetailHandlers(apiUrl, { runs }))
+    const before = await fetch(`${apiUrl}${toPath(runEndpoint.path, { id: failed.id })}`)
+    const { mappingVersion } = runDetailSchema.parse(await before.json())
+
+    await fetch(`${apiUrl}${toPath(retryRunEndpoint.path, { id: failed.id })}`, { method: 'POST' })
+
+    const byRecorded = await listRuns({ mappingId: [recordedMapping?.mappingId ?? ''] })
+    const byPinned = await listRuns({ mappingId: [otherMapping?.mappingId ?? ''] })
+    const after = await fetch(`${apiUrl}${toPath(runEndpoint.path, { id: failed.id })}`)
+
+    expect(byRecorded.body?.runs.map(({ id, status }) => ({ id, status }))).toEqual([
+      { id: failed.id, status: 'received' },
+    ])
+    expect(byPinned.body?.runs).toEqual([])
+    expect(mappingVersion?.mappingId).toBe(recordedMapping?.mappingId)
+    expect(runDetailSchema.parse(await after.json()).mappingVersion).toEqual(mappingVersion)
+  })
+
   it('lists each Run with the direction, Business Reference and Interchange that its detail shows', async () => {
     const seeded = createRuns({ count: 400 })
     const runs = createRunStore(seeded, seedReprocessed(seeded))

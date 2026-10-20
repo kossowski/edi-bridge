@@ -24,6 +24,7 @@ export type RunStore = {
   unplaced: () => readonly RunSummary[]
   newestFirst: () => readonly RunSummary[]
   get: (id: string) => RunSummary | undefined
+  claimed: (id: string) => boolean
   set: (...runs: RunSummary[]) => RunSummary[]
   reprocess: (link: Reprocessed) => void
   replacedOf: (id: string) => string | undefined
@@ -141,6 +142,8 @@ export function createRunStore(
   reprocessed: ReadonlyArray<Reprocessed> = [],
 ): RunStore {
   const byId = new Map(runs.map((run) => [run.id, run]))
+  // A Retry puts a Run back to received, but it stays claimed.
+  const claimed = new Set(runs.flatMap(({ id, status }) => (status === 'received' ? [] : [id])))
   const replaces = new Map(reprocessed.map(({ replaced, replacing }) => [replacing, replaced]))
   const replacedBy = new Map(reprocessed.map(({ replaced, replacing }) => [replaced, replacing]))
   let placement: Placement | undefined
@@ -182,9 +185,14 @@ export function createRunStore(
         .sort((a, b) => b.receivedAt - a.receivedAt)
         .map(({ run }) => run)),
     get: (id) => placed().byId.get(id),
+    claimed: (id) => claimed.has(id),
     set: (...changed) => {
       for (const run of changed) {
         byId.set(run.id, run)
+
+        if (run.status !== 'received') {
+          claimed.add(run.id)
+        }
       }
 
       invalidate()
