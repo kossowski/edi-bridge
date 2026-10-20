@@ -3,14 +3,14 @@ import { Context, Effect } from 'effect'
 
 import type { FastifyRequest } from 'fastify'
 
-import { members, users } from '@edi-bridge/db'
+import { members, users, workspaces } from '@edi-bridge/db'
 
 import type { Session, SessionUser, WorkspaceRole } from '@edi-bridge/contracts'
 
 import { type Auth, headersOf } from './auth.js'
 import { type Database, Db } from './db.js'
 import { Forbidden } from './errors.js'
-import { loadCurrentWorkspace } from './workspace.js'
+import { exactlyOne } from './rows.js'
 
 export interface Member {
   readonly user: SessionUser
@@ -118,10 +118,19 @@ export const recordActivity = Effect.gen(function* () {
 })
 
 export const loadSession = Effect.gen(function* () {
-  const { user, operator, role } = yield* CurrentMember
-  const { id, name } = yield* loadCurrentWorkspace
+  const { user, operator, workspaceId, role } = yield* CurrentMember
+  const db = yield* Db
 
-  return { user, operator, workspace: { id, name, kind: 'standard' }, role } satisfies Session
+  const rows = yield* Effect.promise(() =>
+    db
+      .select({ id: workspaces.id, name: workspaces.name, kind: workspaces.kind })
+      .from(workspaces)
+      .where(eq(workspaces.id, workspaceId)),
+  )
+
+  const workspace = yield* exactlyOne(rows)
+
+  return { user, operator, workspace, role } satisfies Session
 })
 
 export const requireChangeRight = Effect.gen(function* () {
