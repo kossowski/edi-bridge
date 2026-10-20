@@ -292,11 +292,16 @@ export const channelTestFailureReasonSchema = z.enum(channelTestFailureReasons)
 
 export type ChannelTestFailureReason = z.infer<typeof channelTestFailureReasonSchema>
 
+// The API refuses to test a seeded Channel before reaching it, so no reach fails with this reason.
+export const channelTestResultReasonSchema = z.enum([...channelTestFailureReasons, 'seededChannel'])
+
+export type ChannelTestResultReason = z.infer<typeof channelTestResultReasonSchema>
+
 export const channelTestResultSchema = z.discriminatedUnion('outcome', [
   z.object({ outcome: z.literal('succeeded'), testedAt: z.iso.datetime() }),
   z.object({
     outcome: z.literal('failed'),
-    reason: channelTestFailureReasonSchema,
+    reason: channelTestResultReasonSchema,
     testedAt: z.iso.datetime(),
   }),
 ])

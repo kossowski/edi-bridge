@@ -1530,6 +1530,10 @@
           "unexpectedResponse": {
             "title": "Der Server hat unerwartet geantwortet.",
             "hint": "Prüfen Sie die Adresse. Stimmt sie, bitten Sie die IT der Gegenseite, das Protokoll ihres Servers anzusehen."
+          },
+          "seededChannel": {
+            "title": "Das ist eine Demo-Verbindung.",
+            "hint": "Eine Demo-Verbindung sendet nie, darum gibt es nichts zu testen."
           }
         }
       }

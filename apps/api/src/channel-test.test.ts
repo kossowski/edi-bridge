@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm'
 import { createServer as createTcpServer, type Server, type Socket } from 'node:net'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
@@ -165,6 +166,47 @@ describe('POST /channels/:id/test for an HTTP Channel', () => {
     expect(await outcomeOf(httpDelivery(`http://127.0.0.1:${String(silentPort)}/`))).toMatchObject({
       outcome: 'failed',
       reason: 'timedOut',
+    })
+  })
+})
+
+describe('POST /channels/:id/test for a seeded Channel', () => {
+  const seededChannel = async (input: ChannelInput) => {
+    const channel = await created(input)
+
+    await api.connection.db
+      .update(channels)
+      .set({ seeded: true })
+      .where(eq(channels.id, channel.id))
+
+    return channel
+  }
+
+  it('answers that a demo connection never sends, without connecting', async () => {
+    const channel = await seededChannel(httpDelivery())
+
+    const { status, body } = await tested(channel.id)
+
+    expect(status).toBe(200)
+    expect(testChannelEndpoint.response.parse(body)).toMatchObject({
+      outcome: 'failed',
+      reason: 'seededChannel',
+    })
+    expect(erp.received).toEqual([])
+  })
+
+  it('answers the same for a seeded webhook Channel', async () => {
+    const channel = await seededChannel({
+      type: 'webhook',
+      direction: 'inbound',
+      name: 'Seeded webhook',
+      tradingPartnerId: null,
+      rateLimitPerMinute: 60,
+    })
+
+    expect(testChannelEndpoint.response.parse((await tested(channel.id)).body)).toMatchObject({
+      outcome: 'failed',
+      reason: 'seededChannel',
     })
   })
 })

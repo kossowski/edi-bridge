@@ -1002,6 +1002,34 @@ export const TestConnectionRequestFails = meta.story({
   },
 })
 
+export const TestConnectionSeededChannel = meta.story({
+  ...at(live, 'connections'),
+  beforeEach({ msw }) {
+    msw.use(
+      http.post(`${apiUrl}${testChannelEndpoint.path}`, () =>
+        HttpResponse.json({
+          outcome: 'failed',
+          reason: 'seededChannel',
+          testedAt: new Date().toISOString(),
+        }),
+      ),
+    )
+  },
+  async play({ canvasElement }) {
+    const item = await connectionItem(
+      canvasElement,
+      'Connections with Hansemarkt GmbH',
+      'Receive from Hansemarkt GmbH',
+    )
+
+    await userEvent.click(item.getByRole('button', { name: /^Test connection/ }))
+    await expect(await item.findByText('This is a demo connection.')).toBeVisible()
+    await expect(
+      item.getByText('A demo connection never sends, so there is nothing to test.'),
+    ).toBeVisible()
+  },
+})
+
 export const AddConnectionSheet = meta.story({
   ...at(untouched, 'connections'),
   async play({ canvas, canvasElement }) {

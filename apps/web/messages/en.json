@@ -1530,6 +1530,10 @@
           "unexpectedResponse": {
             "title": "The server answered in an unexpected way.",
             "hint": "Check the address. If it is right, ask the other side's IT team to look at their server's log."
+          },
+          "seededChannel": {
+            "title": "This is a demo connection.",
+            "hint": "A demo connection never sends, so there is nothing to test."
           }
         }
       }
