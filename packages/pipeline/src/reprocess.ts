@@ -24,7 +24,6 @@ type Reprocessable = {
   direction: Direction
   problem: { reason: ProblemReason } | null
   mappingVersionId: string | null
-  // Optional until the Run detail carries it; reprocessRun reads it from the Run itself.
   documentDeletedAt?: Date | string | null
 }
 
@@ -75,12 +74,10 @@ export const reprocessRun = ({ workspaceId, runId, mappingVersionId }: Reprocess
             .from(runs)
             .where(eq(runs.replacesRunId, run.id))
 
-          if (run.documentDeletedAt !== null) {
-            return Effect.fail(new RunNotReprocessable({ runId, documentExpired: true }))
-          }
-
           if (replacing !== undefined || !isReprocessable(run)) {
-            return Effect.fail(new RunNotReprocessable({ runId }))
+            return Effect.fail(
+              new RunNotReprocessable({ runId, documentExpired: run.documentDeletedAt !== null }),
+            )
           }
 
           const [chosen] = await tx
