@@ -45,6 +45,12 @@ function destinationChannelOf(run: RunSummary, sources: ProblemSources) {
   return flow && sources.channels.get(flow.destinationChannelId)
 }
 
+function destinationChannelTarget(run: RunSummary, sources: ProblemSources): FixTarget | null {
+  const channel = destinationChannelOf(run, sources)
+
+  return channel ? { kind: 'channel', channelId: channel.id, name: channel.name } : null
+}
+
 function brokenPieceTarget(
   run: RunSummary,
   broken: BrokenPiece | null,
@@ -108,6 +114,7 @@ function brokenPieceTarget(
 function fixTargetOf(
   run: RunSummary,
   fixer: Fixer,
+  reason: ProblemReason,
   broken: BrokenPiece | null,
   mapping: MappingVersionSummary | null,
   sources: ProblemSources,
@@ -126,13 +133,13 @@ function fixTargetOf(
         return brokenPieceTarget(run, broken, mapping, sources)
       }
 
-      const channel = destinationChannelOf(run, sources)
-
-      return channel ? { kind: 'channel', channelId: channel.id, name: channel.name } : null
+      return destinationChannelTarget(run, sources)
     }
 
     case 'you': {
-      return brokenPieceTarget(run, broken, mapping, sources)
+      return reason === 'hostKeyMismatch'
+        ? destinationChannelTarget(run, sources)
+        : brokenPieceTarget(run, broken, mapping, sources)
     }
   }
 }
@@ -155,6 +162,7 @@ export function problemOf(
   return {
     reason,
     whoFixes: fixer,
-    fixTarget: reason === 'defect' ? null : fixTargetOf(run, fixer, broken, mapping, sources),
+    fixTarget:
+      reason === 'defect' ? null : fixTargetOf(run, fixer, reason, broken, mapping, sources),
   }
 }

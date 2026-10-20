@@ -18,7 +18,7 @@ import {
 } from '@edi-bridge/contracts'
 import { parse, validate } from '@edi-bridge/edifact'
 
-import { seedChannels, serverHostKey } from './channel'
+import { refusesHostKey, seedChannels } from './channel'
 import { seedFlows } from './flow'
 import { seedLookupTableNamed } from './lookup-table'
 import { createRun, createRuns, seedRuns } from './run'
@@ -526,7 +526,7 @@ describe('the problem of a failed Run', () => {
     })
   })
 
-  it('seeds one delivery that an SFTP server refused with another host key, fixed at its Channel', async () => {
+  it('seeds one delivery that an SFTP server refused with another host key, fixed by you at its Channel', async () => {
     const runs = createRuns({ count: 2000 })
     const refused = runs.filter(({ problem }) => problem?.reason === 'hostKeyMismatch')
     server.use(...runDetailHandlers(apiUrl, { runs }))
@@ -538,16 +538,14 @@ describe('the problem of a failed Run', () => {
     const channel = seedChannels.find(({ id }) => id === flow.destinationChannelId)!
     const { body } = await getRun(run.id)
 
-    expect(channel.type === 'sftp' && channel.hostKeyFingerprint).not.toBe(
-      channel.type === 'sftp' && serverHostKey(channel.host),
-    )
+    expect(refusesHostKey(channel)).toBe(true)
     expect(body).toMatchObject({
       direction: 'outbound',
       failureStage: 'delivery',
       error: { code: 'hostKeyMismatch', position: null },
       problem: {
         reason: 'hostKeyMismatch',
-        whoFixes: 'retry',
+        whoFixes: 'you',
         fixTarget: { kind: 'channel', channelId: channel.id, name: channel.name },
       },
     })
