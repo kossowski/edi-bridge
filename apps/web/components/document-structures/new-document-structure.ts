@@ -1,11 +1,11 @@
 import {
   type CsvSettings,
+  type DocumentStructureInference,
   type DocumentStructureNode,
   documentStructureNodes,
   type DocumentStructureOriginKind,
   type EncodedFile,
   type FieldLabelChoice,
-  type FieldNamesNotice,
   type InferredDocumentStructure,
   type JsonContent,
   jsonContentSchema,
@@ -60,24 +60,21 @@ export function keptChoices(
   )
 }
 
-type NamedTree = {
-  children: ReadonlyArray<DocumentStructureNode>
-  fieldNamesNotice: FieldNamesNotice | null
-}
-
 export function labelsToSave(
-  { children, fieldNamesNotice }: NamedTree,
+  { children, fieldNamesNotice }: Pick<DocumentStructureInference, 'children' | 'fieldNamesNotice'>,
   choices: LabelChoices,
 ): FieldLabelChoice[] {
-  if (fieldNamesNotice !== null) {
-    return [...choices].map(([path, label]) => ({ path, label }))
+  const namedByAi = fieldNamesNotice === null
+
+  if (namedByAi) {
+    return [...documentStructureNodes(children)].map(({ node }) => {
+      const label = choices.get(node.path) ?? node.label
+
+      return { path: node.path, label, labelReason: label === node.label ? node.labelReason : null }
+    })
   }
 
-  return [...documentStructureNodes(children)].map(({ node }) => {
-    const label = choices.get(node.path) ?? node.label
-
-    return { path: node.path, label, labelReason: label === node.label ? node.labelReason : null }
-  })
+  return [...choices].map(([path, label]) => ({ path, label }))
 }
 
 export type FileFacts =
