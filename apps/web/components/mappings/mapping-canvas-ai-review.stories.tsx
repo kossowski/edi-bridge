@@ -156,6 +156,7 @@ export const InboundWithLookupTable = meta.story({
 
     const lookupTables = () =>
       canvas.queryAllByRole('group', { name: /^Transform Code translation/ })
+
     const before = lookupTables().length
 
     await userEvent.click(panel.getByRole('button', { name: 'Reject Code translation 1' }))
