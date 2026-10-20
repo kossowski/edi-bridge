@@ -69,10 +69,10 @@ beforeAll(async () => {
 
   original = (await submitted(ordersInterchange)).id
 
-  const resent = await submitted(ordersInterchange)
+  const second = await submitted(ordersInterchange)
 
-  expect(resent.status).toBe('duplicate')
-  duplicate = resent.id
+  expect(second.status).toBe('duplicate')
+  duplicate = second.id
 }, 60_000)
 
 afterAll(async () => {
