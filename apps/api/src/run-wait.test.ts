@@ -157,7 +157,6 @@ describe('a failed inbound Run', () => {
   })
 })
 
-// The live events published for the Run since the given count of them.
 const announcedSince = (id: string, count = 0) =>
   api.liveEvents.published.filter(({ event }) => event.run.id === id).slice(count)
 

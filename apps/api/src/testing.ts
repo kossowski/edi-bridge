@@ -77,7 +77,6 @@ export function testRunQueue() {
   return { queued, redis, service }
 }
 
-// Hands each published event to the listeners of its Workspace, as Redis does between processes.
 export function memoryLiveEvents() {
   const published: PublishedLiveEvent[] = []
   const listeners = new Set<{ workspaceId: string; listener: LiveEventListener }>()
