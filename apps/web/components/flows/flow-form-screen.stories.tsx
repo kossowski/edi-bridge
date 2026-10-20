@@ -37,11 +37,11 @@ async function choose(trigger: HTMLElement, option: string | RegExp) {
 
 async function expectOptions(trigger: HTMLElement, options: RegExp[]) {
   await userEvent.click(trigger)
-  await waitFor(() =>
-    expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual(
-      options.map((option) => expect.stringMatching(option)),
-    ),
-  )
+  await waitFor(async () => {
+    const labels = screen.getAllByRole('option').map((option) => option.textContent)
+    await expect(labels).toHaveLength(options.length)
+    await Promise.all(options.map((option, index) => expect(labels[index]).toMatch(option)))
+  })
   await userEvent.keyboard('{Escape}')
   await waitForListboxClosed()
 }
