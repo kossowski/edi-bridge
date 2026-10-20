@@ -3537,6 +3537,25 @@ describe('the CONTRL answering a received Interchange', () => {
     ).resolves.toMatchObject([{ status: 'received' }, { status: 'received' }])
   })
 
+  it('marks the CONTRL rejecting a broken Message of a test Interchange with the test indicator', async () => {
+    const into = await answeringWorkspace('Broken Test Orders')
+    const delivery = recordingDelivery()
+    const withoutBgm = ordersMessage.filter((line) => !line.startsWith('BGM'))
+    const asTest = interchangeOf([withoutBgm]).replace("+00000001'", "+00000001++++++1'")
+
+    await receiveInterchange(into, asTest)
+    await sendWith(delivery.service)
+
+    expect(delivery.to(into.outboundChannelId).map(({ content }) => content)).toEqual([
+      "UNB+UNOC:3+4389876511114:14+4071615111111:14+YYMMDD:HHMM+1++++++1'" +
+        "UNH+1+CONTRL:D:3:UN:EAN002'" +
+        "UCI+00000001+4071615111111:14+4389876511114:14+7'" +
+        "UCM+ME0001+ORDERS:D:96A:UN:EAN008+4+29+UNT+1'" +
+        "UNT+4+1'" +
+        "UNZ+1+1'",
+    ])
+  })
+
   it('answers a Duplicate with a CONTRL of its own', async () => {
     const into = await answeringWorkspace('Duplicate Orders')
     const delivery = recordingDelivery()

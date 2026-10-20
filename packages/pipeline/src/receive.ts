@@ -125,9 +125,9 @@ function route(content: string, channelFlows: readonly ChannelFlow[]) {
   return Effect.succeed({ routed, notRouted })
 }
 
-type Envelope = { key: InterchangeKey | undefined; testIndicator: boolean }
+type ReceivedEnvelope = { key: InterchangeKey | undefined; testIndicator: boolean }
 
-function envelopeOf(content: string): Envelope {
+function envelopeOf(content: string): ReceivedEnvelope {
   try {
     const { header } = readInterchange(content)
     const sender = header?.elements[1]?.[0]

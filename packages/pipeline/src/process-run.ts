@@ -557,7 +557,7 @@ const buildInterchange = (
       receiver: tradingPartner.gln,
       sentAt: yield* DateTime.now,
       reference,
-      testMode,
+      testIndicator: testMode,
     })
 
     const content = yield* encoded(interchange, characterSet)
