@@ -19,7 +19,10 @@ export function awaitsReceiptConfirmation({
   onboarding,
 }: Pick<TradingPartner, 'testMode' | 'onboarding'>) {
   return (
-    testMode && onboarding.testInterchangeSentAt !== null && onboarding.contrlReceivedAt === null
+    testMode &&
+    onboarding.testInterchangeSentAt !== null &&
+    onboarding.contrlReceivedAt === null &&
+    onboarding.testRejectedAt === null
   )
 }
 

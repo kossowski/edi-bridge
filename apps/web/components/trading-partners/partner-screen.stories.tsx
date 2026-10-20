@@ -38,6 +38,7 @@ import {
   createWorkspaceActivity,
   createWorkspace,
   seedFlows,
+  seedRuns,
   seedTradingPartners,
   tradingPartnerActivityHandlers,
   tradingPartnerHandlers,
@@ -47,7 +48,12 @@ import preview from '../../.storybook/preview'
 
 const readyForTest: TradingPartner = {
   ...confirmed,
-  onboarding: { testInterchangeSentAt: null, contrlReceivedAt: null },
+  onboarding: {
+    testInterchangeSentAt: null,
+    contrlReceivedAt: null,
+    testRejectedAt: null,
+    testRejectedRunId: null,
+  },
 }
 
 const withReadyForTest = seedTradingPartners.map((tradingPartner) =>
@@ -302,6 +308,73 @@ export const ConfirmationArrives = meta.story({
     )
     await userEvent.keyboard('{Escape}')
     await waitFor(() => expect(goLive).toHaveFocus())
+  },
+})
+
+const [rejectedRun] = seedRuns()
+
+export const TestRejected = meta.story({
+  ...at(readyForTest),
+  beforeEach({ msw }) {
+    msw.use(
+      ...createHandlers(apiUrl, {
+        tradingPartners: withReadyForTest,
+        testInterchange: { contrlDelayMs: 0, rejectedRunId: rejectedRun!.id },
+      }),
+    )
+  },
+  async play({ canvas }) {
+    await userEvent.click(
+      await canvas.findByRole('button', { name: 'Send a test document' }, activityLoaded),
+    )
+    await expect(await canvas.findByText(/Waiting for the receipt confirmation/)).toBeVisible()
+    focusManager.setFocused(false)
+    focusManager.setFocused(undefined)
+    const current = await canvas.findByRole('listitem', { current: 'step' })
+    await expect(
+      await within(current).findByText('Spreewald Frische GmbH rejected the test document.'),
+    ).toBeVisible()
+    await expect(within(current).getByRole('link', { name: 'See why' })).toHaveAttribute(
+      'href',
+      `/documents/${rejectedRun!.id}`,
+    )
+    await expect(within(current).getByRole('button', { name: 'Send the test again' })).toBeVisible()
+    await expect(canvas.queryByText(/Waiting for the receipt confirmation/)).toBeNull()
+    await expect(canvas.getByRole('status')).toHaveTextContent(
+      'Spreewald Frische GmbH rejected the test document.',
+    )
+  },
+})
+
+const rejectedOnLoad: TradingPartner = {
+  ...readyForTest,
+  onboarding: {
+    ...readyForTest.onboarding,
+    testInterchangeSentAt: '2026-10-19T09:12:00.000Z',
+    testRejectedAt: '2026-10-19T09:14:30.000Z',
+    testRejectedRunId: rejectedRun!.id,
+  },
+}
+
+export const TestRejectedGerman = meta.story({
+  ...at(rejectedOnLoad),
+  decorators: [german],
+  beforeEach({ msw }) {
+    msw.use(
+      ...createHandlers(apiUrl, {
+        tradingPartners: seedTradingPartners.map((tradingPartner) =>
+          tradingPartner.id === rejectedOnLoad.id ? rejectedOnLoad : tradingPartner,
+        ),
+      }),
+    )
+  },
+  async play({ canvas }) {
+    const current = await canvas.findByRole('listitem', { current: 'step' }, activityLoaded)
+    await expect(
+      within(current).getByText('Spreewald Frische GmbH hat den Testbeleg abgelehnt.'),
+    ).toBeVisible()
+    await expect(within(current).getByRole('link', { name: 'Grund ansehen' })).toBeVisible()
+    await expect(within(current).getByRole('button', { name: 'Test erneut senden' })).toBeVisible()
   },
 })
 

@@ -10,7 +10,12 @@ const newPartner = {
   id,
   gln: '0234567890129',
   testMode: true,
-  onboarding: { testInterchangeSentAt: null, contrlReceivedAt: null },
+  onboarding: {
+    testInterchangeSentAt: null,
+    contrlReceivedAt: null,
+    testRejectedAt: null,
+    testRejectedRunId: null,
+  },
 }
 
 const livePartner = {
@@ -20,6 +25,8 @@ const livePartner = {
   onboarding: {
     testInterchangeSentAt: '2026-09-01T08:00:00.000Z',
     contrlReceivedAt: '2026-09-01T08:05:00.000Z',
+    testRejectedAt: null,
+    testRejectedRunId: null,
   },
 }
 

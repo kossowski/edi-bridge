@@ -1,6 +1,11 @@
 'use client'
 
-import { CheckmarkCircle02Icon, Loading03Icon, Rocket01Icon } from '@hugeicons/core-free-icons'
+import {
+  AlertCircleIcon,
+  CheckmarkCircle02Icon,
+  Loading03Icon,
+  Rocket01Icon,
+} from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
@@ -21,6 +26,7 @@ import {
 import { useSession } from '@/hooks/use-session'
 import { sendTestInterchange, switchToProduction, testInterchangeRefusalOf } from '@/lib/api/client'
 import { currentWorkspaceQuery, storeSavedTradingPartner } from '@/lib/api/queries'
+import { documentHref, flowHref } from '@/lib/navigation'
 import {
   canSendTestInterchange,
   canSwitchToProduction,
@@ -77,7 +83,7 @@ function SendRefused({ refusal, name }: { refusal: TestInterchangeRefusal; name:
       return t.rich('sampleMissing', {
         flow: refusal.flow.name,
         link: (chunks) => (
-          <Link href={`/flows/${refusal.flow.id}`} className={linkClass}>
+          <Link href={flowHref(refusal.flow.id)} className={linkClass}>
             {chunks}
           </Link>
         ),
@@ -230,6 +236,33 @@ function Waiting({ tradingPartner }: { tradingPartner: TradingPartner }) {
   )
 }
 
+function Rejected({
+  tradingPartner,
+  runId,
+}: {
+  tradingPartner: TradingPartner
+  runId: string | null
+}) {
+  const t = useTranslations('TradingPartner.setup')
+
+  return (
+    <p className="border-destructive/40 bg-destructive/10 flex flex-wrap items-start gap-x-2 gap-y-1 rounded-lg border p-3 text-sm">
+      <HugeiconsIcon
+        icon={AlertCircleIcon}
+        strokeWidth={2}
+        aria-hidden
+        className="text-destructive-text mt-0.5 size-4 shrink-0"
+      />
+      <span>{t('rejected', { name: tradingPartner.name })}</span>
+      {runId && (
+        <Link href={documentHref(runId)} className={linkClass}>
+          {t('rejectedReason')}
+        </Link>
+      )}
+    </p>
+  )
+}
+
 function Confirmed({ tradingPartner }: { tradingPartner: TradingPartner }) {
   const t = useTranslations('TradingPartner.setup')
 
@@ -297,7 +330,14 @@ function StepAction({ item, context }: { item: PartnerSetupItem; context: SetupC
     case 'awaitConfirmation':
       return (
         <>
-          <Waiting tradingPartner={tradingPartner} />
+          {tradingPartner.onboarding.testRejectedAt === null ? (
+            <Waiting tradingPartner={tradingPartner} />
+          ) : (
+            <Rejected
+              runId={tradingPartner.onboarding.testRejectedRunId}
+              tradingPartner={tradingPartner}
+            />
+          )}
           {canChange && canSendTestInterchange(tradingPartner, workspaceGln) && (
             <SendTestDocument again tradingPartner={tradingPartner} />
           )}
@@ -422,7 +462,11 @@ export function PartnerSetupCard({
 
   const status = !tradingPartner.testMode
     ? wentLive && t('goLive.done', { name })
-    : sawWaiting && !awaiting && t('arrived', { name })
+    : sawWaiting &&
+      !awaiting &&
+      (tradingPartner.onboarding.testRejectedAt === null
+        ? t('arrived', { name })
+        : t('rejected', { name }))
 
   return (
     <Card role="region" aria-labelledby={titleId}>

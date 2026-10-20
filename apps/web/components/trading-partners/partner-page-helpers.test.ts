@@ -7,7 +7,12 @@ import {
 } from './partner-page-helpers'
 
 describe('awaitsReceiptConfirmation', () => {
-  const sent = { testInterchangeSentAt: '2026-10-10T08:00:00.000Z', contrlReceivedAt: null }
+  const sent = {
+    testInterchangeSentAt: '2026-10-10T08:00:00.000Z',
+    contrlReceivedAt: null,
+    testRejectedAt: null,
+    testRejectedRunId: null,
+  }
 
   it('waits after a test document without a receipt confirmation', () => {
     expect(awaitsReceiptConfirmation({ testMode: true, onboarding: sent })).toBe(true)
@@ -22,11 +27,29 @@ describe('awaitsReceiptConfirmation', () => {
     ).toBe(false)
   })
 
+  it('stops waiting once the Trading Partner rejected the test', () => {
+    expect(
+      awaitsReceiptConfirmation({
+        testMode: true,
+        onboarding: {
+          ...sent,
+          testRejectedAt: '2026-10-10T08:05:00.000Z',
+          testRejectedRunId: '00000000-0000-4000-8000-0000000000e1',
+        },
+      }),
+    ).toBe(false)
+  })
+
   it('does not wait before a test document is sent', () => {
     expect(
       awaitsReceiptConfirmation({
         testMode: true,
-        onboarding: { testInterchangeSentAt: null, contrlReceivedAt: null },
+        onboarding: {
+          testInterchangeSentAt: null,
+          contrlReceivedAt: null,
+          testRejectedAt: null,
+          testRejectedRunId: null,
+        },
       }),
     ).toBe(false)
   })
@@ -37,7 +60,12 @@ describe('awaitsReceiptConfirmation', () => {
 })
 
 describe('receiptConfirmationPollInterval', () => {
-  const sent = { testInterchangeSentAt: '2026-10-10T08:00:00.000Z', contrlReceivedAt: null }
+  const sent = {
+    testInterchangeSentAt: '2026-10-10T08:00:00.000Z',
+    contrlReceivedAt: null,
+    testRejectedAt: null,
+    testRejectedRunId: null,
+  }
 
   it('checks every 10 seconds while the receipt confirmation is awaited', () => {
     expect(receiptConfirmationPollInterval({ testMode: true, onboarding: sent })).toBe(10_000)

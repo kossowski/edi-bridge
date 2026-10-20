@@ -84,6 +84,8 @@ const awaitingProduction = createTradingPartner({
   onboarding: {
     testInterchangeSentAt: '2026-10-01T08:00:00.000Z',
     contrlReceivedAt: '2026-10-01T08:05:00.000Z',
+    testRejectedAt: null,
+    testRejectedRunId: null,
   },
 })
 
@@ -91,7 +93,12 @@ const awaitingContrl = createTradingPartner({
   id: '10000000-0000-4000-8000-000000000002',
   gln: '0200000000028',
   testMode: true,
-  onboarding: { testInterchangeSentAt: '2026-10-01T08:00:00.000Z', contrlReceivedAt: null },
+  onboarding: {
+    testInterchangeSentAt: '2026-10-01T08:00:00.000Z',
+    contrlReceivedAt: null,
+    testRejectedAt: null,
+    testRejectedRunId: null,
+  },
 })
 
 describe('seedTradingPartners', () => {
@@ -186,7 +193,12 @@ describe('tradingPartnerHandlers', () => {
     expect(created).toMatchObject({
       ...input,
       testMode: true,
-      onboarding: { testInterchangeSentAt: null, contrlReceivedAt: null },
+      onboarding: {
+        testInterchangeSentAt: null,
+        contrlReceivedAt: null,
+        testRejectedAt: null,
+        testRejectedRunId: null,
+      },
     })
 
     expect(await listTradingPartners()).toEqual([created])
@@ -242,7 +254,12 @@ describe('tradingPartnerHandlers', () => {
     const notStarted = createTradingPartner({
       gln: '0200000000035',
       testMode: true,
-      onboarding: { testInterchangeSentAt: null, contrlReceivedAt: null },
+      onboarding: {
+        testInterchangeSentAt: null,
+        contrlReceivedAt: null,
+        testRejectedAt: null,
+        testRejectedRunId: null,
+      },
     })
 
     server.use(...tradingPartnerHandlers(apiUrl, { tradingPartners: [notStarted] }))
@@ -316,7 +333,12 @@ describe('POST /trading-partners/:id/test-interchange', () => {
     id: '10000000-0000-4000-8000-000000000003',
     gln: '0200000000035',
     testMode: true,
-    onboarding: { testInterchangeSentAt: null, contrlReceivedAt: null },
+    onboarding: {
+      testInterchangeSentAt: null,
+      contrlReceivedAt: null,
+      testRejectedAt: null,
+      testRejectedRunId: null,
+    },
   })
 
   const sentAt = new Date('2026-10-10T12:00:00.000Z')
@@ -343,6 +365,8 @@ describe('POST /trading-partners/:id/test-interchange', () => {
     expect(tradingPartnerSchema.parse(await response.json()).onboarding).toEqual({
       testInterchangeSentAt: '2026-10-10T12:00:00.000Z',
       contrlReceivedAt: null,
+      testRejectedAt: null,
+      testRejectedRunId: null,
     })
 
     vi.setSystemTime(new Date('2026-10-10T12:00:59.000Z'))
@@ -353,6 +377,57 @@ describe('POST /trading-partners/:id/test-interchange', () => {
     expect((await listTradingPartners())[0]?.onboarding).toEqual({
       testInterchangeSentAt: '2026-10-10T12:00:00.000Z',
       contrlReceivedAt: '2026-10-10T12:01:00.000Z',
+      testRejectedAt: null,
+      testRejectedRunId: null,
+    })
+  })
+
+  it('records a rejecting CONTRL after the delay, with the Run of the rejected test', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(sentAt)
+    const rejectedRunId = '10000000-0000-4000-8000-0000000000e1'
+
+    server.use(
+      ...tradingPartnerHandlers(apiUrl, {
+        tradingPartners: [notStarted],
+        testInterchange: { contrlDelayMs: 60_000, rejectedRunId },
+      }),
+    )
+
+    await send('POST', toPath(sendTestInterchangeEndpoint.path, notStarted))
+    vi.setSystemTime(new Date('2026-10-10T12:01:30.000Z'))
+
+    expect((await getTradingPartner(notStarted.id)).onboarding).toEqual({
+      testInterchangeSentAt: '2026-10-10T12:00:00.000Z',
+      contrlReceivedAt: null,
+      testRejectedAt: '2026-10-10T12:01:00.000Z',
+      testRejectedRunId: rejectedRunId,
+    })
+  })
+
+  it('clears the rejected test with the next test send', async () => {
+    const rejected = {
+      ...notStarted,
+      onboarding: {
+        testInterchangeSentAt: '2026-10-09T08:00:00.000Z',
+        contrlReceivedAt: null,
+        testRejectedAt: '2026-10-09T08:05:00.000Z',
+        testRejectedRunId: '10000000-0000-4000-8000-0000000000e1',
+      },
+    }
+
+    server.use(
+      ...tradingPartnerHandlers(apiUrl, {
+        tradingPartners: [rejected],
+        testInterchange: { contrlDelayMs: null },
+      }),
+    )
+
+    const response = await send('POST', toPath(sendTestInterchangeEndpoint.path, rejected))
+
+    expect(tradingPartnerSchema.parse(await response.json()).onboarding).toMatchObject({
+      testRejectedAt: null,
+      testRejectedRunId: null,
     })
   })
 

@@ -1366,6 +1366,8 @@
       "waiting": "Waiting for the receipt confirmation from {name}. This page updates by itself.",
       "sentAt": "Test document sent <when>{time}</when>.",
       "arrived": "The receipt confirmation from {name} arrived. You can go live now.",
+      "rejected": "{name} rejected the test document.",
+      "rejectedReason": "See why",
       "goLive": {
         "title": "Take {name} live?",
         "description": "From now on, documents with {name} are real and no longer marked as tests. They reach your daily work and the partner's real order processing.",

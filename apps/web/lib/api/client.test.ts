@@ -179,6 +179,8 @@ describe('Trading Partner actions', () => {
     onboarding: {
       testInterchangeSentAt: '2026-10-01T08:00:00.000Z',
       contrlReceivedAt: '2026-10-01T08:05:00.000Z',
+      testRejectedAt: null,
+      testRejectedRunId: null,
     },
   })
 
@@ -212,9 +214,15 @@ describe('Trading Partner actions', () => {
 
   it('reads why a test send was refused', async () => {
     const flow = { id: '00000000-0000-4000-8000-0000000000f1', name: 'Invoices to Kieler Kontor' }
+
     const notStarted = {
       ...existing,
-      onboarding: { testInterchangeSentAt: null, contrlReceivedAt: null },
+      onboarding: {
+        testInterchangeSentAt: null,
+        contrlReceivedAt: null,
+        testRejectedAt: null,
+        testRejectedRunId: null,
+      },
     }
 
     server.use(

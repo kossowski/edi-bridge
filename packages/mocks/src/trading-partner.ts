@@ -40,10 +40,20 @@ export function hasTraffic({ onboarding }: Pick<TradingPartner, 'onboarding'>) {
   return onboarding.testInterchangeSentAt !== null
 }
 
-const notStarted: TradingPartnerOnboarding = { testInterchangeSentAt: null, contrlReceivedAt: null }
+const notStarted: TradingPartnerOnboarding = {
+  testInterchangeSentAt: null,
+  contrlReceivedAt: null,
+  testRejectedAt: null,
+  testRejectedRunId: null,
+}
 
 function onboarded(day: string): TradingPartnerOnboarding {
-  return { testInterchangeSentAt: `${day}T09:12:00.000Z`, contrlReceivedAt: `${day}T09:14:30.000Z` }
+  return {
+    testInterchangeSentAt: `${day}T09:12:00.000Z`,
+    contrlReceivedAt: `${day}T09:14:30.000Z`,
+    testRejectedAt: null,
+    testRejectedRunId: null,
+  }
 }
 
 const seeds: ReadonlyArray<
@@ -92,7 +102,12 @@ const seeds: ReadonlyArray<
     characterSet: 'UNOC',
     acknowledgementTimeLimitHours: 12,
     testMode: true,
-    onboarding: { testInterchangeSentAt: '2026-10-06T14:03:00.000Z', contrlReceivedAt: null },
+    onboarding: {
+      testInterchangeSentAt: '2026-10-06T14:03:00.000Z',
+      contrlReceivedAt: null,
+      testRejectedAt: null,
+      testRejectedRunId: null,
+    },
   },
   {
     name: 'Mainfranken Getränke GmbH',
@@ -148,6 +163,8 @@ function generateTradingPartner(faker: Faker, now: Date): TradingPartner {
         stage === 'awaitingTestInterchange' || stage === 'awaitingContrl'
           ? null
           : receivedAt.toISOString(),
+      testRejectedAt: null,
+      testRejectedRunId: null,
     },
   }
 }
@@ -219,6 +236,8 @@ export function toTradingPartnerStore(
 
 export type TestInterchangeOptions = {
   contrlDelayMs?: number | null
+  // The CONTRL after the delay rejects the test and points at this Run.
+  rejectedRunId?: string
   refusal?: Exclude<TestInterchangeRefusal, { reason: 'notAwaited' }>
 }
 
@@ -244,7 +263,7 @@ export function tradingPartnerHandlers(
   {
     tradingPartners = seedTradingPartners,
     workspace = seedWorkspace,
-    testInterchange: { contrlDelayMs = 5000, refusal } = {},
+    testInterchange: { contrlDelayMs = 5000, rejectedRunId, refusal } = {},
     session = seedSession,
   }: {
     tradingPartners?: ReadonlyArray<TradingPartner> | TradingPartnerStore
@@ -268,11 +287,15 @@ export function tradingPartnerHandlers(
 
       contrlDueAt.delete(id)
 
+      const at = new Date(dueAt).toISOString()
+
       store.set({
         ...tradingPartner,
         onboarding: {
           ...tradingPartner.onboarding,
-          contrlReceivedAt: new Date(dueAt).toISOString(),
+          ...(rejectedRunId === undefined
+            ? { contrlReceivedAt: at }
+            : { testRejectedAt: at, testRejectedRunId: rejectedRunId }),
         },
       })
     }
@@ -415,6 +438,8 @@ export function tradingPartnerHandlers(
           onboarding: {
             testInterchangeSentAt: new Date(sentAt).toISOString(),
             contrlReceivedAt: null,
+            testRejectedAt: null,
+            testRejectedRunId: null,
           },
         }
 

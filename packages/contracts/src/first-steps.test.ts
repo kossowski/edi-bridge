@@ -8,7 +8,12 @@ const erpChannel = { tradingPartnerId: null }
 
 const partnerChannel = { tradingPartnerId: '10000000-0000-4000-8000-000000000001' }
 
-const notStarted = { testInterchangeSentAt: null, contrlReceivedAt: null }
+const notStarted = {
+  testInterchangeSentAt: null,
+  contrlReceivedAt: null,
+  testRejectedAt: null,
+  testRejectedRunId: null,
+}
 
 const awaitingTest = {
   id: '10000000-0000-4000-8000-000000000001',
@@ -21,7 +26,12 @@ const tested = {
   id: '10000000-0000-4000-8000-000000000002',
   gln: '4000000000002',
   testMode: true,
-  onboarding: { testInterchangeSentAt: '2026-10-06T14:03:00.000Z', contrlReceivedAt: null },
+  onboarding: {
+    testInterchangeSentAt: '2026-10-06T14:03:00.000Z',
+    contrlReceivedAt: null,
+    testRejectedAt: null,
+    testRejectedRunId: null,
+  },
 }
 
 const live = {
@@ -31,6 +41,8 @@ const live = {
   onboarding: {
     testInterchangeSentAt: '2026-10-01T09:12:00.000Z',
     contrlReceivedAt: '2026-10-01T09:14:30.000Z',
+    testRejectedAt: null,
+    testRejectedRunId: null,
   },
 }
 

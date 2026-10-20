@@ -22,6 +22,8 @@ export const acknowledgementTimeLimitHours = { min: 1, max: 168, default: 24 } a
 export const tradingPartnerOnboardingSchema = z.object({
   testInterchangeSentAt: z.iso.datetime().nullable(),
   contrlReceivedAt: z.iso.datetime().nullable(),
+  testRejectedAt: z.iso.datetime().nullable(),
+  testRejectedRunId: z.uuid().nullable(),
 })
 
 export type TradingPartnerOnboarding = z.infer<typeof tradingPartnerOnboardingSchema>
