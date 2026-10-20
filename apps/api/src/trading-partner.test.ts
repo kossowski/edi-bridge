@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { eq, inArray } from 'drizzle-orm'
 import {
   afterAll,
   afterEach,
@@ -45,6 +45,7 @@ import { type InvoiceWorkspace, seedInvoiceWorkspace } from '@edi-bridge/pipelin
 import {
   addMember,
   type Client,
+  otherWorkspace,
   ownWorkspace,
   signIn,
   startTestApi,
@@ -461,7 +462,9 @@ describe('the Channel directions of a Trading Partner', () => {
   let seeded: string | undefined
 
   afterEach(async () => {
-    await connection.db.delete(channels).where(eq(channels.workspaceId, ownWorkspace.id))
+    await connection.db
+      .delete(channels)
+      .where(inArray(channels.workspaceId, [ownWorkspace.id, otherWorkspace.id]))
 
     if (seeded !== undefined) {
       await connection.db.delete(workspaces).where(eq(workspaces.id, seeded))
@@ -475,9 +478,9 @@ describe('the Channel directions of a Trading Partner', () => {
   const getActivity = (id: string, target = admin) =>
     target.inject({ method: 'GET', url: tradingPartnerActivityEndpoint.path.replace(':id', id) })
 
-  const addOutboundChannel = (tradingPartnerId: string | null) =>
+  const addOutboundChannel = (tradingPartnerId: string | null, workspaceId = ownWorkspace.id) =>
     connection.db.insert(channels).values({
-      workspaceId: ownWorkspace.id,
+      workspaceId,
       tradingPartnerId,
       type: 'http',
       direction: 'outbound',
@@ -511,6 +514,20 @@ describe('the Channel directions of a Trading Partner', () => {
           neededDirections: ['inbound', 'outbound'],
         }),
       ],
+    )
+    expect(
+      tradingPartnerActivityEndpoint.response.parse((await getActivity(created.id)).json()),
+    ).toMatchObject(directions)
+  })
+
+  it('leaves out a Channel of another Workspace', async () => {
+    const created = await postedTradingPartner(hansemarkt)
+    await addOutboundChannel(created.id, otherWorkspace.id)
+
+    const directions = { channelCount: 0, channelDirections: [] }
+
+    expect(tradingPartnerActivitiesEndpoint.response.parse((await getActivities()).json())).toEqual(
+      [expect.objectContaining({ tradingPartnerId: created.id, ...directions })],
     )
     expect(
       tradingPartnerActivityEndpoint.response.parse((await getActivity(created.id)).json()),
