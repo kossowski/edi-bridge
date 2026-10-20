@@ -206,7 +206,7 @@ export const EveryNotSentReason = meta.story({
     ).toBeVisible()
     await expect(
       orders.getByText(
-        /because its connection is a demo connection, and a demo connection never sends\. Nothing needs fixing: in the demo, receipt confirmations stay in EDI Bridge\./,
+        /because the connection is a demo connection, and a demo connection never sends\. Nothing needs fixing: in the demo, receipt confirmations stay in EDI Bridge\./,
       ),
     ).toBeVisible()
   },

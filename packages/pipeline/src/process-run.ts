@@ -445,8 +445,8 @@ const deliveryFailure = (
       SeededChannel: (): Failure => ({
         stage: 'delivery',
         error: {
-          code: 'demoChannel',
-          message: 'A demo connection never sends, so the Document never left EDI Bridge',
+          code: 'seededChannel',
+          message: 'A seeded Channel never sends, so the Document never left EDI Bridge',
           position: null,
           details: null,
         },

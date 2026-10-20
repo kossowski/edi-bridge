@@ -205,24 +205,24 @@ function servingIncompleteSetup(setup: IncompleteSetup) {
   )
 }
 
-const demoChannelTarget = { kind: 'channel', channelId: channel.id, name: channel.name } as const
+const seededChannelTarget = { kind: 'channel', channelId: channel.id, name: channel.name } as const
 
-function servingDemoChannel() {
+function servingSeededChannel() {
   const detail = incompleteSetupDetail({
     error: {
-      code: 'demoChannel',
-      message: 'A demo connection never sends, so the Document never left EDI Bridge',
+      code: 'seededChannel',
+      message: 'A seeded Channel never sends, so the Document never left EDI Bridge',
       position: null,
       details: null,
     },
-    fixTarget: demoChannelTarget,
+    fixTarget: seededChannelTarget,
   })
 
   return http.get(`${apiUrl}${toPath(runEndpoint.path, { id: incompleteSetup.id })}`, () =>
     HttpResponse.json(
       runDetailSchema.parse({
         ...detail,
-        problem: { reason: 'unreachable', whoFixes: 'retry', fixTarget: demoChannelTarget },
+        problem: { reason: 'unreachable', whoFixes: 'retry', fixTarget: seededChannelTarget },
       }),
     ),
   )
@@ -484,10 +484,10 @@ export const DeliveryFailureToErp = meta.story({
   },
 })
 
-export const DemoChannelDelivery = meta.story({
+export const SeededChannelDelivery = meta.story({
   args: { id: incompleteSetup.id },
   beforeEach({ msw }) {
-    msw.use(servingDemoChannel())
+    msw.use(servingSeededChannel())
   },
   async play({ canvas }) {
     await expect(
@@ -501,11 +501,11 @@ export const DemoChannelDelivery = meta.story({
   },
 })
 
-export const GermanDemoChannelDelivery = meta.story({
+export const GermanSeededChannelDelivery = meta.story({
   args: { id: incompleteSetup.id },
   decorators: [german],
   beforeEach({ msw }) {
-    msw.use(servingDemoChannel())
+    msw.use(servingSeededChannel())
   },
   async play({ canvas }) {
     await expect(

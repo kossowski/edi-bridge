@@ -1502,8 +1502,8 @@ describe('the processing of a Run', () => {
       failureStage: 'delivery',
       handedOverAt: null,
       error: {
-        code: 'demoChannel',
-        message: 'A demo connection never sends, so the Document never left EDI Bridge',
+        code: 'seededChannel',
+        message: 'A seeded Channel never sends, so the Document never left EDI Bridge',
         position: null,
         details: null,
       },
@@ -4189,9 +4189,9 @@ describe('the CONTRL answering a received Interchange', () => {
 
       const { acknowledgement, logs } = await recordedFor(into)
 
-      expect(acknowledgement).toMatchObject({ notSentReason: 'demoChannel', channelId: null })
+      expect(acknowledgement).toMatchObject({ notSentReason: 'seededChannel', channelId: null })
       expect(logs).toContainEqual([
-        `The CONTRL for Document ${acknowledgement?.documentId ?? ''} is not sent: a demo connection never sends`,
+        `The CONTRL for Document ${acknowledgement?.documentId ?? ''} is not sent: a seeded Channel never sends`,
       ])
     })
 

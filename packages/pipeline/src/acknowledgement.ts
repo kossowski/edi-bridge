@@ -39,7 +39,7 @@ const notSentMessages: Record<NotSentReason, string> = {
   ambiguousChannel: 'the outbound EDIFACT Flows of its Trading Partner name different Channels',
   workspaceGlnMissing: 'the Workspace has no GLN',
   unechoableInterchangeHeader: 'its UNB cannot be echoed in a valid CONTRL',
-  demoChannel: 'a demo connection never sends',
+  seededChannel: 'a seeded Channel never sends',
 }
 
 const builtContrl = (content: string) =>
@@ -87,7 +87,7 @@ const channelOf = (workspaceId: string, tradingPartnerId: string) =>
     }
 
     return outbound.some(({ seeded }) => seeded)
-      ? { channelId: null, notSentReason: 'demoChannel' as const }
+      ? { channelId: null, notSentReason: 'seededChannel' as const }
       : { channelId, notSentReason: null }
   })
 

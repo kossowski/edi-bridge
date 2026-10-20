@@ -120,7 +120,7 @@ const inboundSftpChannels = Effect.gen(function* () {
         and(
           eq(channels.type, 'sftp'),
           eq(channels.direction, 'inbound'),
-          // A seeded Channel names a reserved .invalid host, so a demo never reaches a real server.
+          // A seeded Channel names a reserved .invalid host, so seeded traffic never reaches a real server.
           eq(channels.seeded, false),
         ),
       ),

@@ -1,1 +1,0 @@
-ALTER TYPE "public"."acknowledgement_not_sent_reason" ADD VALUE 'demoChannel';
