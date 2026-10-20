@@ -2,7 +2,9 @@ import { eq } from 'drizzle-orm'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
+  canSwitchToProduction,
   createTradingPartnerEndpoint,
+  switchToProductionEndpoint,
   tradingPartnerActivitiesEndpoint,
   tradingPartnerActivityEndpoint,
   type TradingPartnerInput,
@@ -12,9 +14,9 @@ import {
   updateTradingPartnerEndpoint,
   withCheckDigit,
 } from '@edi-bridge/contracts'
-import { type Connection, tradingPartners } from '@edi-bridge/db'
+import { type Connection, tradingPartners, workspaces } from '@edi-bridge/db'
 
-import { type Client, startTestApi, type TestApi } from './testing.js'
+import { type Client, ownWorkspace, startTestApi, type TestApi } from './testing.js'
 
 type TradingPartnerBody = Omit<
   TradingPartnerInput,
@@ -390,5 +392,124 @@ describe('GET /trading-partners/:id/activity', () => {
     const response = await getActivity(created.id, otherAdmin)
 
     expect(response.statusCode).toBe(404)
+  })
+})
+
+describe('POST /trading-partners/:id/production', () => {
+  const postProduction = (id: string, target = admin) =>
+    target.inject({ method: 'POST', url: switchToProductionEndpoint.path.replace(':id', id) })
+
+  type Onboarding = Pick<
+    typeof tradingPartners.$inferInsert,
+    'testInterchangeSentAt' | 'contrlReceivedAt' | 'testMode'
+  >
+
+  const onboarded: Onboarding = {
+    testInterchangeSentAt: new Date('2026-10-06T14:03:00.000Z'),
+    contrlReceivedAt: new Date('2026-10-06T14:05:00.000Z'),
+  }
+
+  const setOnboarding = (id: string, onboarding: Onboarding) =>
+    connection.db.update(tradingPartners).set(onboarding).where(eq(tradingPartners.id, id))
+
+  const workspaceGln = withCheckDigit('400000000099')
+
+  const setWorkspaceGln = (gln: string | null) =>
+    connection.db.update(workspaces).set({ gln }).where(eq(workspaces.id, ownWorkspace.id))
+
+  beforeEach(async () => {
+    await setWorkspaceGln(workspaceGln)
+  })
+
+  afterEach(async () => {
+    await setWorkspaceGln(null)
+  })
+
+  it('takes a Trading Partner out of Test Mode once its onboarding is complete', async () => {
+    const created = await postedTradingPartner(hansemarkt)
+    await setOnboarding(created.id, onboarded)
+
+    const response = await postProduction(created.id)
+
+    const expected = {
+      ...created,
+      testMode: false,
+      onboarding: {
+        testInterchangeSentAt: '2026-10-06T14:03:00.000Z',
+        contrlReceivedAt: '2026-10-06T14:05:00.000Z',
+      },
+    }
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json()).toEqual(expected)
+
+    const read = await get(created.id)
+
+    expect(read.json()).toEqual(expected)
+  })
+
+  it.each<{
+    state: string
+    switchable: boolean
+    workspaceGln?: string | null
+    gln?: string | null
+    onboarding?: Partial<Onboarding>
+    testMode?: boolean
+  }>([
+    { state: 'its onboarding is complete', switchable: true },
+    { state: 'the Workspace has no GLN', switchable: false, workspaceGln: null },
+    { state: 'the Trading Partner has no GLN', switchable: false, gln: null },
+    {
+      state: 'no test Interchange was sent',
+      switchable: false,
+      onboarding: { testInterchangeSentAt: null },
+    },
+    { state: 'no CONTRL was received', switchable: false, onboarding: { contrlReceivedAt: null } },
+    { state: 'it is already in production', switchable: false, testMode: false },
+  ])(
+    'answers as canSwitchToProduction does while $state',
+    async ({
+      switchable,
+      workspaceGln: currentWorkspaceGln = workspaceGln,
+      gln = hansemarkt.gln,
+      onboarding = {},
+      testMode = true,
+    }) => {
+      await setWorkspaceGln(currentWorkspaceGln)
+      const created = await postedTradingPartner({ ...hansemarkt, gln })
+      await setOnboarding(created.id, { ...onboarded, ...onboarding, testMode })
+      const before = tradingPartnerSchema.parse((await get(created.id)).json())
+      const after = switchable ? { ...before, testMode: false } : before
+
+      expect(canSwitchToProduction(before, currentWorkspaceGln)).toBe(switchable)
+
+      const response = await postProduction(created.id)
+
+      expect(response.statusCode).toBe(switchable ? 200 : 409)
+      expect(response.json()).toEqual(
+        switchable ? after : { message: 'Onboarding is not complete' },
+      )
+      expect((await get(created.id)).json()).toEqual(after)
+    },
+  )
+
+  it.each([
+    ['an unknown id', unknownId],
+    ['an id that is no uuid', 'hansemarkt'],
+  ])('answers 404 for %s', async (_case, id) => {
+    const response = await postProduction(id)
+
+    expect(response.statusCode).toBe(404)
+    expect(response.json()).toEqual({ message: 'Not found' })
+  })
+
+  it('answers 404 for a Trading Partner of another Workspace', async () => {
+    const created = await postedTradingPartner(hansemarkt, otherAdmin)
+    await setOnboarding(created.id, onboarded)
+
+    const response = await postProduction(created.id)
+
+    expect(response.statusCode).toBe(404)
+    expect((await get(created.id, otherAdmin)).json()).toMatchObject({ testMode: true })
   })
 })

@@ -1,4 +1,4 @@
-import { and, count, eq, isNull, type SQL } from 'drizzle-orm'
+import { and, count, eq, exists, isNotNull, isNull, type SQL } from 'drizzle-orm'
 import { Effect } from 'effect'
 
 import {
@@ -8,11 +8,17 @@ import {
   type TradingPartnerActivityDetail,
   type TradingPartnerInput,
 } from '@edi-bridge/contracts'
-import { channels, flows, tradingPartnerGlnUnique, tradingPartners } from '@edi-bridge/db'
+import {
+  channels,
+  flows,
+  tradingPartnerGlnUnique,
+  tradingPartners,
+  workspaces,
+} from '@edi-bridge/db'
 
 import { Db, type Database, type Transaction } from './db.js'
 import { dayMs } from './duration.js'
-import { NotFound, Unprocessable } from './errors.js'
+import { Conflict, NotFound, Unprocessable } from './errors.js'
 import { byName, exactlyOne, inWorkspace, rejectingDuplicate, rejectingInvalidId } from './rows.js'
 import { CurrentWorkspace } from './workspace.js'
 
@@ -271,4 +277,43 @@ export const updateTradingPartner = (
     return yield* new Unprocessable({
       message: 'The Trading Partner needs its GLN once Interchanges were exchanged',
     })
+  })
+
+// canSwitchToProduction in SQL, so the update checks it atomically
+const switchableToProduction = (db: Database) =>
+  and(
+    eq(tradingPartners.testMode, true),
+    isNotNull(tradingPartners.gln),
+    isNotNull(tradingPartners.testInterchangeSentAt),
+    isNotNull(tradingPartners.contrlReceivedAt),
+    exists(
+      db
+        .select({ id: workspaces.id })
+        .from(workspaces)
+        .where(and(eq(workspaces.id, tradingPartners.workspaceId), isNotNull(workspaces.gln))),
+    ),
+  )
+
+export const switchToProduction = (id: string) =>
+  Effect.gen(function* () {
+    yield* rejectingInvalidId(id)
+
+    const db = yield* Db
+    const workspace = yield* CurrentWorkspace
+
+    const [row] = yield* Effect.promise(() =>
+      db
+        .update(tradingPartners)
+        .set({ testMode: false })
+        .where(inWorkspace(tradingPartners, workspace.id, byId(id), switchableToProduction(db)))
+        .returning(),
+    )
+
+    if (row) {
+      return toTradingPartner(row)
+    }
+
+    yield* loadTradingPartner(id)
+
+    return yield* new Conflict({ message: 'Onboarding is not complete' })
   })
