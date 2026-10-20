@@ -15,7 +15,10 @@ import {
   tradingPartners,
   workspaces,
 } from '@edi-bridge/db'
-import { Database as PipelineDatabase, sendTestDocument } from '@edi-bridge/pipeline'
+import {
+  Database as PipelineDatabase,
+  sendTestInterchange as sendInPipeline,
+} from '@edi-bridge/pipeline'
 
 import { Db, type Database, type Transaction } from './db.js'
 import { dayMs } from './duration.js'
@@ -328,7 +331,7 @@ export const sendTestInterchange = (id: string) =>
     const db = yield* Db
     const workspace = yield* CurrentWorkspace
 
-    yield* sendTestDocument({ workspaceId: workspace.id, tradingPartnerId }).pipe(
+    yield* sendInPipeline({ workspaceId: workspace.id, tradingPartnerId }).pipe(
       Effect.provideService(PipelineDatabase, db),
     )
 

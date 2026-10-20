@@ -277,22 +277,24 @@ const routeOnChannel = ({ workspaceId, channelId, content }: ArrivingDocument) =
       : routing
   })
 
-type StoredRun = {
+type RunToStore = {
   flow: Flow
   run: Pick<
     typeof runs.$inferInsert,
     'workspaceId' | 'documentId' | 'manualSubmission' | 'receivedAt' | 'messageIndex'
-  > & { duplicateOfRunId?: string | undefined }
+  >
+  duplicateOfRunId?: string | undefined
   receipt: { startedAt: Date; finishedAt: Date }
 }
 
-export async function storeRun(tx: Transaction, { flow, run: values, receipt }: StoredRun) {
-  const { duplicateOfRunId, ...stored } = values
-
+export async function storeRun(
+  tx: Transaction,
+  { flow, run: columns, duplicateOfRunId, receipt }: RunToStore,
+) {
   const [run] = await tx
     .insert(runs)
     .values({
-      ...stored,
+      ...columns,
       flowId: flow.id,
       tradingPartnerId: flow.tradingPartnerId,
       ...(duplicateOfRunId !== undefined && {
@@ -405,8 +407,8 @@ export const receive = (arriving: ArrivingDocument) =>
                 manualSubmission: arriving.manualSubmission,
                 receivedAt: document.receivedAt,
                 messageIndex,
-                duplicateOfRunId: originals.get(messageIndex),
               },
+              duplicateOfRunId: originals.get(messageIndex),
               receipt: {
                 startedAt: receiptStartedAt,
                 finishedAt: DateTime.toDateUtc(receiptFinishedAt),

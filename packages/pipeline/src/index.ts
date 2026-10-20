@@ -30,7 +30,7 @@ export { isFixedByReprocess, isReprocessable, type Reprocess, reprocessRun } fro
 
 export { retryRun } from './retry'
 
-export { sendTestDocument, type TestSend } from './send-test-document'
+export { sendTestInterchange, type TestInterchangeToSend } from './send-test-interchange'
 
 export { sweepRunsEvery } from './sweep-runs'
 

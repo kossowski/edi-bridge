@@ -22,13 +22,17 @@ import { TestInterchangeRefused } from './errors'
 import { queueReceived, type ReceivedRun, storeRun } from './receive'
 import { Database } from './services'
 
-export type TestSend = { workspaceId: string; tradingPartnerId: string }
+export type TestInterchangeToSend = { workspaceId: string; tradingPartnerId: string }
 
 type Flow = typeof flows.$inferSelect
 
 type Sample = { fileName: string; content: string }
 
 type Candidate = { flow: Flow; sample: Sample | undefined }
+
+type Refused = { kind: 'refused'; refusal: TestInterchangeRefusal }
+
+const refused = (refusal: TestInterchangeRefusal): Refused => ({ kind: 'refused', refusal })
 
 const outboundMessageTypes = messageTypes.filter(
   (messageType) => messageTypeDirections[messageType] === 'outbound',
@@ -39,7 +43,7 @@ const nameCollator = new Intl.Collator('de')
 // canSendTestInterchange in SQL; the lock holds a concurrent CONTRL or switch back until the Run is stored.
 const lockAwaitingTestInterchange = (
   tx: Transaction,
-  { workspaceId, tradingPartnerId }: TestSend,
+  { workspaceId, tradingPartnerId }: TestInterchangeToSend,
 ) =>
   tx
     .select({ id: tradingPartners.id })
@@ -62,7 +66,10 @@ const lockAwaitingTestInterchange = (
     .for('update')
 
 // An outbound Flow hands its Interchange to the Trading Partner's own outbound Channel.
-async function candidatesOf(tx: Transaction, { workspaceId, tradingPartnerId }: TestSend) {
+async function candidatesOf(
+  tx: Transaction,
+  { workspaceId, tradingPartnerId }: TestInterchangeToSend,
+) {
   const rows = await tx
     .select({
       flow: flows,
@@ -103,39 +110,39 @@ async function candidatesOf(tx: Transaction, { workspaceId, tradingPartnerId }: 
     )
 }
 
-type Chosen = { flow: Flow; sample: Sample }
-
 // The first Flow by name with a sample sends it, so the same Flow sends each test.
-function choose(candidates: readonly Candidate[]): Chosen | TestInterchangeRefusal {
+function choose(
+  candidates: readonly Candidate[],
+): Refused | { kind: 'chosen'; flow: Flow; sample: Sample } {
   const [first] = candidates
 
   if (first === undefined) {
-    return { reason: 'noOutboundFlow' }
+    return refused({ reason: 'noOutboundFlow' })
   }
 
   const chosen = candidates.find(({ sample }) => sample !== undefined)
 
   return chosen?.sample === undefined
-    ? { reason: 'sampleMissing', flow: { id: first.flow.id, name: first.flow.name } }
-    : { flow: chosen.flow, sample: chosen.sample }
+    ? refused({ reason: 'sampleMissing', flow: { id: first.flow.id, name: first.flow.name } })
+    : { kind: 'chosen', flow: chosen.flow, sample: chosen.sample }
 }
 
-export const sendTestDocument = (send: TestSend) =>
+export const sendTestInterchange = (send: TestInterchangeToSend) =>
   Effect.gen(function* () {
     const db = yield* Database
     const receivedAt = yield* DateTime.nowAsDate
 
     const outcome = yield* Effect.promise(() =>
-      db.transaction(async (tx): Promise<ReceivedRun | TestInterchangeRefusal> => {
+      db.transaction(async (tx): Promise<Refused | { kind: 'stored'; run: ReceivedRun }> => {
         const [awaiting] = await lockAwaitingTestInterchange(tx, send)
 
         if (awaiting === undefined) {
-          return { reason: 'notAwaited' }
+          return refused({ reason: 'notAwaited' })
         }
 
         const chosen = choose(await candidatesOf(tx, send))
 
-        if ('reason' in chosen) {
+        if (chosen.kind === 'refused') {
           return chosen
         }
 
@@ -172,15 +179,15 @@ export const sendTestDocument = (send: TestSend) =>
           .set({ testRejectedAt: null, testRejectedRunId: null })
           .where(eq(tradingPartners.id, send.tradingPartnerId))
 
-        return run
+        return { kind: 'stored', run }
       }),
     )
 
-    if ('reason' in outcome) {
-      return yield* new TestInterchangeRefused({ refusal: outcome })
+    if (outcome.kind === 'refused') {
+      return yield* new TestInterchangeRefused({ refusal: outcome.refusal })
     }
 
-    yield* queueReceived([outcome])
+    yield* queueReceived([outcome.run])
 
-    return outcome
+    return outcome.run
   })

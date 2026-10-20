@@ -50,7 +50,7 @@ import {
   retryRun,
   RunNotRetryable,
   sendAcknowledgements,
-  sendTestDocument,
+  sendTestInterchange,
   sweepRunsEvery,
   sweepStuckRuns,
 } from './index'
@@ -3484,7 +3484,7 @@ describe('the Acknowledgement of a sent Interchange', () => {
       })
     })
 
-    describe('the test send', () => {
+    describe('the test Interchange', () => {
       const withSample = async (into: InvoiceWorkspace) => {
         await connection.db
           .update(documentStructures)
@@ -3502,9 +3502,10 @@ describe('the Acknowledgement of a sent Interchange', () => {
         const queue = inMemoryRunQueue()
 
         const run = await Effect.runPromise(
-          sendTestDocument({ workspaceId: into.id, tradingPartnerId: into.tradingPartnerId }).pipe(
-            pipelineServices(connection.db, queue),
-          ),
+          sendTestInterchange({
+            workspaceId: into.id,
+            tradingPartnerId: into.tradingPartnerId,
+          }).pipe(pipelineServices(connection.db, queue)),
         )
 
         expect(queue.queued).toEqual([{ workspaceId: into.id, runId: run.id }])
@@ -3553,9 +3554,10 @@ describe('the Acknowledgement of a sent Interchange', () => {
         const queue = inMemoryRunQueue()
 
         await Effect.runPromise(
-          sendTestDocument({ workspaceId: into.id, tradingPartnerId: into.tradingPartnerId }).pipe(
-            pipelineServices(connection.db, queue),
-          ),
+          sendTestInterchange({
+            workspaceId: into.id,
+            tradingPartnerId: into.tradingPartnerId,
+          }).pipe(pipelineServices(connection.db, queue)),
         )
 
         await expect(onboardingOf(into)).resolves.toMatchObject({
