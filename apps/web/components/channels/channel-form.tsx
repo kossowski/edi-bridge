@@ -14,6 +14,7 @@ import {
   channelKindOf,
   type FieldError,
   type FieldOfKind,
+  hasStoredPassphrase,
   isChannelKindKey,
   isFieldOfKind,
   toFormValues,
@@ -237,11 +238,7 @@ export function ChannelKindFields({
   const credential = field('credential')
   const authorization = field('authorization')
 
-  // A stored passphrase belongs to the stored key, so it only counts while the key stays.
-  const storedPassphrase =
-    channel?.type === 'sftp' &&
-    channel.authentication === 'privateKey' &&
-    channel.passphrase != null
+  const storedPassphrase = channel != null && hasStoredPassphrase(channel)
 
   const credentialDescription = channel
     ? t('fields.credential.keep')

@@ -5,6 +5,7 @@ import { createChannel, toChannel } from '@edi-bridge/mocks'
 
 import {
   type ChannelFormValues,
+  hasStoredPassphrase,
   toFormValues,
   validateChannelUpdate,
   validateNewChannel,
@@ -219,6 +220,23 @@ describe('validateChannelUpdate', () => {
     expect(validateChannelUpdate({ ...values, removePassphrase: true }, channel)).toMatchObject({
       input: { passphrase: null },
     })
+  })
+
+  it('counts a stored passphrase only on a Channel that logs in with a private key', () => {
+    const passphrase = { lastFour: null }
+
+    expect(
+      hasStoredPassphrase(existing(channelKinds[0], { authentication: 'privateKey', passphrase })),
+    ).toBe(true)
+    expect(
+      hasStoredPassphrase(
+        existing(channelKinds[0], { authentication: 'privateKey', passphrase: null }),
+      ),
+    ).toBe(false)
+    expect(
+      hasStoredPassphrase(existing(channelKinds[0], { authentication: 'password', passphrase })),
+    ).toBe(false)
+    expect(hasStoredPassphrase(existing(channelKinds[3]))).toBe(false)
   })
 
   it('removes the stored passphrase when the Channel switches to a password', () => {

@@ -116,6 +116,12 @@ function emptyToUndefined(value: string) {
   return value === '' ? undefined : value
 }
 
+export function hasStoredPassphrase(channel: Channel) {
+  return (
+    channel.type === 'sftp' && channel.authentication === 'privateKey' && channel.passphrase != null
+  )
+}
+
 type Secrets = { keep: false } | { keep: true; storedPassphrase: boolean }
 
 // Blank keeps the stored passphrase; only a private key takes one, so a password drops it.
@@ -200,7 +206,7 @@ export function validateChannelUpdate(
 ): ChannelFormResult<ChannelUpdate> {
   const body = toBody(values, {
     keep: true,
-    storedPassphrase: existing.type === 'sftp' && existing.passphrase != null,
+    storedPassphrase: hasStoredPassphrase(existing),
   })
 
   const parsed = channelUpdateSchema.safeParse(body)
