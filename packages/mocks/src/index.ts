@@ -111,6 +111,7 @@ export {
 } from './ai-draft'
 
 export {
+  blockedAddressChannel,
   channelHandlers,
   type ChannelRecord,
   type ChannelStore,
@@ -262,7 +263,15 @@ export {
   seedOverdueAcknowledgements,
 } from './overdue-acknowledgement'
 
-export { createRun, createRuns, type RunFields, runsHandler, seedRuns, toRunSummary } from './run'
+export {
+  blockedAddressRun,
+  createRun,
+  createRuns,
+  type RunFields,
+  runsHandler,
+  seedRuns,
+  toRunSummary,
+} from './run'
 
 export { serializeSegment } from './interchange'
 

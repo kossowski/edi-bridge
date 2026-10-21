@@ -813,6 +813,10 @@
           "title": "{direction, select, inbound {Der Server Ihres ERP hat einen anderen Serverschlüssel gezeigt} other {Der Server von {tradingPartner} hat einen anderen Serverschlüssel gezeigt}}",
           "description": "{direction, select, inbound {Der Beleg wurde übersetzt} other {Der Beleg ist fertig}}, aber der Serverschlüssel ist nicht der für diese Verbindung bestätigte, deshalb hat EDI Bridge den Beleg nicht gesendet. Ein neuer Versuch schlägt fehl, bis der neue Serverschlüssel an der Verbindung übernommen ist."
         },
+        "addressBlocked": {
+          "title": "{direction, select, inbound {Die Adresse Ihres ERP zeigt in ein internes Netz} other {Die Adresse von {tradingPartner} zeigt in ein internes Netz}}",
+          "description": "{direction, select, inbound {Der Beleg wurde übersetzt} other {Der Beleg ist fertig}}, aber die Serveradresse der Verbindung zeigt in ein internes Netz, deshalb hat EDI Bridge den Beleg nicht gesendet. Ein neuer Versuch schlägt fehl, bis die Adresse an der Verbindung geändert ist."
+        },
         "seededChannel": {
           "title": "Demo-Verbindungen senden nie",
           "description": "Dies ist eine Demo-Verbindung, über die EDI Bridge nie Belege sendet. Der Beleg ist fertig, bleibt aber in EDI Bridge, und ein neuer Versuch endet genauso."
@@ -1985,6 +1989,10 @@
         "unexpectedResponse": {
           "title": "Der Server hat unerwartet geantwortet.",
           "hint": "Prüfen Sie die Adresse. Stimmt sie, bitten Sie die IT der Gegenseite, das Protokoll ihres Servers anzusehen."
+        },
+        "addressBlocked": {
+          "title": "Die Serveradresse zeigt in ein internes Netz.",
+          "hint": "EDI Bridge verbindet sich nicht mit internen Adressen. Prüfen Sie die Serveradresse dieser Verbindung."
         },
         "seededChannel": {
           "title": "Das ist eine Demo-Verbindung.",

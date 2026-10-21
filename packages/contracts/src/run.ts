@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import { blockedAddressSchema } from './channel'
 import { controlReferenceSchema, segmentTagSchema } from './edifact'
 import { flowSummarySchema } from './flow'
 import { listPageFields, listQueryFields, many } from './list'
@@ -28,6 +29,7 @@ export const problemReasons = [
   'missingField',
   'unreachable',
   'hostKeyMismatch',
+  'addressBlocked',
   'incompleteSetup',
   'defect',
 ] as const
@@ -59,8 +61,10 @@ export function whoFixes(run: {
     }
 
     case 'delivery': {
-      // A retry fails until an Admin accepts the server's new host key on the Channel.
-      return run.problem?.reason === 'hostKeyMismatch' ? 'you' : 'retry'
+      // A retry fails until an Admin accepts the server's new host key or changes the Channel's host.
+      return run.problem?.reason === 'hostKeyMismatch' || run.problem?.reason === 'addressBlocked'
+        ? 'you'
+        : 'retry'
     }
 
     case 'parse':
@@ -174,6 +178,10 @@ export const runErrorDetailsSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('httpResponse'),
     status: z.number().int().min(100).max(599),
+  }),
+  z.object({
+    kind: z.literal('blockedAddress'),
+    address: blockedAddressSchema,
   }),
 ])
 
@@ -312,6 +320,17 @@ export const runDetailSchema = z
         code: 'custom',
         path: ['problem', 'whoFixes'],
         message: 'Who fixes a problem follows from its reason, the Failure Stage and the direction',
+      })
+    }
+
+    if (
+      (run.problem?.reason === 'addressBlocked') !==
+      (run.error?.details?.kind === 'blockedAddress')
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['error', 'details'],
+        message: 'A Run fails with addressBlocked exactly when its error names the blocked address',
       })
     }
 

@@ -18,6 +18,7 @@ import {
 
 import type { ValidationErrorCode } from '@edi-bridge/edifact'
 
+import { blockedHost } from './channel'
 import { seedFlows } from './flow'
 import { seedLookupTableNamed } from './lookup-table-seed'
 import { publishedVersionsByMapping, seedMappingDrafts } from './mapping'
@@ -39,6 +40,7 @@ export type GeneratedErrorCode =
   | 'destinationUnreachable'
   | 'destinationUnavailable'
   | 'hostKeyMismatch'
+  | 'addressBlocked'
   | 'glnMissing'
   | 'channelDefect'
   | 'characterSetUnsupported'
@@ -50,6 +52,7 @@ export type GeneratedError = RunError & { code: GeneratedErrorCode }
 type ProblemFields = Pick<RunSummary, 'id' | 'messageType' | 'flow' | 'failureStage'> & {
   defect?: boolean | undefined
   refusedHostKey?: boolean | undefined
+  refusedAddress?: boolean | undefined
 }
 
 export type BrokenPiece =
@@ -129,6 +132,13 @@ const hostKeyMismatchError: GeneratedError = {
   message: 'The SFTP server showed a different host key from the one confirmed',
   position: null,
   details: null,
+}
+
+const addressBlockedError: GeneratedError = {
+  code: 'addressBlocked',
+  message: `The host of the Channel resolves to the blocked address ${blockedHost}`,
+  position: null,
+  details: { kind: 'blockedAddress', address: blockedHost },
 }
 
 // A separate seed keeps the Messages of the other Runs as they were.
@@ -252,6 +262,10 @@ export function problemReasonOf(
     case 'delivery': {
       if (run.refusedHostKey) {
         return 'hostKeyMismatch'
+      }
+
+      if (run.refusedAddress) {
+        return 'addressBlocked'
       }
 
       return incompleteSetupOf(run) === null ? 'unreachable' : 'incompleteSetup'
@@ -604,6 +618,10 @@ function failureOf(run: RunSummary, faker: Faker, { fault, broken }: FaultyMessa
 
   if (run.problem?.reason === 'hostKeyMismatch') {
     return { error: hostKeyMismatchError, broken: null }
+  }
+
+  if (run.problem?.reason === 'addressBlocked') {
+    return { error: addressBlockedError, broken: null }
   }
 
   const incompleteSetup = incompleteSetupOf(run)

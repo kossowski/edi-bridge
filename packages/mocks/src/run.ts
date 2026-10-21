@@ -31,6 +31,7 @@ import { includesText, pageOf } from './list'
 import { badRequest } from './responses'
 import { recordedMappingVersionOf as seededRecordedMappingVersionOf } from './run-steps'
 import { createRunStore, interchangeIdOf, type RunStore, toRunStore } from './run-store'
+import { seedId } from './seed-id'
 import { seedTradingPartners } from './trading-partner'
 
 export type RunFields = Pick<
@@ -47,6 +48,7 @@ export type RunFields = Pick<
   businessReference?: string | null
   defect?: boolean | undefined
   refusedHostKey?: boolean | undefined
+  refusedAddress?: boolean | undefined
 }
 
 // A CONTRL acknowledges a whole Interchange, so it carries no Business Reference.
@@ -57,7 +59,12 @@ function businessReferenceOf({ id, messageType }: Pick<RunSummary, 'id' | 'messa
 }
 
 // The Run Store places each Run in its Interchange.
-export function toRunSummary({ defect, refusedHostKey, ...run }: RunFields): RunSummary {
+export function toRunSummary({
+  defect,
+  refusedHostKey,
+  refusedAddress,
+  ...run
+}: RunFields): RunSummary {
   const { failureStage } = run
 
   return runSummarySchema.parse({
@@ -65,7 +72,15 @@ export function toRunSummary({ defect, refusedHostKey, ...run }: RunFields): Run
     problem:
       failureStage === null
         ? null
-        : { reason: problemReasonOf({ ...run, defect, refusedHostKey, failureStage }) },
+        : {
+            reason: problemReasonOf({
+              ...run,
+              defect,
+              refusedHostKey,
+              refusedAddress,
+              failureStage,
+            }),
+          },
     direction: directionOf(run),
     businessReference:
       run.businessReference === undefined ? businessReferenceOf(run) : run.businessReference,
@@ -129,6 +144,28 @@ export function createRun(
     ...overrides,
   })
 }
+
+// SAFETY: the seed holds at least one Trading Partner.
+const blockedAddressPartner = seedTradingPartners[0]!
+
+// SAFETY: the seed holds an INVOIC Flow for the first Trading Partner.
+const blockedAddressFlow = seedFlows.find(
+  ({ messageType, tradingPartnerId }) =>
+    messageType === 'INVOIC' && tradingPartnerId === blockedAddressPartner.id,
+)!
+
+// Not a seed, so the seeded screens keep their Runs.
+export const blockedAddressRun: RunSummary = toRunSummary({
+  id: seedId(4, 900),
+  receivedAt: '2026-10-19T05:12:00.000Z',
+  tradingPartner: blockedAddressPartner,
+  messageType: blockedAddressFlow.messageType,
+  flow: { id: blockedAddressFlow.id, name: blockedAddressFlow.name },
+  manualSubmission: false,
+  status: 'failed',
+  failureStage: 'delivery',
+  refusedAddress: true,
+})
 
 type Order = { receivedAt: number; businessReference: string | null }
 

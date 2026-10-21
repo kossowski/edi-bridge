@@ -397,6 +397,7 @@ const deliveryReasons: Record<ChannelTestFailureReason, string> = {
   remotePathMissing: 'The remote path of the Channel does not exist',
   permissionDenied: 'The Channel refused to take the file',
   unexpectedResponse: 'The Channel answered unexpectedly',
+  addressBlocked: 'The host of the Channel resolves to a blocked address',
 }
 
 const glnOwners = { workspace: 'The Workspace', tradingPartner: 'The Trading Partner' } as const

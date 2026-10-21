@@ -133,6 +133,11 @@ Why an inbound SFTP Channel could not be polled, stored with the time of the fir
 _Avoid_: Poll error, connection error
 _On screen_: Polling failed (DE: Abfrage fehlgeschlagen)
 
+**Blocked address**:
+An address of a Channel's host that EDI Bridge refuses to connect to, unless the installation allows it: a loopback, link-local, private (RFC 1918 or IPv6 unique local), shared (CGNAT) or unspecified address, or an IPv6 address that embeds such an IPv4 address.
+_Avoid_: Internal IP, private host, forbidden address
+_On screen_: Internal address (DE: interne Adresse)
+
 **Document Structure**:
 The known shape of a non-EDIFACT Document (fields, nesting, repetitions), derived from a sample Document or a JSON Schema; it forms the source or target side of a Mapping.
 _Avoid_: Source schema, format definition, layout

@@ -242,6 +242,30 @@ describe('the poll problem of a Channel', () => {
     ).toBe(false)
   })
 
+  it('names the address when polling was refused for a blocked address', () => {
+    const blocked = {
+      reason: 'addressBlocked',
+      since: pollProblem.since,
+      blockedAddress: 'fd00::7',
+    }
+
+    expect(channelSchema.parse({ ...sftpChannel, pollProblem: blocked })).toMatchObject({
+      pollProblem: blocked,
+    })
+    expect(
+      channelSchema.safeParse({
+        ...sftpChannel,
+        pollProblem: { reason: 'addressBlocked', since: pollProblem.since },
+      }).success,
+    ).toBe(false)
+    expect(
+      channelSchema.safeParse({
+        ...sftpChannel,
+        pollProblem: { ...pollProblem, blockedAddress: 'fd00::7' },
+      }).success,
+    ).toBe(false)
+  })
+
   it('is absent on a Channel that is never polled', () => {
     expect(channelSchema.safeParse(outboundSftpChannel).success).toBe(true)
     expect(channelSchema.safeParse({ ...outboundSftpChannel, pollProblem: null }).success).toBe(
@@ -406,6 +430,38 @@ describe('channelTestResultSchema', () => {
         reason: 'hostKeyMismatch',
         testedAt,
         hostKey: { fingerprint, state: 'matches' },
+      }).success,
+    ).toBe(false)
+  })
+
+  it('names the address when a Channel points at a blocked address', () => {
+    const blocked = {
+      outcome: 'failed',
+      reason: 'addressBlocked',
+      testedAt,
+      blockedAddress: '10.0.4.17',
+    }
+
+    expect(channelTestResultSchema.parse(blocked)).toEqual(blocked)
+    expect(
+      channelTestResultSchema.safeParse({ ...blocked, blockedAddress: '::ffff:127.0.0.1' }).success,
+    ).toBe(true)
+    expect(
+      channelTestResultSchema.safeParse({ ...blocked, blockedAddress: 'sftp.internal' }).success,
+    ).toBe(false)
+  })
+
+  it('carries a blocked address exactly when the address was blocked', () => {
+    expect(
+      channelTestResultSchema.safeParse({ outcome: 'failed', reason: 'addressBlocked', testedAt })
+        .success,
+    ).toBe(false)
+    expect(
+      channelTestResultSchema.safeParse({
+        outcome: 'failed',
+        reason: 'hostUnreachable',
+        testedAt,
+        blockedAddress: '10.0.4.17',
       }).success,
     ).toBe(false)
   })

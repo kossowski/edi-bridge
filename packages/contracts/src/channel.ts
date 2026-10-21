@@ -79,16 +79,31 @@ export const channelTestFailureReasons = [
   'remotePathMissing',
   'permissionDenied',
   'unexpectedResponse',
+  'addressBlocked',
 ] as const
 
 export const channelTestFailureReasonSchema = z.enum(channelTestFailureReasons)
 
 export type ChannelTestFailureReason = z.infer<typeof channelTestFailureReasonSchema>
 
-export const pollProblemSchema = z.strictObject({
-  reason: channelTestFailureReasonSchema,
-  since: z.iso.datetime(),
-})
+// An IPv4-mapped IPv6 address stays as resolved, so the Admin sees the address that was refused.
+export const blockedAddressSchema = z.union([z.ipv4(), z.ipv6()])
+
+const namesBlockedAddress = (failure: { reason: string; blockedAddress?: string | undefined }) =>
+  (failure.reason === 'addressBlocked') === (failure.blockedAddress !== undefined)
+
+const blockedAddressIssue = {
+  path: ['blockedAddress'],
+  message: 'A failure names the blocked address exactly when its reason is addressBlocked',
+}
+
+export const pollProblemSchema = z
+  .strictObject({
+    reason: channelTestFailureReasonSchema,
+    since: z.iso.datetime(),
+    blockedAddress: blockedAddressSchema.optional(),
+  })
+  .refine(namesBlockedAddress, blockedAddressIssue)
 
 export type PollProblem = z.infer<typeof pollProblemSchema>
 
@@ -345,10 +360,15 @@ export const channelTestResultSchema = z
     z.object({
       outcome: z.literal('failed'),
       reason: channelTestResultReasonSchema,
+      blockedAddress: blockedAddressSchema.optional(),
       ...channelTestFields,
     }),
   ])
   .superRefine((result, context) => {
+    if (result.outcome === 'failed' && !namesBlockedAddress(result)) {
+      context.addIssue({ code: 'custom', ...blockedAddressIssue })
+    }
+
     const mismatch = result.hostKey?.state === 'mismatch'
     const failedOnMismatch = result.outcome === 'failed' && result.reason === 'hostKeyMismatch'
 
