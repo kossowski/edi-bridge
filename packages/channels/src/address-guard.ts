@@ -110,15 +110,15 @@ export const addressPolicy = (
 const isAllowed = (policy: AddressPolicy, address: string) =>
   policy.allowedAddresses.check(address, ipFamily(address))
 
-const isBlockedAddress = (policy: AddressPolicy, address: string) =>
+const inBlockedRange = (policy: AddressPolicy, address: string) =>
   blockedRanges.check(address, ipFamily(address)) && !isAllowed(policy, address)
 
-const isBlocked = (policy: AddressPolicy, address: string) => {
+const isBlockedWithEmbeddedIpv4 = (policy: AddressPolicy, address: string) => {
   const ipv4 = isIP(address) === 6 ? embeddedIpv4(address) : undefined
 
   return (
-    isBlockedAddress(policy, address) ||
-    (ipv4 !== undefined && !isAllowed(policy, address) && isBlockedAddress(policy, ipv4))
+    inBlockedRange(policy, address) ||
+    (ipv4 !== undefined && !isAllowed(policy, address) && inBlockedRange(policy, ipv4))
   )
 }
 
@@ -129,4 +129,4 @@ export const blockedAddressOf = (
 ) =>
   policy.allowedHostNames.has(hostNameKey(host))
     ? undefined
-    : addresses.find((address) => isBlocked(policy, address))
+    : addresses.find((address) => isBlockedWithEmbeddedIpv4(policy, address))
