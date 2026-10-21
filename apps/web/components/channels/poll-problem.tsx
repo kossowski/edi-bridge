@@ -111,8 +111,11 @@ function PollProblemLine({ channelId, problem }: { channelId: string; problem: P
       />
       <p className="flex flex-wrap gap-x-2 gap-y-0.5">
         <span className="text-destructive-text font-medium">{t.rich('listSince', since)}</span>
-        <span>{tFailed(`${problem.reason}.title`)}</span>
-        {canChange && <FixLink channelId={channelId} problem={problem} className="relative" />}
+        {/* Below xl the reason and fix wrap the Name cell; the Channel page shows them. */}
+        <span className="hidden xl:inline">{tFailed(`${problem.reason}.title`)}</span>
+        {canChange && (
+          <FixLink channelId={channelId} problem={problem} className="relative hidden xl:inline" />
+        )}
       </p>
     </div>
   )

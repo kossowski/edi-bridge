@@ -4,6 +4,7 @@ import { expect, within } from 'storybook/test'
 
 import { ChannelsScreen } from '@/components/channels/channels-screen'
 import { viewerStory } from '@/components/session/session-story-helpers'
+import { desktop, mobile, tablet } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
 import { channelsEndpoint } from '@edi-bridge/contracts'
@@ -31,11 +32,17 @@ export const Default = meta.story({
 // SAFETY: the seed holds Rheinkauf SFTP inbox, the Channel with a stored poll problem.
 const pollFailedInbox = seedChannels.find(({ name }) => name === 'Rheinkauf SFTP inbox')!
 
+async function findPollFailedRow(canvasElement: HTMLElement) {
+  const link = await within(canvasElement).findByRole('link', { name: 'Rheinkauf SFTP inbox' })
+
+  // SAFETY: every Channel name link sits inside the row of its Channel.
+  return within(link.closest('tr')!)
+}
+
 export const PollProblem = meta.story({
-  async play({ canvas }) {
-    const link = await canvas.findByRole('link', { name: 'Rheinkauf SFTP inbox' })
-    // SAFETY: every Channel name link sits inside the row of its Channel.
-    const row = within(link.closest('tr')!)
+  ...desktop,
+  async play({ canvas, canvasElement }) {
+    const row = await findPollFailedRow(canvasElement)
 
     await expect(row.getByText(/^Polling failed since/)).toBeVisible()
     await expect(row.getByText('The server showed a different key.')).toBeVisible()
@@ -44,6 +51,26 @@ export const PollProblem = meta.story({
     ).toHaveAttribute('href', `/channels/${pollFailedInbox.id}#channel-host-key`)
     await expect(canvas.getAllByText(/^Polling failed since/)).toHaveLength(1)
   },
+})
+
+async function expectOnlyPollingFailed(canvasElement: HTMLElement) {
+  const row = await findPollFailedRow(canvasElement)
+
+  await expect(row.getByText(/^Polling failed since/)).toBeVisible()
+  await expect(row.getByText('The server showed a different key.')).not.toBeVisible()
+  await expect(
+    row.queryByRole('link', { name: 'Test the connection, then accept the new key' }),
+  ).toBeNull()
+}
+
+export const PollProblemMobile = meta.story({
+  ...mobile,
+  play: ({ canvasElement }) => expectOnlyPollingFailed(canvasElement),
+})
+
+export const PollProblemTablet = meta.story({
+  ...tablet,
+  play: ({ canvasElement }) => expectOnlyPollingFailed(canvasElement),
 })
 
 export const Empty = meta.story({
