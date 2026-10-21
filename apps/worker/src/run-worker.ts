@@ -49,9 +49,9 @@ export function startRunWorker({
   const documents = postgresDocumentStorage(db)
   const queue = bullmqRunQueue(redisUrl)
   const liveEvents = redisLiveEvents(redisUrl)
-  const connecting = { secrets, timeoutMs: channelTimeoutMs, addressPolicy }
-  const delivery = channelDelivery(connecting)
-  const download = sftpChannelDownload(connecting)
+  const connectOptions = { secrets, timeoutMs: channelTimeoutMs, addressPolicy }
+  const delivery = channelDelivery(connectOptions)
+  const download = sftpChannelDownload(connectOptions)
 
   const worker = new Worker<QueuedRun>(
     runQueueName,
