@@ -65,15 +65,16 @@ const ipv6Groups = (address: string) => {
 const ipv4Of = (high: number, low: number) =>
   [high >> 8, high & 0xff, low >> 8, low & 0xff].join('.')
 
-// IPv4-compatible (::/96), NAT64 (64:ff9b::/96) and 6to4 (2002::/16) addresses reach an IPv4 address.
+// IPv4-compatible (::/96), NAT64 (64:ff9b::/96), SIIT (::ffff:0:0/96) and 6to4 (2002::/16) reach IPv4.
 const embeddedIpv4 = (address: string) => {
   const groups = ipv6Groups(address)
   const group = (index: number) => groups[index] ?? 0
-  const zeroFrom32To96 = groups.slice(2, 6).every((value) => value === 0)
-  const compatible = group(0) === 0 && group(1) === 0
-  const nat64 = group(0) === 0x64 && group(1) === 0xff9b
+  const zeroFrom32To64 = group(2) === 0 && group(3) === 0
+  const compatible = group(0) === 0 && group(1) === 0 && group(4) === 0 && group(5) === 0
+  const nat64 = group(0) === 0x64 && group(1) === 0xff9b && group(4) === 0 && group(5) === 0
+  const siit = group(0) === 0 && group(1) === 0 && group(4) === 0xffff && group(5) === 0
 
-  if (zeroFrom32To96 && (compatible || nat64)) {
+  if (zeroFrom32To64 && (compatible || nat64 || siit)) {
     return ipv4Of(group(6), group(7))
   }
 
