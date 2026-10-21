@@ -2107,7 +2107,7 @@
       "passphrase": {
         "label": "Passphrase (optional)",
         "description": "Only for a private key protected by a passphrase. Stored encrypted and never shown again.",
-        "keep": "Stored encrypted and never shown again. Leave blank to keep the current one."
+        "keep": "Stored encrypted and never shown again. Leave blank to keep the current one; it stays with a new private key until you remove it."
       },
       "removePassphrase": {
         "label": "Remove the stored passphrase"

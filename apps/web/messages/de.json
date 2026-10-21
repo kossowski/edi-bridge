@@ -2107,7 +2107,7 @@
       "passphrase": {
         "label": "Passphrase (optional)",
         "description": "Nur für einen privaten Schlüssel, der mit einer Passphrase geschützt ist. Wird verschlüsselt gespeichert und nie wieder angezeigt.",
-        "keep": "Wird verschlüsselt gespeichert und nie wieder angezeigt. Leer lassen, um die aktuelle Passphrase zu behalten."
+        "keep": "Wird verschlüsselt gespeichert und nie wieder angezeigt. Leer lassen, um die aktuelle Passphrase zu behalten; sie bleibt auch bei einem neuen privaten Schlüssel, bis Sie sie entfernen."
       },
       "removePassphrase": {
         "label": "Gespeicherte Passphrase entfernen"

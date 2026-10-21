@@ -186,7 +186,7 @@ export const EditStoredPassphrase = meta.story({
     const passphrase = await canvas.findByLabelText('Passphrase (optional)')
     await expect(passphrase).toHaveValue('')
     await expect(passphrase).toHaveAccessibleDescription(
-      'Stored encrypted and never shown again. Leave blank to keep the current one.',
+      'Stored encrypted and never shown again. Leave blank to keep the current one; it stays with a new private key until you remove it.',
     )
 
     await userEvent.click(canvas.getByRole('checkbox', { name: 'Remove the stored passphrase' }))
