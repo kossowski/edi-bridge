@@ -875,14 +875,14 @@ describe('the polling of inbound SFTP Channels', () => {
     )
 
     await vi.waitFor(() => {
-      expect(defects.reported).toEqual([
+      expect(defects.reported).toMatchObject([
         {
           workspaceId: workspace.id,
           runId: null,
           tradingPartnerId: null,
           channelId: box.channelId,
           code: 'channelDefect',
-          cause: expect.objectContaining({ name: 'Error' }),
+          cause: { name: 'Error' },
         },
       ])
     }, wait)
@@ -900,14 +900,14 @@ describe('the polling of inbound SFTP Channels', () => {
 
     await polling.pollAgain(box.channelId)
     await vi.waitFor(() => {
-      expect(defects.reported).toEqual([
+      expect(defects.reported).toMatchObject([
         {
           workspaceId: workspace.id,
           runId: null,
           tradingPartnerId: null,
           channelId: box.channelId,
           code: 'channelDefect',
-          cause: expect.objectContaining({ name: 'Error' }),
+          cause: { name: 'Error' },
         },
       ])
     }, wait)
@@ -942,16 +942,14 @@ describe('the polling of inbound SFTP Channels', () => {
     }, wait)
 
     // Each later poll tries the removal again, and each attempt is a defect of its own.
-    expect(defects.reported).toEqual(
-      defects.reported.map(() =>
-        expect.objectContaining({
-          workspaceId: workspace.id,
-          runId: null,
-          channelId: box.channelId,
-          code: 'channelDefect',
-        }),
-      ),
-    )
+    for (const report of defects.reported) {
+      expect(report).toMatchObject({
+        workspaceId: workspace.id,
+        runId: null,
+        channelId: box.channelId,
+        code: 'channelDefect',
+      })
+    }
   })
 
   it('reports no failed poll to error monitoring', async () => {
@@ -994,14 +992,14 @@ describe('the polling loop', () => {
     await startPolling(download, [], { db: breakingDatabase(connection.db, 'select'), defects })
 
     await vi.waitFor(() => {
-      expect(defects.reported).toEqual([
+      expect(defects.reported).toMatchObject([
         {
           workspaceId: null,
           runId: null,
           tradingPartnerId: null,
           channelId: null,
           code: 'pollingDefect',
-          cause: expect.objectContaining({ name: 'Error' }),
+          cause: { name: 'Error' },
         },
       ])
     }, wait)
