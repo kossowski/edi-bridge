@@ -78,17 +78,15 @@ const resolvedAddresses = (host: string, { resolve }: AddressPolicy) =>
 // Connecting to the checked addresses, not the host name, keeps a second lookup from rebinding them.
 const connectAddresses = (
   host: string,
-  addressPolicy: AddressPolicy | undefined,
+  addressPolicy: AddressPolicy,
 ): Effect.Effect<readonly string[], ChannelUnreachable> =>
-  addressPolicy === undefined
-    ? Effect.succeed([host])
-    : Effect.flatMap(resolvedAddresses(host, addressPolicy), (addresses) => {
-        const blockedAddress = blockedAddressOf(addressPolicy, host, addresses)
+  Effect.flatMap(resolvedAddresses(host, addressPolicy), (addresses) => {
+    const blockedAddress = blockedAddressOf(addressPolicy, host, addresses)
 
-        return blockedAddress === undefined
-          ? Effect.succeed(addresses)
-          : Effect.fail(new ChannelUnreachable({ reason: 'addressBlocked', blockedAddress }))
-      })
+    return blockedAddress === undefined
+      ? Effect.succeed(addresses)
+      : Effect.fail(new ChannelUnreachable({ reason: 'addressBlocked', blockedAddress }))
+  })
 
 class ConnectFailed extends Data.TaggedError('ConnectFailed')<{
   readonly reason: ChannelTestFailureReason
@@ -130,7 +128,7 @@ const firstConnecting = <A>(
 
 export interface ConnectOptions {
   timeoutMs: number
-  addressPolicy?: AddressPolicy | undefined
+  addressPolicy: AddressPolicy
 }
 
 const sshLevelSchema = z.enum([
@@ -413,14 +411,14 @@ const pinnedAgent = (address: string, connectTimeoutMs: number): PinnedAgent => 
   return { agent, connected: () => connected }
 }
 
-const requesting = (url: string, init: RequestInit, pinned?: PinnedAgent) =>
+const requesting = (url: string, init: RequestInit, pinned: PinnedAgent) =>
   Effect.tryPromise({
     try: async (signal) => {
       const response = await fetch(url, {
         ...init,
         redirect: 'manual',
         signal,
-        ...(pinned && { dispatcher: pinned.agent }),
+        dispatcher: pinned.agent,
       })
 
       // An unread body holds its keep-alive connection until garbage collection.
@@ -429,7 +427,7 @@ const requesting = (url: string, init: RequestInit, pinned?: PinnedAgent) =>
       return response
     },
     catch: (error) =>
-      requestFailure(fetchFailure.parse(error), pinned !== undefined && !pinned.connected()),
+      requestFailure(fetchFailure.parse(error), !pinned.connected()),
   })
 
 // The URL keeps its host name, so TLS still checks the certificate against it.
@@ -438,10 +436,6 @@ export const httpRequest = (
   init: RequestInit,
   { timeoutMs, addressPolicy }: ConnectOptions,
 ) => {
-  if (addressPolicy === undefined) {
-    return connectFailedAsUnreachable(requesting(url, init))
-  }
-
   const host = URL.parse(url)?.hostname.replace(/^\[(.*)\]$/, '$1')
 
   if (host === undefined) {
@@ -479,7 +473,6 @@ export const timingOut = <A>(effect: Effect.Effect<A, ChannelUnreachable>, timeo
     orElse: () => Effect.fail(unreachable('timedOut')),
   })
 
-// Optional until the api, pipeline and worker pass a policy, so they keep working meanwhile.
 export const channelReach = (options: ConnectOptions) =>
   ChannelReach.of({
     sftp: (login) => timingOut(reachSftp(login, options), options.timeoutMs),

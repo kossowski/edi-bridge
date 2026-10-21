@@ -1,7 +1,7 @@
 import { Redis } from 'ioredis'
 import { once } from 'node:events'
 
-import { secretBox } from '@edi-bridge/channels'
+import { addressPolicy, secretBox } from '@edi-bridge/channels'
 import { connect } from '@edi-bridge/db'
 
 import { config } from './config.js'
@@ -30,6 +30,7 @@ const runWorker = startRunWorker({
   redisUrl: config.redisUrl,
   db: connection.db,
   secrets: secretBox(config.channelSecretKey),
+  addressPolicy: addressPolicy(config.channelAllowedHosts),
   requeueInterval: config.requeueInterval,
   stuckAfter: config.stuckAfter,
   monitoring,

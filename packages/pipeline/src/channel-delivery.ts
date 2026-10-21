@@ -1,13 +1,17 @@
 import { Effect } from 'effect'
 
-import { type SecretBox, httpChannelDelivery, sftpChannelDelivery } from '@edi-bridge/channels'
+import {
+  type ConnectOptions,
+  type SecretBox,
+  httpChannelDelivery,
+  sftpChannelDelivery,
+} from '@edi-bridge/channels'
 
 import type { DeliveryService } from './services'
 
-export const channelDelivery = (options: {
-  secrets: SecretBox
-  timeoutMs: number
-}): DeliveryService => {
+export const channelDelivery = (
+  options: ConnectOptions & { secrets: SecretBox },
+): DeliveryService => {
   const sftp = sftpChannelDelivery(options)
   const http = httpChannelDelivery(options)
 

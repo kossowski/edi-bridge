@@ -9,11 +9,13 @@ import {
   secretBox,
   secretKeyBytes,
   sftpChannelDownload,
+  addressPolicy,
 } from '@edi-bridge/channels'
 import {
   mismatchingHostKeyFingerprint,
   startTestSftpServer,
   type TestSftpServer,
+  testAllowedHosts,
 } from '@edi-bridge/channels/testing'
 import { channels, connect, type Connection, documents, runs, workspaces } from '@edi-bridge/db'
 import { startTestDatabase, type TestDatabase } from '@edi-bridge/db/testing'
@@ -117,7 +119,11 @@ const sftpLogin = {
   remotePath: '/outbox',
 }
 
-const sftpDownload = sftpChannelDownload({ secrets: testSecrets, timeoutMs: 5000 })
+const sftpDownload = sftpChannelDownload({
+  secrets: testSecrets,
+  timeoutMs: 5000,
+  addressPolicy: addressPolicy(testAllowedHosts),
+})
 
 const inMemory = (channelId: string) => remotePaths.has(channelId)
 

@@ -10,6 +10,7 @@ import {
   secretBox,
   secretKeyBytes,
   sftpChannelDelivery,
+  addressPolicy,
 } from '@edi-bridge/channels'
 import {
   mismatchingHostKeyFingerprint,
@@ -17,6 +18,7 @@ import {
   startTestSftpServer,
   type TestErp,
   type TestSftpServer,
+  testAllowedHosts,
 } from '@edi-bridge/channels/testing'
 import { type CharacterSet, withCheckDigit } from '@edi-bridge/contracts'
 import {
@@ -623,9 +625,14 @@ const receiveInvoice = async (
 const sftpDelivery: DeliveryService = sftpChannelDelivery({
   secrets: testSecrets,
   timeoutMs: 1500,
+  addressPolicy: addressPolicy(testAllowedHosts),
 })
 
-const deliveryByChannelType = channelDelivery({ secrets: testSecrets, timeoutMs: 1500 })
+const deliveryByChannelType = channelDelivery({
+  secrets: testSecrets,
+  timeoutMs: 1500,
+  addressPolicy: addressPolicy(testAllowedHosts),
+})
 
 beforeEach(() => {
   erp.received.length = 0
