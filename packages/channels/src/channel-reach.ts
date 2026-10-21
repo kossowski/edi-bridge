@@ -196,26 +196,23 @@ const statAndOpenDirectory = (
   })
 }
 
+export type SftpUse<A> = (
+  sftp: SFTPWrapper,
+  done: (outcome: Effect.Effect<A, ChannelUnreachable>) => void,
+  hostKey: TestedHostKey,
+) => void
+
 // Unchecked without a fingerprint, so Channels set up before host key checks keep working.
 export const sftpSession = <A>(
   login: SftpLogin,
   { timeoutMs, addressPolicy }: ConnectOptions,
-  use: (
-    sftp: SFTPWrapper,
-    done: (outcome: Effect.Effect<A, ChannelUnreachable>) => void,
-    hostKey: TestedHostKey,
-  ) => void,
+  use: SftpUse<A>,
 ) =>
   Effect.flatMap(connectAddress(login.host, addressPolicy), (host) =>
     sshSession(host, login, timeoutMs, use),
   )
 
-const sshSession = <A>(
-  host: string,
-  login: SftpLogin,
-  timeoutMs: number,
-  use: Parameters<typeof sftpSession<A>>[2],
-) =>
+const sshSession = <A>(host: string, login: SftpLogin, timeoutMs: number, use: SftpUse<A>) =>
   Effect.callback<A, ChannelUnreachable>((resume) => {
     const client = new Client()
     let settled = false
@@ -374,7 +371,7 @@ export const timingOut = <A>(effect: Effect.Effect<A, ChannelUnreachable>, timeo
     orElse: () => Effect.fail(unreachable('timedOut')),
   })
 
-// Without an address policy a Channel may reach any address.
+// Optional until the api, pipeline and worker pass a policy, so they keep working meanwhile.
 export const channelReach = (options: ConnectOptions) =>
   ChannelReach.of({
     sftp: (login) => timingOut(reachSftp(login, options), options.timeoutMs),

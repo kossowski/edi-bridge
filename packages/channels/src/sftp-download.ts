@@ -4,9 +4,11 @@ import { posix } from 'node:path'
 import type { ChannelTestFailureReason } from '@edi-bridge/contracts'
 
 import {
+  type ChannelUnreachable,
   type ConnectOptions,
   sftpReason,
   sftpSession,
+  type SftpUse,
   timingOut,
   unreachable,
   type SftpLogin,
@@ -20,23 +22,20 @@ export class DownloadFailed extends Data.TaggedError('DownloadFailed')<{
   readonly blockedAddress?: string
 }> {}
 
+const downloadFailed = ({ reason, blockedAddress }: ChannelUnreachable) =>
+  blockedAddress === undefined
+    ? new DownloadFailed({ reason })
+    : new DownloadFailed({ reason, blockedAddress })
+
 export interface SftpFile {
   readonly name: string
   readonly size: number
   readonly modifiedAt: Date
 }
 
-const downloading = <A>(
-  login: SftpLogin,
-  options: ConnectOptions,
-  use: Parameters<typeof sftpSession<A>>[2],
-) =>
+const downloading = <A>(login: SftpLogin, options: ConnectOptions, use: SftpUse<A>) =>
   timingOut(sftpSession(login, options, use), options.timeoutMs).pipe(
-    Effect.mapError(({ reason, blockedAddress }) =>
-      blockedAddress === undefined
-        ? new DownloadFailed({ reason })
-        : new DownloadFailed({ reason, blockedAddress }),
-    ),
+    Effect.mapError(downloadFailed),
   )
 
 export const listSftp = (login: SftpLogin, options: ConnectOptions) =>

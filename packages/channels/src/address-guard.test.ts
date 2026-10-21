@@ -136,7 +136,7 @@ describe('channelReach for a host name', () => {
     expect(['127.0.0.1', '::1']).toContain(failed.blockedAddress)
   })
 
-  it('refuses a host name that resolves to an internal address', async () => {
+  it('refuses a host name that resolves to a blocked address', async () => {
     const reach = reachVia(resolving('sftp.partner.test', '10.0.4.17'))
 
     expect(await failure(reach.sftp(sftpLoginAt('sftp.partner.test')))).toMatchObject({
@@ -145,7 +145,7 @@ describe('channelReach for a host name', () => {
     })
   })
 
-  it('refuses a host name when any of its addresses is internal', async () => {
+  it('refuses a host name when any of its addresses is blocked', async () => {
     const reach = reachVia(resolving('erp.partner.test', '203.0.113.5', '169.254.169.254'))
 
     expect(await failure(reach.http(httpAt('http://erp.partner.test/')))).toMatchObject({
@@ -234,13 +234,13 @@ const blockedDelivery = (address: string) =>
   })
 
 describe('a delivery with an address policy', () => {
-  it('refuses to post to an internal address and names it in the details', async () => {
+  it('refuses to post to a blocked address and names it in the details', async () => {
     expect(
       await failure(postHttp(httpAt('http://169.254.169.254/latest/'), order, blocking)),
     ).toEqual(blockedDelivery('169.254.169.254'))
   })
 
-  it('refuses to upload to an internal address and names it in the details', async () => {
+  it('refuses to upload to a blocked address and names it in the details', async () => {
     expect(await failure(uploadSftp(sftpLoginAt('fd00::7'), order, blocking))).toEqual(
       blockedDelivery('fd00::7'),
     )
@@ -254,7 +254,7 @@ describe('a delivery with an address policy', () => {
     expect(erp.received).toHaveLength(1)
   })
 
-  it('does not follow a redirect to an internal address', async () => {
+  it('does not follow a redirect to a blocked address', async () => {
     const redirecting = createHttpServer((_request, response) => {
       response.writeHead(307, { location: erp.url }).end()
     })
@@ -291,7 +291,7 @@ describe('a delivery with an address policy', () => {
 })
 
 describe('a download with an address policy', () => {
-  it('refuses to list the files at an internal address and names it', async () => {
+  it('refuses to list the files at a blocked address and names it', async () => {
     expect(await failure(listSftp(sftpLoginAt('192.168.1.10'), blocking))).toEqual(
       new DownloadFailed({ reason: 'addressBlocked', blockedAddress: '192.168.1.10' }),
     )
@@ -314,7 +314,7 @@ const sftpChannel = {
 }
 
 describe('the Channel deliveries and download with an address policy', () => {
-  it('refuses an SFTP Channel at an internal address', async () => {
+  it('refuses an SFTP Channel at a blocked address', async () => {
     expect(
       await failure(sftpChannelDelivery({ secrets, ...blocking })(sftpChannel, order)),
     ).toEqual(blockedDelivery('10.0.4.17'))
@@ -323,7 +323,7 @@ describe('the Channel deliveries and download with an address policy', () => {
     )
   })
 
-  it('refuses an HTTP Channel at an internal address', async () => {
+  it('refuses an HTTP Channel at a blocked address', async () => {
     expect(
       await failure(
         httpChannelDelivery({ secrets, ...blocking })(

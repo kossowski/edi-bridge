@@ -37,7 +37,7 @@ for (const [network, prefix] of [
   blockedRanges.addSubnet(network, prefix, 'ipv6')
 }
 
-const allowedEntry = (allowed: BlockList, hostNames: Set<string>, entry: string) => {
+const addAllowedEntry = (allowed: BlockList, hostNames: Set<string>, entry: string) => {
   const [network, prefix] = entry.split('/')
 
   if (network !== undefined && prefix !== undefined && isIP(network) !== 0) {
@@ -50,14 +50,14 @@ const allowedEntry = (allowed: BlockList, hostNames: Set<string>, entry: string)
 }
 
 export const addressPolicy = (
-  allowedPrivateHosts: readonly string[],
+  allowedHosts: readonly string[],
   resolve: HostResolver = systemResolver,
 ): AddressPolicy => {
   const allowedAddresses = new BlockList()
   const allowedHostNames = new Set<string>()
 
-  for (const entry of allowedPrivateHosts) {
-    allowedEntry(allowedAddresses, allowedHostNames, entry.trim())
+  for (const entry of allowedHosts) {
+    addAllowedEntry(allowedAddresses, allowedHostNames, entry.trim())
   }
 
   return { allowedAddresses, allowedHostNames, resolve }
