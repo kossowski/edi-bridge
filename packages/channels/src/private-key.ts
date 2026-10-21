@@ -1,4 +1,4 @@
-import { utils } from 'ssh2'
+import ssh2 from 'ssh2'
 
 import type { SftpCredential } from './channel-reach'
 
@@ -32,7 +32,7 @@ const probe = Buffer.from('edi-bridge key probe')
 
 // A wrong passphrase can decrypt a legacy PEM key into another key ssh2 still parses.
 const unlocksKey = (privateKey: string, passphrase: string | undefined) => {
-  const key = utils.parseKey(privateKey, passphrase)
+  const key = ssh2.utils.parseKey(privateKey, passphrase)
 
   if (key instanceof Error) {
     return false

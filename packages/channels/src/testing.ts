@@ -1,6 +1,6 @@
 import { createPrivateKey, generateKeyPairSync } from 'node:crypto'
 import { createServer as createHttpServer, type IncomingHttpHeaders } from 'node:http'
-import { utils } from 'ssh2'
+import ssh2, { type utils } from 'ssh2'
 import { GenericContainer, Wait } from 'testcontainers'
 import { z } from 'zod'
 
@@ -26,12 +26,12 @@ export const listening = async (server: Server) => {
 
 // ssh2 drops a leading zero byte of the public key, so about one Ed25519 pair in 256 is malformed.
 export const sshKeyPair = (passphrase?: string): utils.KeyPairReturn => {
-  const pair = utils.generateKeyPairSync(
+  const pair = ssh2.utils.generateKeyPairSync(
     'ed25519',
     passphrase === undefined ? {} : { passphrase, cipher: 'aes256-ctr', rounds: 16 },
   )
 
-  return utils.parseKey(pair.public) instanceof Error ? sshKeyPair(passphrase) : pair
+  return ssh2.utils.parseKey(pair.public) instanceof Error ? sshKeyPair(passphrase) : pair
 }
 
 // A passphrase that does not unlock the protected key of the test SFTP server.
@@ -47,7 +47,7 @@ export const legacyPemKeyPair = (passphrase: string) => {
     privateKeyEncoding: legacyPem(passphrase),
   }).privateKey
 
-  const parsed = utils.parseKey(privateKey, passphrase)
+  const parsed = ssh2.utils.parseKey(privateKey, passphrase)
 
   if (parsed instanceof Error) {
     throw parsed
