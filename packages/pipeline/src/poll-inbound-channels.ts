@@ -81,16 +81,50 @@ const receiveFile = (channel: InboundChannel, file: SftpFile, state: ChannelPoll
     ),
   )
 
-const reasonOf = (cause: Cause.Cause<unknown>) =>
+const downloadFailure = (cause: Cause.Cause<unknown>) =>
   Cause.findErrorOption(cause).pipe(
-    Option.filter((error) => error instanceof DownloadFailed),
+    Option.filter((error): error is DownloadFailed => error instanceof DownloadFailed),
+  )
+
+const reasonOf = (cause: Cause.Cause<unknown>) =>
+  downloadFailure(cause).pipe(
     Option.match({ onNone: () => '', onSome: ({ reason }) => `: ${reason}` }),
   )
+
+const setPollProblem = (
+  channel: InboundChannel,
+  pollProblem: Pick<InboundChannel, 'pollProblemReason' | 'pollProblemSince'>,
+) =>
+  Effect.gen(function* () {
+    const db = yield* Database
+
+    yield* Effect.promise(() =>
+      db.update(channels).set(pollProblem).where(eq(channels.id, channel.id)),
+    )
+  })
+
+// The same reason again keeps the time of its first failure and writes nothing.
+const storePollProblem = (channel: InboundChannel, cause: Cause.Cause<unknown>, since: Date) =>
+  Option.match(downloadFailure(cause), {
+    onNone: () => Effect.void,
+    onSome: ({ reason }) =>
+      reason === channel.pollProblemReason
+        ? Effect.void
+        : setPollProblem(channel, { pollProblemReason: reason, pollProblemSince: since }),
+  })
+
+const clearPollProblem = (channel: InboundChannel) =>
+  channel.pollProblemReason === null
+    ? Effect.void
+    : setPollProblem(channel, { pollProblemReason: null, pollProblemSince: null })
 
 const pollChannel = (channel: InboundChannel, state: ChannelPolling) =>
   Effect.gen(function* () {
     const download = yield* Download
     const files = yield* download.list(channel)
+
+    yield* clearPollProblem(channel)
+
     const previous = state.listed
     const keys = new Set(files.map(fileKey))
 
@@ -179,7 +213,13 @@ export const pollInboundChannels = (minute: Duration.Input = Duration.minutes(1)
         // Each Channel polls in its own fiber, so a failure or defect stops only that Channel.
         yield* pollChannel(channel, state).pipe(
           Effect.catchCause((cause) =>
-            Effect.logError(`Inbound Channel ${channel.id} not polled${reasonOf(cause)}`, cause),
+            Effect.logError(
+              `Inbound Channel ${channel.id} not polled${reasonOf(cause)}`,
+              cause,
+            ).pipe(Effect.andThen(storePollProblem(channel, cause, new Date(now)))),
+          ),
+          Effect.catchCause((cause) =>
+            Effect.logError(`Poll problem of Inbound Channel ${channel.id} not stored`, cause),
           ),
           Effect.ensuring(
             Effect.sync(() => {

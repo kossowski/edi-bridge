@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { Cause, Clock, Duration, Effect, Exit, Fiber, Logger, Option, Scope } from 'effect'
 import { TestClock } from 'effect/testing'
 import { createHash, randomBytes } from 'node:crypto'
@@ -170,7 +170,9 @@ const startPolling = async (service: DownloadService = download, logs: PollLog[]
   const scope = await Effect.runPromise(Scope.make())
   const clock = await Effect.runPromise(TestClock.make().pipe(Scope.provide(scope)))
 
-  await Effect.runPromise(clock.setTime(Date.now()))
+  const startedAt = Date.now()
+
+  await Effect.runPromise(clock.setTime(startedAt))
 
   const polling = Effect.runFork(
     pollInboundChannels().pipe(
@@ -204,6 +206,7 @@ const startPolling = async (service: DownloadService = download, logs: PollLog[]
     }, wait)
 
   return {
+    startedAt: new Date(startedAt),
     calls: recording.calls,
     lists,
     operations,
@@ -711,5 +714,139 @@ describe('the polling of inbound SFTP Channels', () => {
       { status: 'received', duplicateOfRunId: null, id: anyId },
       { status: 'duplicate', duplicateOfRunId: stored[0]?.id, id: anyId },
     ])
+  })
+
+  const pollProblemOf = async (channelId: string) => {
+    const [stored] = await connection.db
+      .select({
+        reason: channels.pollProblemReason,
+        since: channels.pollProblemSince,
+        // Postgres gives a row a new xmin on every update, so an unchanged one means no write.
+        version: sql<string>`xmin::text`,
+      })
+      .from(channels)
+      .where(eq(channels.id, channelId))
+
+    return stored
+  }
+
+  const pollProblemStored = (channelId: string, expected: { reason: string; since: Date }) =>
+    vi.waitFor(
+      async () => {
+        expect(await pollProblemOf(channelId)).toMatchObject(expected)
+      },
+      { timeout: 2000, interval: 10 },
+    )
+
+  const impostor = async () => {
+    const remotePath = `/impostor-${randomBytes(4).toString('hex')}`
+
+    await sftp.exec(`install -d -m 777 ${sftp.home}${remotePath}`)
+
+    return receiveOverSftp(connection.db, workspace, {
+      ...sftpLogin,
+      host: sftp.host,
+      port: sftp.port,
+      remotePath,
+      hostKeyFingerprint: mismatchingHostKeyFingerprint,
+    })
+  }
+
+  it('stores the reason of a failed poll and the time of its first failure on the Channel', async () => {
+    const impostorId = await impostor()
+    const polling = await startPolling()
+
+    await pollProblemStored(impostorId, { reason: 'hostKeyMismatch', since: polling.startedAt })
+  })
+
+  it('writes nothing while a Channel fails again with the same reason', async () => {
+    const impostorId = await impostor()
+    const polling = await startPolling()
+
+    await pollProblemStored(impostorId, { reason: 'hostKeyMismatch', since: polling.startedAt })
+
+    const first = await pollProblemOf(impostorId)
+
+    await polling.minutesPass(1)
+    await polling.polled(impostorId, 2)
+
+    expect(await pollProblemOf(impostorId)).toEqual(first)
+  })
+
+  it('clears the poll problem at the next successful poll', async () => {
+    const impostorId = await impostor()
+    const polling = await startPolling()
+
+    await pollProblemStored(impostorId, { reason: 'hostKeyMismatch', since: polling.startedAt })
+    await connection.db
+      .update(channels)
+      .set({ hostKeyFingerprint: sftp.hostKeyFingerprint })
+      .where(eq(channels.id, impostorId))
+    await polling.minutesPass(1)
+
+    await vi.waitFor(
+      async () => {
+        expect(await pollProblemOf(impostorId)).toMatchObject({ reason: null, since: null })
+      },
+      { timeout: 2000, interval: 10 },
+    )
+  })
+
+  const failingWith = (channelId: string, failure: () => Effect.Effect<never, DownloadFailed>) => ({
+    ...download,
+    list: (channel: Parameters<DownloadService['list']>[0]) =>
+      channel.id === channelId ? failure() : download.list(channel),
+  })
+
+  it('rewrites the reason and the time of the first failure when the reason changes', async () => {
+    const box = await outbox()
+    let reason: DownloadFailed['reason'] = 'timedOut'
+
+    const polling = await startPolling(
+      failingWith(box.channelId, () => Effect.fail(new DownloadFailed({ reason }))),
+    )
+
+    await pollProblemStored(box.channelId, { reason: 'timedOut', since: polling.startedAt })
+    reason = 'loginRejected'
+    await polling.minutesPass(1)
+
+    await pollProblemStored(box.channelId, {
+      reason: 'loginRejected',
+      since: new Date(polling.startedAt.getTime() + 60_000),
+    })
+  })
+
+  it('writes nothing when a Channel without a poll problem is polled', async () => {
+    const box = await outbox()
+    const polling = await startPolling()
+    const before = await pollProblemOf(box.channelId)
+
+    await polling.pollAgain(box.channelId)
+    await polling.polled(box.channelId, 2)
+
+    expect(await pollProblemOf(box.channelId)).toEqual(before)
+  })
+
+  it('stores no poll problem for a defect', async () => {
+    const box = await outbox()
+    const logs: PollLog[] = []
+
+    const polling = await startPolling(
+      failingWith(box.channelId, () => Effect.die(new Error('listing broke'))),
+      logs,
+    )
+
+    await polling.polled(box.channelId, 1)
+    await vi.waitFor(() => {
+      expect(
+        logs.some(
+          ({ message }) =>
+            Array.isArray(message) &&
+            message.includes(`Inbound Channel ${box.channelId} not polled`),
+        ),
+      ).toBe(true)
+    }, wait)
+
+    expect(await pollProblemOf(box.channelId)).toMatchObject({ reason: null, since: null })
   })
 })
