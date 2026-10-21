@@ -33,6 +33,36 @@ describe('the Channel secret key', () => {
   })
 })
 
+describe('the hosts a Channel may reach at a blocked address', () => {
+  it('are none by default', () => {
+    expect(loadConfig(production).channels.allowedHosts).toEqual([])
+  })
+
+  it('are none with an empty value', () => {
+    expect(loadConfig({ ...production, CHANNEL_ALLOWED_HOSTS: '' }).channels.allowedHosts).toEqual(
+      [],
+    )
+  })
+
+  it('list IP addresses, CIDR ranges and host names', () => {
+    expect(
+      loadConfig({
+        ...production,
+        CHANNEL_ALLOWED_HOSTS: '10.8.0.12, 192.168.40.0/24,fd00::/8 , sftp.partner.internal',
+      }).channels.allowedHosts,
+    ).toEqual(['10.8.0.12', '192.168.40.0/24', 'fd00::/8', 'sftp.partner.internal'])
+  })
+
+  it.each(['10.0.0.0/33', 'fd00::/129', '10.0.0.0/', '10.0.0.0/8x', 'sftp partner'])(
+    'refuse to start with the entry %s',
+    (entry) => {
+      expect(() => loadConfig({ ...production, CHANNEL_ALLOWED_HOSTS: entry })).toThrow(
+        /CHANNEL_ALLOWED_HOSTS/,
+      )
+    },
+  )
+})
+
 describe('the public API URL', () => {
   it('is the /api path of the public origin in production', () => {
     expect(loadConfig(production).channels.apiPublicUrl).toBe('https://edi-bridge.example.com/api')

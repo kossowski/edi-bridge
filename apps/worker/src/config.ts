@@ -1,7 +1,7 @@
 import { Duration } from 'effect'
 import { z } from 'zod'
 
-import { secretKeyEnv } from '@edi-bridge/channels'
+import { allowedHostsEnv, secretKeyEnv } from '@edi-bridge/channels'
 import { localDatabaseUrl } from '@edi-bridge/db'
 
 import type { SentryConfig } from './sentry.js'
@@ -15,6 +15,7 @@ const envSchema = (production: boolean) =>
     RUN_REQUEUE_INTERVAL_SECONDS: z.coerce.number().int().positive().default(60),
     RUN_STUCK_AFTER_MINUTES: z.coerce.number().int().positive().default(10),
     CHANNEL_SECRET_KEY: secretKeyEnv(production),
+    CHANNEL_ALLOWED_HOSTS: allowedHostsEnv,
     SENTRY_DSN: z.union([z.literal(''), z.url()]).optional(),
     SENTRY_ENVIRONMENT: z.string().optional(),
     SENTRY_TRACES_SAMPLE_RATE: z.preprocess(
@@ -45,6 +46,7 @@ export function loadConfig(source: NodeJS.ProcessEnv) {
     requeueInterval: Duration.seconds(env.data.RUN_REQUEUE_INTERVAL_SECONDS),
     stuckAfter: Duration.minutes(env.data.RUN_STUCK_AFTER_MINUTES),
     channelSecretKey: env.data.CHANNEL_SECRET_KEY,
+    channelAllowedHosts: env.data.CHANNEL_ALLOWED_HOSTS,
     sentry,
   }
 }

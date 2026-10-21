@@ -5,7 +5,7 @@ import Fastify from 'fastify'
 import type { LanguageModel } from 'ai'
 import type { FastifyInstance, FastifyReply, FastifyRequest, FastifyServerOptions } from 'fastify'
 
-import { ChannelReach, channelReach, secretBox } from '@edi-bridge/channels'
+import { addressPolicy, ChannelReach, channelReach, secretBox } from '@edi-bridge/channels'
 import {
   acceptAiDraftEndpoint,
   acceptAiProposedPartsEndpoint,
@@ -409,7 +409,10 @@ function registerRoutes(
     apiPublicUrl: channelSettings.apiPublicUrl,
   }
 
-  const reach = channelReach({ timeoutMs: channelSettings.reachTimeoutMs })
+  const reach = channelReach({
+    timeoutMs: channelSettings.reachTimeoutMs,
+    addressPolicy: addressPolicy(channelSettings.allowedHosts),
+  })
 
   app.get('/health', { logLevel: 'silent' }, async (_request, reply) => {
     const [postgres, redis] = await Promise.all([

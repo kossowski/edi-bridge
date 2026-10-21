@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { secretKeyEnv } from '@edi-bridge/channels'
+import { allowedHostsEnv, secretKeyEnv } from '@edi-bridge/channels'
 import { localDatabaseUrl } from '@edi-bridge/db'
 
 import { aiModelFromEnv } from './ai-model.js'
@@ -27,6 +27,7 @@ const envSchema = (production: boolean) =>
       ? z.string().min(32)
       : z.string().min(32).default('edi-bridge-development-secret-not-for-production'),
     CHANNEL_SECRET_KEY: secretKeyEnv(production),
+    CHANNEL_ALLOWED_HOSTS: allowedHostsEnv,
     API_PUBLIC_URL: z.url().optional(),
     SENTRY_DSN: unsetWhenEmpty(z.url()),
     SENTRY_ENVIRONMENT: unsetWhenEmpty(z.string()),
@@ -63,6 +64,7 @@ export function loadConfig(source: NodeJS.ProcessEnv) {
       secretKey: env.data.CHANNEL_SECRET_KEY,
       apiPublicUrl,
       reachTimeoutMs: channelReachTimeoutMs,
+      allowedHosts: env.data.CHANNEL_ALLOWED_HOSTS,
     } satisfies ChannelSettings,
     aiModel: aiModelFromEnv(source),
     sentry:

@@ -17,9 +17,10 @@ import {
   startTestSftpServer,
   type TestErp,
   type TestSftpServer,
+  testAddressPolicy,
 } from './testing'
 
-const reach = channelReach({ timeoutMs: 1500 })
+const reach = channelReach({ timeoutMs: 1500, addressPolicy: testAddressPolicy })
 
 let sftp: TestSftpServer
 

@@ -232,6 +232,28 @@ describe('POST /channels/:id/test for an HTTP Channel', () => {
   })
 })
 
+describe('POST /channels/:id/test for a Channel at a blocked address', () => {
+  it('refuses an SFTP Channel whose host is a loopback address off the allow list', async () => {
+    expect(await outcomeOf({ ...sftpOutbox(), host: '127.0.0.2' })).toEqual({
+      outcome: 'failed',
+      reason: 'addressBlocked',
+      blockedAddress: '127.0.0.2',
+      hostKey: null,
+      testedAt: anyTimestamp,
+    })
+  })
+
+  it('refuses an HTTP Channel that points at the cloud metadata address', async () => {
+    expect(await outcomeOf(httpDelivery('http://169.254.169.254/latest/meta-data'))).toEqual({
+      outcome: 'failed',
+      reason: 'addressBlocked',
+      blockedAddress: '169.254.169.254',
+      hostKey: null,
+      testedAt: anyTimestamp,
+    })
+  })
+})
+
 describe('POST /channels/:id/test for a seeded Channel', () => {
   const seededChannel = async (input: ChannelInput) => {
     const channel = await created(input)

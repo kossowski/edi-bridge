@@ -38,7 +38,7 @@ pnpm dev
 
 Before the api starts, `pnpm dev` seeds a development Workspace and its Operator. Sign in as `operator@edi-bridge.example` with the password `edi-bridge-operator`. The production image never runs this seed; see [Create the Operator](docs/deployment/deployment-operations.md#create-the-operator) for a deployment.
 
-The host ports of the infrastructure services can be changed in `.env` (`POSTGRES_PORT`, `REDIS_PORT`, `SFTP_PORT`). Compose binds all published ports to `127.0.0.1`. The bundled credentials are for local development only.
+The host ports of the infrastructure services can be changed in `.env` (`POSTGRES_PORT`, `REDIS_PORT`, `SFTP_PORT`). `.env.example` sets `CHANNEL_ALLOWED_HOSTS` to the loopback hosts, so a Channel can reach the SFTP server of Compose at `localhost`; without it, the api and the worker refuse internal addresses. Compose binds all published ports to `127.0.0.1`. The bundled credentials are for local development only.
 
 Stop the infrastructure with `docker compose down`; add `-v` to also delete its data.
 

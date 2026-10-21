@@ -38,6 +38,7 @@ export interface ChannelSettings {
   secretKey: Buffer
   apiPublicUrl: string
   reachTimeoutMs: number
+  allowedHosts: readonly string[]
 }
 
 export class ChannelEnvironment extends Context.Service<
@@ -96,10 +97,14 @@ interface KindHandling<K extends Kind> {
 
 type KindHandlings = { [K in Kind]: KindHandling<K> }
 
-const pollProblemOf = ({ pollProblemReason, pollProblemSince }: Row) =>
+const pollProblemOf = ({ pollProblemReason, pollProblemSince, pollProblemBlockedAddress }: Row) =>
   pollProblemReason === null || pollProblemSince === null
     ? null
-    : { reason: pollProblemReason, since: pollProblemSince.toISOString() }
+    : {
+        reason: pollProblemReason,
+        since: pollProblemSince.toISOString(),
+        ...(pollProblemBlockedAddress !== null && { blockedAddress: pollProblemBlockedAddress }),
+      }
 
 const kinds: KindHandlings = {
   sftp: {
@@ -429,14 +434,14 @@ export const testChannel = (id: string) =>
     const channel = toChannel(row, apiPublicUrl)
 
     // A seeded Channel points at a reserved host and never connects, not even for a test.
-    const { reason, hostKey } = row.seeded
-      ? { reason: 'seededChannel' as const, hostKey: null }
+    const { reason, hostKey, blockedAddress } = row.seeded
+      ? { reason: 'seededChannel' as const, hostKey: null, blockedAddress: undefined }
       : yield* handlingOf(channel.type)
           .reach(channel, secretOf(secrets, row))
           .pipe(
-            Effect.map((hostKey) => ({ reason: null, hostKey })),
-            Effect.catchTag('ChannelUnreachable', ({ reason, hostKey = null }) =>
-              Effect.succeed({ reason, hostKey }),
+            Effect.map((hostKey) => ({ reason: null, hostKey, blockedAddress: undefined })),
+            Effect.catchTag('ChannelUnreachable', ({ reason, hostKey = null, blockedAddress }) =>
+              Effect.succeed({ reason, hostKey, blockedAddress }),
             ),
           )
 
@@ -445,6 +450,12 @@ export const testChannel = (id: string) =>
     return (
       reason === null
         ? { outcome: 'succeeded', hostKey, testedAt }
-        : { outcome: 'failed', reason, hostKey, testedAt }
+        : {
+            outcome: 'failed',
+            reason,
+            hostKey,
+            testedAt,
+            ...(blockedAddress && { blockedAddress }),
+          }
     ) satisfies ChannelTestResult
   })

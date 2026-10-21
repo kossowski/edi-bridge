@@ -17,9 +17,12 @@ import {
   mismatchingHostKeyFingerprint,
   startTestSftpServer,
   type TestSftpServer,
+  testAddressPolicy,
 } from './testing'
 
 const timeoutMs = 1500
+
+const options = { timeoutMs, addressPolicy: testAddressPolicy }
 
 let sftp: TestSftpServer
 
@@ -65,7 +68,7 @@ const remoteFile = async (path: string) => (await sftp.exec(`cat ${sftp.home}${p
 
 describe('uploadSftp', () => {
   it('puts the file with its content into the remote path', async () => {
-    await Effect.runPromise(uploadSftp(outbox(), interchange('orders-42.edi'), { timeoutMs }))
+    await Effect.runPromise(uploadSftp(outbox(), interchange('orders-42.edi'), options))
 
     expect(await remoteFile('/upload/orders-42.edi')).toBe(
       "UNB+UNOC:3+4012345000009:14+4098765000002:14+261019:1627+42'",
@@ -76,9 +79,7 @@ describe('uploadSftp', () => {
   it('reports a missing remote path', async () => {
     expect(
       await failure(
-        uploadSftp({ ...outbox(), remotePath: '/outbox' }, interchange('orders-43.edi'), {
-          timeoutMs,
-        }),
+        uploadSftp({ ...outbox(), remotePath: '/outbox' }, interchange('orders-43.edi'), options),
       ),
     ).toEqual(new DeliveryFailed({ reason: 'remotePathMissing' }))
   })
@@ -90,9 +91,11 @@ describe('uploadSftp', () => {
 
     expect(
       await failure(
-        uploadSftp({ ...outbox(), remotePath: '/upload/taken' }, interchange('orders-44.edi'), {
-          timeoutMs,
-        }),
+        uploadSftp(
+          { ...outbox(), remotePath: '/upload/taken' },
+          interchange('orders-44.edi'),
+          options,
+        ),
       ),
     ).toEqual(new DeliveryFailed({ reason: 'unexpectedResponse' }))
 
@@ -109,7 +112,7 @@ describe('uploadSftp', () => {
       uploadSftp(
         { ...outbox(), remotePath: '/upload/landed' },
         { ...interchange('orders-48.edi'), isRetry: true },
-        { timeoutMs },
+        options,
       ),
     )
 
@@ -126,7 +129,7 @@ describe('uploadSftp', () => {
       uploadSftp(
         { ...outbox(), remotePath: '/upload/resumed' },
         { ...interchange('orders-47.edi'), isRetry: true },
-        { timeoutMs },
+        options,
       ),
     )
 
@@ -139,9 +142,7 @@ describe('uploadSftp', () => {
   it('reports a remote path the user may not write', async () => {
     expect(
       await failure(
-        uploadSftp({ ...outbox(), remotePath: '/locked' }, interchange('orders-45.edi'), {
-          timeoutMs,
-        }),
+        uploadSftp({ ...outbox(), remotePath: '/locked' }, interchange('orders-45.edi'), options),
       ),
     ).toEqual(new DeliveryFailed({ reason: 'permissionDenied' }))
   })
@@ -151,7 +152,7 @@ describe('uploadSftp', () => {
       uploadSftp(
         { ...outbox(), hostKeyFingerprint: sftp.hostKeyFingerprint },
         interchange('orders-49.edi'),
-        { timeoutMs },
+        options,
       ),
     )
 
@@ -164,7 +165,7 @@ describe('uploadSftp', () => {
         uploadSftp(
           { ...outbox(), hostKeyFingerprint: mismatchingHostKeyFingerprint },
           interchange('orders-50.edi'),
-          { timeoutMs },
+          options,
         ),
       ),
     ).toEqual(new DeliveryFailed({ reason: 'hostKeyMismatch' }))
@@ -177,9 +178,7 @@ describe('uploadSftp', () => {
 
     expect(
       await failure(
-        uploadSftp({ ...outbox(), host: '127.0.0.1', port }, interchange('orders-46.edi'), {
-          timeoutMs,
-        }),
+        uploadSftp({ ...outbox(), host: '127.0.0.1', port }, interchange('orders-46.edi'), options),
       ),
     ).toEqual(new DeliveryFailed({ reason: 'hostUnreachable' }))
   })
@@ -189,7 +188,7 @@ const secrets = secretBox(Buffer.alloc(secretKeyBytes, 'test-channel-secret-key'
 
 const channelId = '5d1e8c3a-7f42-4b9e-a0d6-2c9b1f8e4a17'
 
-const deliver = sftpChannelDelivery({ secrets, timeoutMs })
+const deliver = sftpChannelDelivery({ secrets, ...options })
 
 const outboundChannel = (): SftpChannel => ({
   id: channelId,

@@ -101,10 +101,12 @@ const reasonOf = (cause: Cause.Cause<unknown>) =>
     Option.match({ onNone: () => '', onSome: ({ reason }) => `: ${reason}` }),
   )
 
-const setPollProblem = (
-  channel: InboundChannel,
-  pollProblem: Pick<InboundChannel, 'pollProblemReason' | 'pollProblemSince'>,
-) =>
+type PollProblem = Pick<
+  InboundChannel,
+  'pollProblemReason' | 'pollProblemSince' | 'pollProblemBlockedAddress'
+>
+
+const setPollProblem = (channel: InboundChannel, pollProblem: PollProblem) =>
   Effect.gen(function* () {
     const db = yield* Database
 
@@ -113,20 +115,31 @@ const setPollProblem = (
     )
   })
 
-// The same reason again keeps the time of its first failure and writes nothing.
+// A poll problem tells since when polling fails, so a new failure for the same reason keeps that time.
 const storePollProblem = (channel: InboundChannel, cause: Cause.Cause<unknown>, since: Date) =>
   Option.match(downloadFailure(cause), {
     onNone: () => Effect.void,
-    onSome: ({ reason }) =>
-      reason === channel.pollProblemReason
+    onSome: ({ reason, blockedAddress = null }) => {
+      const sameReason = reason === channel.pollProblemReason
+
+      return sameReason && blockedAddress === channel.pollProblemBlockedAddress
         ? Effect.void
-        : setPollProblem(channel, { pollProblemReason: reason, pollProblemSince: since }),
+        : setPollProblem(channel, {
+            pollProblemReason: reason,
+            pollProblemSince: sameReason ? channel.pollProblemSince : since,
+            pollProblemBlockedAddress: blockedAddress,
+          })
+    },
   })
 
 const clearPollProblem = (channel: InboundChannel) =>
   channel.pollProblemReason === null
     ? Effect.void
-    : setPollProblem(channel, { pollProblemReason: null, pollProblemSince: null })
+    : setPollProblem(channel, {
+        pollProblemReason: null,
+        pollProblemSince: null,
+        pollProblemBlockedAddress: null,
+      })
 
 const pollChannel = (channel: InboundChannel, state: ChannelPolling) =>
   Effect.gen(function* () {

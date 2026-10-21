@@ -410,6 +410,7 @@ export const channels = pgTable(
     pollingIntervalMinutes: integer(),
     pollProblemReason: pollProblemReason(),
     pollProblemSince: timestamp({ withTimezone: true, mode: 'date' }),
+    pollProblemBlockedAddress: text(),
     rateLimitPerMinute: integer(),
     encryptedWebhookToken: text(),
     webhookTokenLastFour: text(),
@@ -462,6 +463,11 @@ export const channels = pgTable(
     check(
       'channels_poll_problem',
       sql`num_nonnulls(${table.pollProblemReason}, ${table.pollProblemSince}) = 0 or (${table.type} = 'sftp' and ${table.direction} = 'inbound' and num_nonnulls(${table.pollProblemReason}, ${table.pollProblemSince}) = 2)`,
+    ),
+    check(
+      'channels_poll_problem_blocked_address',
+      // The text cast keeps the check off the enum value its migration adds in the same transaction.
+      sql`(${table.pollProblemReason}::text is not distinct from 'addressBlocked') = (${table.pollProblemBlockedAddress} is not null)`,
     ),
     check(
       'channels_authorization',

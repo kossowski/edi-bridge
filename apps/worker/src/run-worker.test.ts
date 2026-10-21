@@ -10,6 +10,7 @@ import {
   startTestSftpServer,
   type TestErp,
   type TestSftpServer,
+  testAddressPolicy,
 } from '@edi-bridge/channels/testing'
 import { channels, connect, type Connection, documents, mappings, runs } from '@edi-bridge/db'
 import { startTestDatabase, type TestDatabase } from '@edi-bridge/db/testing'
@@ -94,6 +95,7 @@ beforeAll(async () => {
     redisUrl: testRedis.url,
     db: connection.db,
     secrets: testSecrets,
+    addressPolicy: testAddressPolicy,
     requeueInterval: '100 millis',
     stuckAfter: '1 hour',
     pollingMinute: '100 millis',
@@ -399,6 +401,7 @@ describe('the worker', () => {
         redisUrl: unmonitoredRedis.url,
         db: connection.db,
         secrets: testSecrets,
+        addressPolicy: testAddressPolicy,
         requeueInterval: '1 hour',
         stuckAfter: '1 hour',
         pollingMinute: '1 hour',

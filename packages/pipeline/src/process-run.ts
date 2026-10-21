@@ -400,6 +400,11 @@ const deliveryReasons: Record<ChannelTestFailureReason, string> = {
   addressBlocked: 'The host of the Channel resolves to a blocked address',
 }
 
+const deliveryProblems: Partial<Record<ChannelTestFailureReason, ProblemReason>> = {
+  hostKeyMismatch: 'hostKeyMismatch',
+  addressBlocked: 'addressBlocked',
+}
+
 const glnOwners = { workspace: 'The Workspace', tradingPartner: 'The Trading Partner' } as const
 
 type DeliveryError =
@@ -425,7 +430,7 @@ const deliveryFailure = (
           details: details ?? null,
         },
         problem: {
-          reason: reason === 'hostKeyMismatch' ? 'hostKeyMismatch' : 'unreachable',
+          reason: deliveryProblems[reason] ?? 'unreachable',
           fixTarget: { kind: 'channel', channelId: channel.id, name: channel.name },
         },
       }),

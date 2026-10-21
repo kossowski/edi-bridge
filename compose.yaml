@@ -59,6 +59,7 @@ services:
       WEB_ORIGIN: http://localhost:${WEB_PORT:-3000}
       BETTER_AUTH_SECRET: edi-bridge-local-full-stack-secret-not-for-production
       CHANNEL_SECRET_KEY: ZWRpLWJyaWRnZS1sb2NhbC1mdWxsLXN0YWNrLWtleWU=
+      CHANNEL_ALLOWED_HOSTS: sftp
     ports:
       - '127.0.0.1:${API_PORT:-3001}:3001'
     depends_on:
@@ -78,6 +79,7 @@ services:
       REDIS_URL: redis://redis:6379
       WORKER_HEALTH_PORT: 3002
       CHANNEL_SECRET_KEY: ZWRpLWJyaWRnZS1sb2NhbC1mdWxsLXN0YWNrLWtleWU=
+      CHANNEL_ALLOWED_HOSTS: sftp
     ports:
       - '127.0.0.1:${WORKER_HEALTH_PORT:-3002}:3002'
     depends_on:

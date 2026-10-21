@@ -17,6 +17,7 @@ import {
   startTestSftpServer,
   type TestErp,
   type TestSftpServer,
+  testAddressPolicy,
 } from '@edi-bridge/channels/testing'
 import { type CharacterSet, withCheckDigit } from '@edi-bridge/contracts'
 import {
@@ -623,9 +624,14 @@ const receiveInvoice = async (
 const sftpDelivery: DeliveryService = sftpChannelDelivery({
   secrets: testSecrets,
   timeoutMs: 1500,
+  addressPolicy: testAddressPolicy,
 })
 
-const deliveryByChannelType = channelDelivery({ secrets: testSecrets, timeoutMs: 1500 })
+const deliveryByChannelType = channelDelivery({
+  secrets: testSecrets,
+  timeoutMs: 1500,
+  addressPolicy: testAddressPolicy,
+})
 
 beforeEach(() => {
   erp.received.length = 0
@@ -1621,6 +1627,43 @@ describe('the processing of a Run', () => {
     })
     expect(run?.output).toMatch(/^UNB\+UNOC:3\+.*UNZ\+1\+1'$/)
     expect(ranStages(run)).toEqual(['receipt', 'mapping', 'validation', 'delivery'])
+  })
+
+  it('fails a Run at delivery when its SFTP Channel points at a blocked address, naming the address and the Channel to fix', async () => {
+    const internal = await seedInvoiceWorkspace(connection.db, 'Internal Foods')
+
+    const channelId = await deliverOverSftp(connection.db, internal, {
+      ...sftpLogin(),
+      host: '10.0.4.17',
+    })
+
+    const { queue, runId } = await receiveInvoice(goldenInvoice, inMemoryRunQueue(), internal)
+    const defects = recordingDefectReporter()
+
+    for (const queued of queue.queued) {
+      await Effect.runPromise(
+        processRun(queued).pipe(
+          Effect.provideService(DefectReporter, defects.service),
+          pipelineServices(connection.db, queue, sftpDelivery),
+        ),
+      )
+    }
+
+    expect(await readRun(connection.db, runId)).toMatchObject({
+      status: 'failed',
+      failureStage: 'delivery',
+      handedOverAt: null,
+      error: {
+        code: 'addressBlocked',
+        position: null,
+        details: { kind: 'blockedAddress', address: '10.0.4.17' },
+      },
+      problem: {
+        reason: 'addressBlocked',
+        fixTarget: { kind: 'channel', channelId, name: 'Hanse Retail SFTP inbox' },
+      },
+    })
+    expect(defects.reported).toEqual([])
   })
 
   it('fails a Run at delivery when its SFTP server shows another host key, naming the Channel to fix', async () => {

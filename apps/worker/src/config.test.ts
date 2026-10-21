@@ -22,6 +22,24 @@ describe('the Channel secret key', () => {
   })
 })
 
+describe('the hosts a Channel may reach at a blocked address', () => {
+  it('are none by default', () => {
+    expect(loadConfig({}).channelAllowedHosts).toEqual([])
+  })
+
+  it('list IP addresses, CIDR ranges and host names', () => {
+    expect(
+      loadConfig({ CHANNEL_ALLOWED_HOSTS: '10.8.0.12,192.168.40.0/24,sftp' }).channelAllowedHosts,
+    ).toEqual(['10.8.0.12', '192.168.40.0/24', 'sftp'])
+  })
+
+  it('refuse to start with a range of a wrong prefix', () => {
+    expect(() => loadConfig({ CHANNEL_ALLOWED_HOSTS: '10.0.0.0/40' })).toThrow(
+      /CHANNEL_ALLOWED_HOSTS/,
+    )
+  })
+})
+
 describe('the bound after which a processing Run is stuck', () => {
   it('is 10 minutes by default', () => {
     expect(Duration.toMinutes(loadConfig({}).stuckAfter)).toBe(10)

@@ -1,4 +1,9 @@
-export { type AddressPolicy, addressPolicy, type HostResolver } from './address-guard'
+export {
+  type AddressPolicy,
+  addressPolicy,
+  allowedHostsEnv,
+  type HostResolver,
+} from './address-guard'
 
 export {
   ChannelReach,
