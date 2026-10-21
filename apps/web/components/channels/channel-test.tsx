@@ -98,6 +98,7 @@ function TestOutcome({
   accept: AcceptMutation
 }) {
   const t = useTranslations('Channel.test')
+  const tFix = useTranslations('Channel.pollProblem.fix')
   const format = useFormatter()
   const now = useNow({ updateInterval: 30_000 })
 
@@ -147,7 +148,7 @@ function TestOutcome({
           <Link
             href={pollProblemFix(channel.id, result.reason).href}
             className={cn(linkClass, 'w-fit')}>
-            {t('changeAddress')}
+            {tFix('address')}
           </Link>
         )}
         {hostKey}

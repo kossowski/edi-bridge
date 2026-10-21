@@ -3,7 +3,7 @@ import { channelSettingsHref } from '@/lib/navigation'
 import type { Channel, ChannelTestFailureReason, PollProblem } from '@edi-bridge/contracts'
 
 export type PollProblemFix = {
-  target: 'hostKey' | 'credentials' | 'settings'
+  target: 'hostKey' | 'credentials' | 'address' | 'settings'
   href: string
 }
 
@@ -28,6 +28,8 @@ export function pollProblemFix(
       return { target: 'hostKey', href: `/channels/${channelId}#channel-host-key` }
     case 'loginRejected':
       return { target: 'credentials', href: channelSettingsHref(channelId) }
+    case 'addressBlocked':
+      return { target: 'address', href: channelSettingsHref(channelId) }
     default:
       return { target: 'settings', href: channelSettingsHref(channelId) }
   }

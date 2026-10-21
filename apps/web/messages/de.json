@@ -1952,6 +1952,7 @@
       "fix": {
         "hostKey": "Verbindung testen, dann neuen Schlüssel übernehmen",
         "credentials": "Anmeldedaten ändern",
+        "address": "Serveradresse ändern",
         "settings": "Verbindungseinstellungen prüfen"
       },
       "viewOnly": "Ein Admin kann die Verbindung korrigieren."
@@ -1963,7 +1964,6 @@
       "succeeded": "Die Verbindung funktioniert.",
       "testedAt": "Getestet <when>{time}</when>.",
       "requestFailed": "Der Test konnte nicht laufen. Versuchen Sie es erneut.",
-      "changeAddress": "Serveradresse ändern",
       "failed": {
         "hostKeyMismatch": {
           "title": "Der Server hat einen anderen Serverschlüssel gezeigt.",

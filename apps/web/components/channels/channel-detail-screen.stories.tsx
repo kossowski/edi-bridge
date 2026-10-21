@@ -158,9 +158,10 @@ export const PollProblemAddressBlocked = meta.story({
     const problem = pollProblemSection(canvasElement)
     const refused = 'The server address resolves to the internal address 10.20.0.15.'
     await expect(problem.getByText(refused)).toBeVisible()
-    await expect(
-      problem.getByRole('link', { name: 'Check the connection settings' }),
-    ).toHaveAttribute('href', `/channels/${blockedAddressChannel.id}/edit`)
+    await expect(problem.getByRole('link', { name: 'Change the server address' })).toHaveAttribute(
+      'href',
+      `/channels/${blockedAddressChannel.id}/edit`,
+    )
 
     const section = hostKeySection(canvasElement)
     await userEvent.click(section.getByRole('button', { name: /^Test connection/ }))
@@ -187,7 +188,13 @@ export const PollProblemAddressBlockedGerman = meta.story({
   async play({ canvas, canvasElement }) {
     await canvas.findByRole('heading', { level: 2, name: 'Abfrage fehlgeschlagen' })
     const refused = 'Die Serveradresse führt zur internen Adresse 10.20.0.15.'
-    await expect(canvas.getByText(refused)).toBeVisible()
+
+    const problem = within(
+      within(canvasElement).getByRole('region', { name: 'Abfrage fehlgeschlagen' }),
+    )
+
+    await expect(problem.getByText(refused)).toBeVisible()
+    await expect(problem.getByRole('link', { name: 'Serveradresse ändern' })).toBeVisible()
 
     const section = within(within(canvasElement).getByRole('region', { name: 'Serverschlüssel' }))
     await userEvent.click(section.getByRole('button', { name: /^Verbindung testen/ }))
