@@ -13,6 +13,7 @@ import {
   type TestErp,
   type TestSftpServer,
   testAddressPolicy,
+  wrongPassphrase,
 } from './testing'
 
 const reach = channelReach({ timeoutMs: 1500, addressPolicy: testAddressPolicy })
@@ -132,7 +133,7 @@ describe('channelReach for an SFTP Channel', () => {
   })
 
   it('reports a wrong passphrase without naming it', async () => {
-    const passphrase = 'wrong-key-passphrase'
+    const passphrase = wrongPassphrase
 
     const exit = await Effect.runPromiseExit(
       reach.sftp({
@@ -150,7 +151,7 @@ describe('channelReach for an SFTP Channel', () => {
       await hostKeyOutcome(
         reach.sftp({
           ...sftpOutbox(),
-          credential: { ...sftp.protectedKey, passphrase: 'wrong-key-passphrase' },
+          credential: { ...sftp.protectedKey, passphrase: wrongPassphrase },
           hostKeyFingerprint: mismatchingHostKeyFingerprint,
         }),
       ),

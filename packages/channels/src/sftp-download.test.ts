@@ -17,6 +17,7 @@ import {
   startTestSftpServer,
   type TestSftpServer,
   testAddressPolicy,
+  wrongPassphrase,
 } from './testing'
 
 const timeoutMs = 1500
@@ -205,6 +206,24 @@ describe('sftpChannelDownload', () => {
       listSftp(locked, downloadOptions),
       readSftp(locked, 'orders-3.edi', downloadOptions),
       removeSftp(locked, 'orders-3.edi', downloadOptions),
+    ]) {
+      expect(await Effect.runPromise(Effect.flip(attempt))).toEqual(
+        new DownloadFailed({ reason: 'passphraseRejected' }),
+      )
+    }
+
+    expect(await listedNames(channel)).toEqual(['orders-3.edi'])
+  })
+
+  it('reports a protected private key with a wrong passphrase', async () => {
+    const channel = await inbox('wrong-passphrase', { 'orders-3.edi': 'UNB' })
+
+    const rejected = protectedLogin('/upload/wrong-passphrase', wrongPassphrase)
+
+    for (const attempt of [
+      listSftp(rejected, downloadOptions),
+      readSftp(rejected, 'orders-3.edi', downloadOptions),
+      removeSftp(rejected, 'orders-3.edi', downloadOptions),
     ]) {
       expect(await Effect.runPromise(Effect.flip(attempt))).toEqual(
         new DownloadFailed({ reason: 'passphraseRejected' }),

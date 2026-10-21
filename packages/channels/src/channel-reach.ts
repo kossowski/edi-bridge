@@ -168,7 +168,7 @@ const sftpFailureSchema = z.object({
     .catch(undefined),
 })
 
-// ssh2 parses the key before the handshake, so a locked key fails before the host key check.
+// Relies on ssh2's key-parse messages mentioning "passphrase".
 const keyFailureReasonSchema = z
   .object({ message: z.string() })
   .transform(({ message }): ChannelTestFailureReason =>
@@ -351,6 +351,7 @@ const sshSession = <A>(socket: Socket, login: SftpLogin, timeoutMs: number, use:
         ...login.credential,
       })
     } catch (error) {
+      // ssh2 parses the key before the handshake, so a locked key fails before the host key check.
       fail(keyFailureReasonSchema.parse(error))
     }
 

@@ -81,6 +81,9 @@ export const mismatchingHostKeyFingerprint = hostKeyFingerprintSchema.parse(
   `SHA256:${'A'.repeat(43)}`,
 )
 
+// A passphrase that does not unlock the protected key of the test SFTP server.
+export const wrongPassphrase = 'wrong-key-passphrase'
+
 export interface ReceivedRequest {
   method: string | undefined
   url: string | undefined

@@ -18,6 +18,7 @@ import {
   startTestSftpServer,
   type TestSftpServer,
   testAddressPolicy,
+  wrongPassphrase,
 } from './testing'
 
 const timeoutMs = 1500
@@ -94,7 +95,7 @@ describe('uploadSftp', () => {
         uploadSftp(
           {
             ...outbox(),
-            credential: { ...sftp.protectedKey, passphrase: 'wrong-key-passphrase' },
+            credential: { ...sftp.protectedKey, passphrase: wrongPassphrase },
           },
           interchange('orders-62.edi'),
           options,
