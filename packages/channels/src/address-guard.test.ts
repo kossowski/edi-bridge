@@ -357,6 +357,32 @@ describe('channelReach tries the checked addresses in order', () => {
     expect(erp.received).toHaveLength(1)
   })
 
+  it('does not post a delivery to the next address after the connection opened', async () => {
+    const connections: Socket[] = []
+
+    const resetting = createTcpServer((socket) => {
+      connections.push(socket)
+      socket.once('data', () => socket.resetAndDestroy())
+    })
+
+    const port = await listening(resetting)
+    const { resolve } = countingLookups('erp.partner.test', '127.0.0.1', '127.0.0.1')
+
+    try {
+      expect(
+        await failure(
+          postHttp(httpAt(`http://erp.partner.test:${port}/`), order, {
+            timeoutMs,
+            addressPolicy: addressPolicy(['127.0.0.0/8'], resolve),
+          }),
+        ),
+      ).toMatchObject({ reason: 'hostUnreachable' })
+      expect(connections).toHaveLength(1)
+    } finally {
+      resetting.close()
+    }
+  })
+
   it('does not send an HTTP request again after an answer it rejects', async () => {
     const { resolve } = countingLookups('erp.partner.test', '127.0.0.1', '127.0.0.1')
 

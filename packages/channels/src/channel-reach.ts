@@ -2,7 +2,7 @@ import { Context, Data, Effect } from 'effect'
 import { createHash } from 'node:crypto'
 import { connect, isIP, type LookupFunction, type Socket } from 'node:net'
 import { Client, type SFTPWrapper } from 'ssh2'
-import { Agent, fetch, type RequestInit } from 'undici'
+import { Agent, buildConnector, fetch, type RequestInit } from 'undici'
 import { z } from 'zod'
 
 import type {
@@ -46,14 +46,9 @@ export class ChannelReach extends Context.Service<
 
 export const unreachable = (reason: ChannelTestFailureReason) => new ChannelUnreachable({ reason })
 
-const unreachableHostCodes = new Set([
-  'ECONNREFUSED',
-  'ECONNRESET',
-  'EHOSTUNREACH',
-  'ENETUNREACH',
-  'ENOTFOUND',
-  'EAI_AGAIN',
-])
+const refusedCodes = ['ECONNREFUSED', 'EHOSTUNREACH', 'ENETUNREACH']
+
+const unreachableHostCodes = new Set([...refusedCodes, 'ECONNRESET', 'ENOTFOUND', 'EAI_AGAIN'])
 
 const timedOutCodes = new Set(['ETIMEDOUT', 'UND_ERR_CONNECT_TIMEOUT'])
 
@@ -99,13 +94,7 @@ class ConnectFailed extends Data.TaggedError('ConnectFailed')<{
   readonly reason: ChannelTestFailureReason
 }> {}
 
-const connectFailureCodes = new Set([
-  'ECONNREFUSED',
-  'EHOSTUNREACH',
-  'ENETUNREACH',
-  'ETIMEDOUT',
-  'UND_ERR_CONNECT_TIMEOUT',
-])
+const connectFailureCodes = new Set([...refusedCodes, ...timedOutCodes])
 
 const connectFailedAsUnreachable = <A>(
   effect: Effect.Effect<A, ChannelUnreachable | ConnectFailed>,
@@ -378,15 +367,20 @@ export const rejectedLoginReason = (status: number): ChannelTestFailureReason | 
 const httpStatusReason = (status: number): ChannelTestFailureReason | undefined =>
   rejectedLoginReason(status) ?? (status >= 500 ? 'unexpectedResponse' : undefined)
 
-// A connection that never opened sent nothing, so another address may take the request.
-const fetchFailureSchema = z
+const fetchFailure = z
   .object({ cause: z.object({ code: z.string() }) })
-  .transform(({ cause: { code } }) => {
-    const reason = networkReason(code) ?? 'unexpectedResponse'
+  .transform(({ cause: { code } }) => code)
+  .optional()
+  .catch(undefined)
 
-    return connectFailureCodes.has(code) ? new ConnectFailed({ reason }) : unreachable(reason)
-  })
-  .catch(() => unreachable('unexpectedResponse'))
+// A socket error can also end a request already sent, so only one that never connected moves on.
+const requestFailure = (code: string | undefined, neverConnected: boolean) => {
+  const reason = networkReason(code) ?? 'unexpectedResponse'
+
+  return neverConnected && code !== undefined && connectFailureCodes.has(code)
+    ? new ConnectFailed({ reason })
+    : unreachable(reason)
+}
 
 const pinnedLookup =
   (address: string): LookupFunction =>
@@ -398,14 +392,35 @@ const pinnedLookup =
     }
   }
 
-const requesting = (url: string, init: RequestInit, dispatcher?: Agent) =>
+interface PinnedAgent {
+  readonly agent: Agent
+  readonly connected: () => boolean
+}
+
+const pinnedAgent = (address: string, connectTimeoutMs: number): PinnedAgent => {
+  const connector = buildConnector({ lookup: pinnedLookup(address), timeout: connectTimeoutMs })
+  let connected = false
+
+  const agent = new Agent({
+    connect: (options, callback) => {
+      connector(options, (...args) => {
+        connected ||= args[0] === null
+        callback(...args)
+      })
+    },
+  })
+
+  return { agent, connected: () => connected }
+}
+
+const requesting = (url: string, init: RequestInit, pinned?: PinnedAgent) =>
   Effect.tryPromise({
     try: async (signal) => {
       const response = await fetch(url, {
         ...init,
         redirect: 'manual',
         signal,
-        ...(dispatcher && { dispatcher }),
+        ...(pinned && { dispatcher: pinned.agent }),
       })
 
       // An unread body holds its keep-alive connection until garbage collection.
@@ -413,7 +428,8 @@ const requesting = (url: string, init: RequestInit, dispatcher?: Agent) =>
 
       return response
     },
-    catch: (error) => fetchFailureSchema.parse(error),
+    catch: (error) =>
+      requestFailure(fetchFailure.parse(error), pinned !== undefined && !pinned.connected()),
   })
 
 // The URL keeps its host name, so TLS still checks the certificate against it.
@@ -435,12 +451,9 @@ export const httpRequest = (
   return Effect.flatMap(connectAddresses(host, addressPolicy), (addresses) =>
     firstConnecting(addresses, timeoutMs, (address, connectTimeoutMs) =>
       Effect.acquireUseRelease(
-        Effect.sync(
-          () =>
-            new Agent({ connect: { lookup: pinnedLookup(address), timeout: connectTimeoutMs } }),
-        ),
-        (agent) => requesting(url, init, agent),
-        (agent) => Effect.promise(() => agent.destroy()),
+        Effect.sync(() => pinnedAgent(address, connectTimeoutMs)),
+        (pinned) => requesting(url, init, pinned),
+        ({ agent }) => Effect.promise(() => agent.destroy()),
       ),
     ),
   )
