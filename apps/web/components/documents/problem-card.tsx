@@ -21,7 +21,7 @@ import {
   useFreshlyReprocessed,
 } from '@/components/documents/problem-actions'
 import { useCanChange } from '@/hooks/use-session'
-import { fixTargetHref } from '@/lib/navigation'
+import { channelSettingsHref, fixTargetHref } from '@/lib/navigation'
 import { buttonVariants } from '@edi-bridge/ui/components/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@edi-bridge/ui/components/card'
 import { cn } from '@edi-bridge/ui/lib/utils'
@@ -166,7 +166,7 @@ function FixLink({
 
   return (
     <Link
-      href={channelSettings ? `/channels/${target.channelId}/edit` : fixTargetHref(target, runId)}
+      href={channelSettings ? channelSettingsHref(target.channelId) : fixTargetHref(target, runId)}
       className={cn(
         buttonVariants({ variant: primary ? 'default' : 'outline' }),
         'h-auto min-h-8 max-w-full py-1.5 text-left whitespace-normal',
@@ -186,12 +186,17 @@ function StepBody({ text, children }: { text: string; children?: ReactNode }) {
   )
 }
 
+type FixLinkOptions = {
+  primary: boolean
+  // Sends an Admin to the Channel settings to change its server address.
+  changeAddress?: boolean
+}
+
 function fixStep(
   text: string,
   run: FailedRun,
   target: FixTarget,
-  primary: boolean,
-  changeAddress = false,
+  { primary, changeAddress = false }: FixLinkOptions,
 ): WhatToDoStep {
   return {
     key: 'fix',
@@ -227,7 +232,7 @@ export function useFixSteps(run: FailedRun): WhatToDoStep[] {
             }),
             run,
             target,
-            true,
+            { primary: true },
           ),
           { key: 'tryAgain', content: <TryAgainStep run={run} secondary /> },
         ]
@@ -236,7 +241,10 @@ export function useFixSteps(run: FailedRun): WhatToDoStep[] {
       // A retry is refused until the Channel's host no longer resolves to a blocked address.
       if (problem.reason === 'addressBlocked' && target) {
         return [
-          fixStep(t('changeAddress', { address: blockedAddressOf(run) }), run, target, true, true),
+          fixStep(t('changeAddress', { address: blockedAddressOf(run) }), run, target, {
+            primary: true,
+            changeAddress: true,
+          }),
           { key: 'tryAgain', content: <TryAgainStep run={run} secondary /> },
         ]
       }
@@ -260,7 +268,7 @@ export function useFixSteps(run: FailedRun): WhatToDoStep[] {
       }
 
       return [
-        ...(target ? [fixStep(t('fixCause'), run, target, true)] : []),
+        ...(target ? [fixStep(t('fixCause'), run, target, { primary: true })] : []),
         ...(mapping
           ? [
               run.documentDeletedAt === null
@@ -284,14 +292,14 @@ export function useFixSteps(run: FailedRun): WhatToDoStep[] {
       // The setup has to be complete before trying again can work.
       if (problem.reason === 'incompleteSetup' && target) {
         return [
-          fixStep(t('completeSetup'), run, target, true),
+          fixStep(t('completeSetup'), run, target, { primary: true }),
           { key: 'tryAgain', content: <TryAgainStep run={run} secondary /> },
         ]
       }
 
       return [
         { key: 'tryAgain', content: <TryAgainStep run={run} secondary={false} /> },
-        ...(target ? [fixStep(t('checkConnection'), run, target, false)] : []),
+        ...(target ? [fixStep(t('checkConnection'), run, target, { primary: false })] : []),
       ]
     }
 
