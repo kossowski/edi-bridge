@@ -15,8 +15,20 @@ It type-checks and unit-tests the packages changed since `<parent>` and every pa
 ## Left to CI and the hooks
 
 - CI runs every task on each PR: `lint`, `check-types`, `test`, `test:stories`, `test:canvas`, `test:e2e`, `build`, `build-storybook`, and `test:e2e:full-stack` against the `full-stack` Compose profile in a job of its own (`.github/workflows/ci.yml`). Run one of these locally only to reproduce a failed CI task.
+- Run `pnpm check` locally only through the slot script with `--all`, which holds every test slot: `bash .agents/skills/developer/scripts/test-slot.sh --all pnpm check`. See [Full check](#full-check).
 - The pre-commit hook runs lint-staged: `oxlint --fix` and `oxfmt` on the staged files.
 - The `agent-hooks` CI job tests the Claude Code hooks in `.claude/hooks/`. After a change there, run `pnpm test:agent-hooks` locally: the verify command leaves these hooks out.
+
+## Full check
+
+`pnpm check` holds every test slot because the canvas stories crash with `VITEST_BROWSER_CONNECTION_CLOSED` when memory runs out (#240):
+
+- A full check peaks at about 5.5–7.5 GB of the machine's 11.7 GB; the canvas stories alone take about 3.2 GB.
+- The OOM killer ends the Chromium renderer first: its `oom_score_adj` of 300 is the highest on the machine.
+- The cgroup sets `memory.swap.max = 0`, so swap gives no cushion, whatever `SWAP_LIMIT_MB` says.
+- `test-slot.sh` measures free memory only when a slot opens, so a second heavy command that starts beside a check can push it over the limit later.
+
+The crash is memory. Testcontainers veth address changes and the Ryuk container were tested and do not cause it.
 
 ## UI parts
 
