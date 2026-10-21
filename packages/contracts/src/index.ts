@@ -65,6 +65,7 @@ export {
   type AcceptHostKeyBody,
   acceptHostKeyBodySchema,
   acceptHostKeyEndpoint,
+  blockedAddressSchema,
   type Channel,
   channelEndpoint,
   type ChannelInput,

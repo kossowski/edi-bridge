@@ -113,6 +113,16 @@ describe('whoFixes', () => {
     ).toBe('you')
   })
 
+  it('leaves a blocked address to the Workspace, since a retry is refused until the Channel changes', () => {
+    expect(
+      whoFixes({
+        failureStage: 'delivery',
+        direction: 'outbound',
+        problem: { reason: 'addressBlocked' },
+      }),
+    ).toBe('you')
+  })
+
   it('offers trying again for a defect at every Failure Stage', () => {
     for (const failureStage of failureStages) {
       for (const direction of ['inbound', 'outbound'] as const) {
@@ -201,6 +211,40 @@ describe('runDetailSchema', () => {
     }
 
     expect(runDetailSchema.parse(hostKeyMismatch)).toEqual(hostKeyMismatch)
+  })
+
+  it('names the blocked address and the Channel to change when a delivery is refused', () => {
+    const blocked = {
+      ...unreadable,
+      direction: 'outbound',
+      failureStage: 'delivery',
+      error: {
+        code: 'addressBlocked',
+        message: 'The host of the Channel resolves to an internal address',
+        position: null,
+        details: { kind: 'blockedAddress', address: '169.254.169.254' },
+      },
+      problem: {
+        reason: 'addressBlocked',
+        whoFixes: 'you',
+        fixTarget: {
+          kind: 'channel',
+          channelId: '00000003-0000-4000-8000-000000000003',
+          name: 'Hansemarkt HTTP outbox',
+        },
+      },
+    }
+
+    expect(runDetailSchema.parse(blocked)).toEqual(blocked)
+    expect(
+      runDetailSchema.safeParse({
+        ...blocked,
+        error: { ...blocked.error, details: { kind: 'blockedAddress', address: 'localhost' } },
+      }).success,
+    ).toBe(false)
+    expect(
+      runDetailSchema.safeParse({ ...blocked, error: { ...blocked.error, details: null } }).success,
+    ).toBe(false)
   })
 
   it('records the HTTP status the receiving system answered on a delivery failure', () => {
