@@ -817,6 +817,10 @@
           "title": "{direction, select, inbound {The address of your ERP points to an internal network} other {The address of {tradingPartner} points to an internal network}}",
           "description": "{direction, select, inbound {The document was translated} other {The document is ready}}, but the server address of the connection resolves to the internal address {address}, so EDI Bridge did not send the document. Trying again fails until the address on the connection is changed."
         },
+        "passphraseRejected": {
+          "title": "{direction, select, inbound {The private key for your ERP could not be unlocked} other {The private key for {tradingPartner} could not be unlocked}}",
+          "description": "{direction, select, inbound {The document was translated} other {The document is ready}}, but the passphrase of the connection is missing or does not unlock its private key, so EDI Bridge did not send the document. Trying again fails until the passphrase on the connection is corrected."
+        },
         "seededChannel": {
           "title": "Demo connections never send",
           "description": "This is a demo connection, so EDI Bridge never sends documents over it. The document is ready, but it stays in EDI Bridge, and trying again ends the same way."
@@ -1996,6 +2000,10 @@
         "addressBlocked": {
           "title": "The server address resolves to the internal address {address}.",
           "hint": "EDI Bridge does not connect to internal addresses. Change the server address, or, if the server is reached over a private network, ask the Operator to allow this address."
+        },
+        "passphraseRejected": {
+          "title": "The private key could not be unlocked.",
+          "hint": "The passphrase is missing or does not unlock the private key, so EDI Bridge did not connect. Enter the passphrase that belongs to this key."
         },
         "seededChannel": {
           "title": "This is a demo connection.",

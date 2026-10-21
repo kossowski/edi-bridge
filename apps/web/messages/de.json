@@ -817,6 +817,10 @@
           "title": "{direction, select, inbound {Die Adresse Ihres ERP zeigt in ein internes Netz} other {Die Adresse von {tradingPartner} zeigt in ein internes Netz}}",
           "description": "{direction, select, inbound {Der Beleg wurde übersetzt} other {Der Beleg ist fertig}}, aber die Serveradresse der Verbindung führt zur internen Adresse {address}, deshalb hat EDI Bridge den Beleg nicht gesendet. Ein neuer Versuch schlägt fehl, bis die Adresse an der Verbindung geändert ist."
         },
+        "passphraseRejected": {
+          "title": "{direction, select, inbound {Der private Schlüssel für Ihr ERP ließ sich nicht entsperren} other {Der private Schlüssel für {tradingPartner} ließ sich nicht entsperren}}",
+          "description": "{direction, select, inbound {Der Beleg wurde übersetzt} other {Der Beleg ist fertig}}, aber die Passphrase der Verbindung fehlt oder entsperrt ihren privaten Schlüssel nicht, deshalb hat EDI Bridge den Beleg nicht gesendet. Ein neuer Versuch schlägt fehl, bis die Passphrase an der Verbindung korrigiert ist."
+        },
         "seededChannel": {
           "title": "Demo-Verbindungen senden nie",
           "description": "Dies ist eine Demo-Verbindung, über die EDI Bridge nie Belege sendet. Der Beleg ist fertig, bleibt aber in EDI Bridge, und ein neuer Versuch endet genauso."
@@ -1996,6 +2000,10 @@
         "addressBlocked": {
           "title": "Die Serveradresse führt zur internen Adresse {address}.",
           "hint": "EDI Bridge verbindet sich nicht mit internen Adressen. Ändern Sie die Serveradresse, oder bitten Sie den Operator, diese Adresse freizugeben, wenn der Server über ein privates Netz erreichbar ist."
+        },
+        "passphraseRejected": {
+          "title": "Der private Schlüssel ließ sich nicht entsperren.",
+          "hint": "Die Passphrase fehlt oder entsperrt den privaten Schlüssel nicht, deshalb hat sich EDI Bridge nicht verbunden. Geben Sie die Passphrase ein, die zu diesem Schlüssel gehört."
         },
         "seededChannel": {
           "title": "Das ist eine Demo-Verbindung.",

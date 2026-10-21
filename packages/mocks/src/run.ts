@@ -49,6 +49,7 @@ export type RunFields = Pick<
   defect?: boolean | undefined
   refusedHostKey?: boolean | undefined
   refusedAddress?: boolean | undefined
+  rejectedPassphrase?: boolean | undefined
 }
 
 // A CONTRL acknowledges a whole Interchange, so it carries no Business Reference.
@@ -63,6 +64,7 @@ export function toRunSummary({
   defect,
   refusedHostKey,
   refusedAddress,
+  rejectedPassphrase,
   ...run
 }: RunFields): RunSummary {
   const { failureStage } = run
@@ -78,6 +80,7 @@ export function toRunSummary({
               defect,
               refusedHostKey,
               refusedAddress,
+              rejectedPassphrase,
               failureStage,
             }),
           },
@@ -146,25 +149,37 @@ export function createRun(
 }
 
 // SAFETY: the seed holds at least one Trading Partner.
-const blockedAddressPartner = seedTradingPartners[0]!
+const channelProblemPartner = seedTradingPartners[0]!
 
 // SAFETY: the seed holds an INVOIC Flow for the first Trading Partner.
-const blockedAddressFlow = seedFlows.find(
+const channelProblemFlow = seedFlows.find(
   ({ messageType, tradingPartnerId }) =>
-    messageType === 'INVOIC' && tradingPartnerId === blockedAddressPartner.id,
+    messageType === 'INVOIC' && tradingPartnerId === channelProblemPartner.id,
 )!
 
-// Not a seed, so the seeded screens keep their Runs.
+// Not seeds, so the seeded screens keep their Runs.
 export const blockedAddressRun: RunSummary = toRunSummary({
   id: seedId(4, 900),
   receivedAt: '2026-10-19T05:12:00.000Z',
-  tradingPartner: blockedAddressPartner,
-  messageType: blockedAddressFlow.messageType,
-  flow: { id: blockedAddressFlow.id, name: blockedAddressFlow.name },
+  tradingPartner: channelProblemPartner,
+  messageType: channelProblemFlow.messageType,
+  flow: { id: channelProblemFlow.id, name: channelProblemFlow.name },
   manualSubmission: false,
   status: 'failed',
   failureStage: 'delivery',
   refusedAddress: true,
+})
+
+export const passphraseRejectedRun: RunSummary = toRunSummary({
+  id: seedId(4, 901),
+  receivedAt: '2026-10-20T06:07:00.000Z',
+  tradingPartner: channelProblemPartner,
+  messageType: channelProblemFlow.messageType,
+  flow: { id: channelProblemFlow.id, name: channelProblemFlow.name },
+  manualSubmission: false,
+  status: 'failed',
+  failureStage: 'delivery',
+  rejectedPassphrase: true,
 })
 
 type Order = { receivedAt: number; businessReference: string | null }

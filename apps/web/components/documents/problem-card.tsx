@@ -120,6 +120,13 @@ function useProblemText(run: FailedRun) {
       }
     }
 
+    case 'passphraseRejected': {
+      return {
+        title: t('passphraseRejected.title', values),
+        description: t('passphraseRejected.description', values),
+      }
+    }
+
     case 'incompleteSetup': {
       return {
         title: t('incompleteSetup.title', values),

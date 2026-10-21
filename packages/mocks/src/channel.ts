@@ -80,6 +80,7 @@ export function toChannel(record: ChannelRecord, apiUrl: string): Channel {
       const channel = {
         ...record,
         credential: hidden,
+        passphrase: record.passphrase === undefined ? null : hidden,
         hostKeyFingerprint: record.hostKeyFingerprint ?? null,
       }
 
@@ -345,6 +346,70 @@ export const blockedAddressChannel: ChannelRecord = parseRecord({
   },
 })
 
+// An encrypted PKCS#8 or legacy PEM key; the mock cannot tell an encrypted OpenSSH key apart.
+const encryptedKey = /-----BEGIN ENCRYPTED PRIVATE KEY-----|Proc-Type: 4,ENCRYPTED/
+
+const protectedKey = [
+  '-----BEGIN ENCRYPTED PRIVATE KEY-----',
+  'MIIFHzBJBgkqhkiG9w0BBQ0wPDAbBgkqhkiG9w0BBQwwDgQIq5tvfVhB0VQCAggA',
+  'MB0GCWCGSAFlAwQBKgQQ4oVd0VHhXkG1YmV0YXN0YXRpb24EggTQNzVxbW9jaw==',
+  '-----END ENCRYPTED PRIVATE KEY-----',
+].join('\n')
+
+const protectedKeyPassphrase = 'harbour lights 1907'
+
+// The passphrase of each key the mock knows; any passphrase unlocks another encrypted key.
+const keyPassphrases: ReadonlyMap<string, string> = new Map([
+  [protectedKey, protectedKeyPassphrase],
+])
+
+function rejectsPassphrase(record: ChannelRecord) {
+  if (
+    record.type !== 'sftp' ||
+    record.authentication !== 'privateKey' ||
+    !encryptedKey.test(record.credential)
+  ) {
+    return false
+  }
+
+  const expected = keyPassphrases.get(record.credential)
+
+  return (
+    record.passphrase === undefined || (expected !== undefined && record.passphrase !== expected)
+  )
+}
+
+const protectedKeyServer = 'sftp.kuestenfrost.example'
+
+// Not seeds, so the seeded screens keep their Channels.
+export const passphraseProtectedChannel: ChannelRecord = parseRecord({
+  id: seedId(3, 901),
+  type: 'sftp',
+  direction: 'outbound',
+  name: 'Kuestenfrost SFTP outbox',
+  remotePath: '/inbox',
+  ...sftpConnection(seededFaker(`sftp:${protectedKeyServer}`), null, protectedKeyServer, {
+    authentication: 'privateKey',
+    credential: protectedKey,
+    passphrase: protectedKeyPassphrase,
+  }),
+})
+
+export const wrongPassphraseChannel: ChannelRecord = parseRecord({
+  id: seedId(3, 902),
+  type: 'sftp',
+  direction: 'inbound',
+  name: 'Kuestenfrost SFTP inbox',
+  remotePath: '/outbox',
+  pollingIntervalMinutes: 1,
+  ...sftpConnection(seededFaker(`sftp:${protectedKeyServer}`), null, protectedKeyServer, {
+    authentication: 'privateKey',
+    credential: protectedKey,
+    passphrase: 'harbour lights 1970',
+  }),
+  pollProblem: { reason: 'passphraseRejected', since: '2026-10-20T06:05:00.000Z' },
+})
+
 export function createChannel(
   kind: ChannelKind = channelKinds[0],
   { tradingPartnerIds = [] }: { tradingPartnerIds?: ReadonlyArray<string> } = {},
@@ -426,12 +491,17 @@ function applyUpdate(
       }
     }
 
+    const { passphrase: given, ...withoutPassphrase } = update
+    const passphrase = given === undefined ? existing.passphrase : given
+
     return {
       record: {
-        ...update,
+        ...withoutPassphrase,
         ...(existing.direction === 'inbound' && { pollProblem: existing.pollProblem }),
         id: existing.id,
         credential: update.credential ?? existing.credential,
+        // A password takes no passphrase, so switching to one drops the stored passphrase.
+        ...(passphrase != null && update.authentication === 'privateKey' && { passphrase }),
         hostKeyFingerprint:
           update.hostKeyFingerprint === undefined
             ? existing.hostKeyFingerprint
@@ -468,10 +538,10 @@ const rejectedLogin = seedChannels.find(
     type === 'sftp' && direction === 'outbound' && tradingPartnerId === awaitingContrl?.id,
 )
 
-// A mismatching host key and a blocked address follow from the Channel, never from this list.
+// Channel problems follow from the Channel, never from this list.
 export type ConnectionFailure = Exclude<
   ChannelTestResultReason,
-  'hostKeyMismatch' | 'addressBlocked'
+  'hostKeyMismatch' | 'addressBlocked' | 'passphraseRejected'
 >
 
 export const seedConnectionFailures: ReadonlyMap<string, ConnectionFailure> = new Map(
@@ -596,6 +666,11 @@ function testResult(
 
   if (blockedAddress !== undefined) {
     return { outcome: 'failed', reason: 'addressBlocked', blockedAddress, testedAt, hostKey: null }
+  }
+
+  // The key is unlocked before the connection opens, so the server is never reached.
+  if (rejectsPassphrase(record)) {
+    return { outcome: 'failed', reason: 'passphraseRejected', testedAt, hostKey: null }
   }
 
   const hostKey = testedHostKey(record, failure)

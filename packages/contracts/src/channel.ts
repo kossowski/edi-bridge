@@ -61,6 +61,11 @@ export const maskedSecretSchema = z.strictObject({
 
 export type MaskedSecret = z.infer<typeof maskedSecretSchema>
 
+// A passphrase is read back only as stored: even its last characters would help guess it.
+export const hiddenSecretSchema = z.strictObject({ lastFour: z.null() })
+
+export type HiddenSecret = z.infer<typeof hiddenSecretSchema>
+
 export const maxChannelNameLength = 70
 
 // The last of the 43 base64 characters carries only 4 bits of the 32-byte hash.
@@ -80,6 +85,7 @@ export const channelTestFailureReasons = [
   'permissionDenied',
   'unexpectedResponse',
   'addressBlocked',
+  'passphraseRejected',
 ] as const
 
 export const channelTestFailureReasonSchema = z.enum(channelTestFailureReasons)
@@ -175,6 +181,7 @@ function channelUnion<
   Config extends z.core.$ZodObjectConfig,
   Common extends Record<string, z.ZodType>,
   Credential extends z.ZodType,
+  Passphrase extends z.ZodType,
   PollingInterval extends z.ZodType,
   Webhook extends Record<string, z.ZodType>,
   Authorization extends z.ZodType,
@@ -186,13 +193,14 @@ function channelUnion<
   parts: {
     common: Common
     credential: Credential
+    passphrase: Passphrase
     pollingInterval: PollingInterval
     webhook: Webhook
     authorization: Authorization
     polling: Polling
   },
 ) {
-  const { common, credential, pollingInterval, webhook, authorization, polling } = parts
+  const { common, credential, passphrase, pollingInterval, webhook, authorization, polling } = parts
 
   return z.discriminatedUnion('type', [
     z.discriminatedUnion('direction', [
@@ -203,6 +211,7 @@ function channelUnion<
         ...sftpConnection,
         pollingIntervalMinutes: pollingInterval,
         credential,
+        passphrase,
         hostKeyFingerprint: hostKeyFingerprintSchema.nullable().optional(),
         ...polling,
       }),
@@ -212,6 +221,7 @@ function channelUnion<
         ...channelIdentity,
         ...sftpConnection,
         credential,
+        passphrase,
         hostKeyFingerprint: hostKeyFingerprintSchema.nullable().optional(),
       }),
     ]),
@@ -232,14 +242,33 @@ function channelUnion<
   ])
 }
 
+// Only a private key takes a passphrase; null, which removes the stored one, fits any Channel.
+function unlocksPrivateKey(channel: {
+  type: ChannelType
+  authentication?: SftpAuthentication
+  passphrase?: unknown
+}) {
+  return (
+    channel.passphrase === undefined ||
+    channel.passphrase === null ||
+    channel.authentication === 'privateKey'
+  )
+}
+
+const passphraseIssue = {
+  path: ['passphrase'],
+  message: 'Only a Channel that authenticates with a private key takes a passphrase',
+}
+
 export const channelInputSchema = channelUnion(z.object, {
   common: {},
   credential: secretInputSchema,
+  passphrase: secretInputSchema.optional(),
   pollingInterval: pollingIntervalSchema.default(pollingIntervalMinutes.default),
   webhook: {},
   authorization: secretInputSchema.nullable(),
   polling: {},
-})
+}).refine(unlocksPrivateKey, passphraseIssue)
 
 export type ChannelInput = z.infer<typeof channelInputSchema>
 
@@ -247,11 +276,12 @@ export type ChannelInput = z.infer<typeof channelInputSchema>
 export const channelUpdateSchema = channelUnion(z.object, {
   common: {},
   credential: secretInputSchema.optional(),
+  passphrase: secretInputSchema.nullable().optional(),
   pollingInterval: pollingIntervalSchema,
   webhook: {},
   authorization: secretInputSchema.nullable().optional(),
   polling: {},
-})
+}).refine(unlocksPrivateKey, passphraseIssue)
 
 export type ChannelUpdate = z.infer<typeof channelUpdateSchema>
 
@@ -259,11 +289,12 @@ export type ChannelUpdate = z.infer<typeof channelUpdateSchema>
 export const channelSchema = channelUnion(z.strictObject, {
   common: { id: z.uuid() },
   credential: maskedSecretSchema,
+  passphrase: hiddenSecretSchema.nullable().optional(),
   pollingInterval: pollingIntervalSchema,
   webhook: { url: z.url(), token: maskedSecretSchema },
   authorization: maskedSecretSchema.nullable(),
   polling: { pollProblem: pollProblemSchema.nullable() },
-})
+}).refine(unlocksPrivateKey, passphraseIssue)
 
 export type Channel = z.infer<typeof channelSchema>
 

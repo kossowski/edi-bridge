@@ -1,4 +1,5 @@
 import {
+  channelProblemReasons,
   type Fixer,
   type FixTarget,
   type MappingVersionSummary,
@@ -34,6 +35,7 @@ const reasons = {
   destinationUnavailable: 'unreachable',
   hostKeyMismatch: 'hostKeyMismatch',
   addressBlocked: 'addressBlocked',
+  passphraseRejected: 'passphraseRejected',
   glnMissing: 'incompleteSetup',
   channelDefect: 'incompleteSetup',
   characterSetUnsupported: 'incompleteSetup',
@@ -138,7 +140,7 @@ function fixTargetOf(
     }
 
     case 'you': {
-      return reason === 'hostKeyMismatch' || reason === 'addressBlocked'
+      return channelProblemReasons.has(reason)
         ? destinationChannelTarget(run, sources)
         : brokenPieceTarget(run, broken, mapping, sources)
     }

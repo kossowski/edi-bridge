@@ -47,8 +47,9 @@ const leftOut: Record<Language, Record<string, string>> = {
     Draft: sameName,
     Overdue: sameName,
     Duplicate: sameName,
+    Passphrase: sameName,
   },
-  de: { ...withoutOnScreenName, Operator: sameName, Mapping: sameName },
+  de: { ...withoutOnScreenName, Operator: sameName, Mapping: sameName, Passphrase: sameName },
 }
 
 function glossaryTerms(): ReadonlyArray<GlossaryTerm> {

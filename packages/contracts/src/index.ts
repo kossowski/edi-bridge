@@ -91,6 +91,8 @@ export {
   type CreatedChannel,
   createChannelEndpoint,
   createdChannelSchema,
+  type HiddenSecret,
+  hiddenSecretSchema,
   type HostKeyFingerprint,
   hostKeyFingerprintSchema,
   type HostKeyState,
@@ -622,6 +624,7 @@ export {
 } from './trading-partner-health'
 
 export {
+  channelProblemReasons,
   endWaitingForTradingPartnerRunEndpoint,
   type ErrorPosition,
   errorPositionSchema,
