@@ -183,12 +183,13 @@ const asAdmin = (path: string, init: RequestInit = {}) =>
     headers: { origin: webOrigin, cookie, 'content-type': 'application/json' },
   })
 
-const submit = (content: string) =>
+const submit = (content: string, extra: Record<string, string> = {}) =>
   asAdmin(submitDocumentEndpoint.path, {
     method: submitDocumentEndpoint.method,
     body: JSON.stringify({
       channelId: workspace.inboundChannelId,
       document: { fileName: 'invoice.json', content: Buffer.from(content).toString('base64') },
+      ...extra,
     }),
   })
 
@@ -212,16 +213,20 @@ describe('the error report of the api', () => {
     expectAbsent(envelopes, goldenInvoice)
   })
 
-  it('reports a defect of a Manual Submission without the Document or the session', async () => {
+  it('reports a defect of a Manual Submission without the request body or the session', async () => {
+    const passphrase = `passphrase-${randomUUID()}`
+
     // Sentry drops an event that repeats the one before it.
     defect = new Error('The queue broke again')
 
-    expect(await submit(goldenInvoice)).toBe(500)
+    // No seam fails a Channel route, so this body stands in for a Channel with a passphrase.
+    expect(await submit(goldenInvoice, { passphrase })).toBe(500)
 
     const envelopes = await flushed()
 
     expect(events()).toHaveLength(1)
     expectAbsent(envelopes, Buffer.from(goldenInvoice).toString('base64'))
+    expectAbsent(envelopes, passphrase)
 
     for (const value of cookie.split('; ').map((pair) => pair.slice(pair.indexOf('=') + 1))) {
       expectAbsent(envelopes, value)

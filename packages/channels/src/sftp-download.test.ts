@@ -46,6 +46,7 @@ const inboundChannel = (remotePath: string): SftpChannel => ({
   remotePath,
   authentication: 'password',
   encryptedCredential: secrets.seal(sftp.password, `channels/${channelId}/encryptedCredential`),
+  encryptedPassphrase: null,
   hostKeyFingerprint: null,
 })
 
@@ -231,6 +232,25 @@ describe('sftpChannelDownload', () => {
     }
 
     expect(await listedNames(channel)).toEqual(['orders-3.edi'])
+  })
+
+  it('opens the sealed passphrase of the channel and unlocks its private key', async () => {
+    const channel = await inbox('sealed-passphrase', { 'orders-4.edi': 'UNB' })
+
+    expect(
+      await listedNames({
+        ...channel,
+        authentication: 'privateKey',
+        encryptedCredential: secrets.seal(
+          sftp.protectedKey.privateKey,
+          `channels/${channelId}/encryptedCredential`,
+        ),
+        encryptedPassphrase: secrets.seal(
+          sftp.protectedKey.passphrase,
+          `channels/${channelId}/encryptedPassphrase`,
+        ),
+      }),
+    ).toEqual(['orders-4.edi'])
   })
 
   it('refuses a credential sealed for another channel', async () => {

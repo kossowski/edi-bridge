@@ -23,6 +23,7 @@ export const secretKeyEnv = (production: boolean) =>
 
 export type SecretColumn =
   | 'encryptedCredential'
+  | 'encryptedPassphrase'
   | 'encryptedWebhookToken'
   | 'encryptedAuthorization'
 

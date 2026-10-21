@@ -24,7 +24,7 @@ export {
   secretKeyEnv,
 } from './secret'
 
-export { type SftpChannel, sftpLogin } from './sftp-channel'
+export { type SftpChannel, sftpCredential, sftpLogin } from './sftp-channel'
 
 export {
   DownloadFailed,

@@ -142,6 +142,7 @@ async function pollOrders() {
       username: sftp.username,
       password: sftp.password,
       remotePath,
+      protectedKey: sftp.protectedKey,
     },
     { flowId },
   )
@@ -357,7 +358,7 @@ describe('the worker', () => {
     await expect(processed(runId)).resolves.toMatchObject({ status: 'delivered' })
   })
 
-  it('polls an inbound SFTP Channel and posts its ORDERS Message to the HTTP Channel of the ERP', async () => {
+  it('polls an inbound SFTP Channel with a protected private key and posts its ORDERS Message to the HTTP Channel of the ERP', async () => {
     const delivered = await vi.waitFor(
       async () => {
         const [run] = await connection.db

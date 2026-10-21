@@ -18,6 +18,7 @@ import {
   type TestErp,
   type TestSftpServer,
   testAddressPolicy,
+  wrongPassphrase,
 } from '@edi-bridge/channels/testing'
 import { type CharacterSet, withCheckDigit } from '@edi-bridge/contracts'
 import {
@@ -1628,6 +1629,75 @@ describe('the processing of a Run', () => {
     expect(run?.output).toMatch(/^UNB\+UNOC:3\+.*UNZ\+1\+1'$/)
     expect(ranStages(run)).toEqual(['receipt', 'mapping', 'validation', 'delivery'])
   })
+
+  it('delivers over SFTP with a private key its stored passphrase unlocks', async () => {
+    const locked = await seedInvoiceWorkspace(connection.db, 'Locked Key Foods')
+
+    await sftp.exec(`install -d -m 777 ${sftp.home}/upload/locked`)
+    await deliverOverSftp(connection.db, locked, {
+      ...sftpLogin(),
+      remotePath: '/upload/locked',
+      protectedKey: sftp.protectedKey,
+    })
+
+    const { queue, runId } = await receiveInvoice(goldenInvoice, inMemoryRunQueue(), locked)
+
+    await processQueued(queue)
+
+    const run = await readRun(connection.db, runId)
+
+    expect(run).toMatchObject({ status: 'delivered' })
+    await expect(
+      remoteFile(`/upload/locked/INVOIC-${String(run?.controlReference)}.edi`),
+    ).resolves.toBe(run?.output)
+  })
+
+  it.each([
+    ['a wrong', { passphrase: wrongPassphrase }],
+    ['no', {}],
+  ])(
+    'fails a Run at delivery when its SFTP Channel has %s passphrase, naming the Channel to fix without a report',
+    async (_case, passphrase) => {
+      const locked = await seedInvoiceWorkspace(connection.db, 'Wrong Passphrase Foods')
+
+      const channelId = await deliverOverSftp(connection.db, locked, {
+        ...sftpLogin(),
+        protectedKey: { privateKey: sftp.protectedKey.privateKey, ...passphrase },
+      })
+
+      const { queue, runId } = await receiveInvoice(goldenInvoice, inMemoryRunQueue(), locked)
+      const defects = recordingDefectReporter()
+
+      for (const queued of queue.queued) {
+        await Effect.runPromise(
+          processRun(queued).pipe(
+            Effect.provideService(DefectReporter, defects.service),
+            pipelineServices(connection.db, queue, sftpDelivery),
+          ),
+        )
+      }
+
+      const run = await readRun(connection.db, runId)
+
+      expect(run).toMatchObject({
+        status: 'failed',
+        failureStage: 'delivery',
+        handedOverAt: null,
+        error: {
+          code: 'passphraseRejected',
+          message: 'The passphrase of the Channel does not unlock its private key',
+          position: null,
+          details: null,
+        },
+        problem: {
+          reason: 'passphraseRejected',
+          fixTarget: { kind: 'channel', channelId, name: 'Hanse Retail SFTP inbox' },
+        },
+      })
+      expect(JSON.stringify(run)).not.toContain(wrongPassphrase)
+      expect(defects.reported).toEqual([])
+    },
+  )
 
   it('fails a Run at delivery when its SFTP Channel points at a blocked address, naming the address and the Channel to fix', async () => {
     const internal = await seedInvoiceWorkspace(connection.db, 'Internal Foods')

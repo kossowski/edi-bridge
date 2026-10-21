@@ -253,6 +253,13 @@
       "when": 1792585175497,
       "tag": "0035_channel_poll_problem_blocked_address",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1792591039199,
+      "tag": "0036_channel_passphrase",
+      "breakpoints": true
     }
   ]
 }

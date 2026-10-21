@@ -9,6 +9,7 @@ import {
   startTestSftpServer,
   type TestErp,
   type TestSftpServer,
+  wrongPassphrase,
 } from '@edi-bridge/channels/testing'
 import {
   acceptHostKeyEndpoint,
@@ -17,6 +18,7 @@ import {
   createdChannelSchema,
   testChannelEndpoint,
   toPath,
+  updateChannelEndpoint,
 } from '@edi-bridge/contracts'
 import { channels } from '@edi-bridge/db'
 
@@ -141,6 +143,52 @@ describe('POST /channels/:id/test for an SFTP Channel', () => {
     expect(await outcomeOf({ ...sftpOutbox(), credential: 'wrong-password' })).toMatchObject({
       outcome: 'failed',
       reason: 'loginRejected',
+    })
+  })
+})
+
+describe('POST /channels/:id/test for an SFTP Channel with a protected private key', () => {
+  const protectedKey = () =>
+    ({
+      ...sftpOutbox(),
+      authentication: 'privateKey',
+      credential: sftp.protectedKey.privateKey,
+    }) satisfies ChannelInput
+
+  it('unlocks the stored private key with the stored passphrase', async () => {
+    expect(
+      await outcomeOf({ ...protectedKey(), passphrase: sftp.protectedKey.passphrase }),
+    ).toMatchObject({ outcome: 'succeeded' })
+  })
+
+  it.each([
+    ['a wrong', { passphrase: wrongPassphrase }],
+    ['no', {}],
+  ])('reports %s passphrase as rejected and shows no passphrase', async (_case, passphrase) => {
+    const { status, body } = await tested((await created({ ...protectedKey(), ...passphrase })).id)
+
+    expect(status).toBe(200)
+    expect(body).toEqual({
+      outcome: 'failed',
+      reason: 'passphraseRejected',
+      hostKey: null,
+      testedAt: anyTimestamp,
+    })
+    expect(JSON.stringify(body)).not.toContain(wrongPassphrase)
+  })
+
+  it('unlocks the key once an update stores the right passphrase', async () => {
+    const channel = await created({ ...protectedKey(), passphrase: wrongPassphrase })
+
+    const updated = await admin.inject({
+      method: 'PUT',
+      url: toPath(updateChannelEndpoint.path, { id: channel.id }),
+      body: { ...protectedKey(), credential: undefined, passphrase: sftp.protectedKey.passphrase },
+    })
+
+    expect(updated.statusCode).toBe(200)
+    expect(testChannelEndpoint.response.parse((await tested(channel.id)).body)).toMatchObject({
+      outcome: 'succeeded',
     })
   })
 })

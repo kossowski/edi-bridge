@@ -15,6 +15,7 @@ import {
   startTestSftpServer,
   type TestSftpServer,
   testAddressPolicy,
+  wrongPassphrase,
 } from '@edi-bridge/channels/testing'
 import { channels, connect, type Connection, documents, runs, workspaces } from '@edi-bridge/db'
 import { startTestDatabase, type TestDatabase } from '@edi-bridge/db/testing'
@@ -813,6 +814,33 @@ describe('the polling of inbound SFTP Channels', () => {
     })
     expect(defects.reported).toEqual([])
   })
+
+  it.each([
+    ['a wrong', { passphrase: wrongPassphrase }],
+    ['no', {}],
+  ])(
+    'stores a rejected passphrase for a Channel with %s passphrase, without a report',
+    async (_case, passphrase) => {
+      const channelId = await receiveOverSftp(connection.db, workspace, {
+        ...sftpLogin,
+        host: sftp.host,
+        port: sftp.port,
+        protectedKey: { privateKey: sftp.protectedKey.privateKey, ...passphrase },
+      })
+
+      const defects = recordingDefectReporter()
+      const logs: PollLog[] = []
+      const polling = await startPolling(download, logs, { defects })
+
+      await pollProblemStored(channelId, {
+        reason: 'passphraseRejected',
+        since: polling.startedAt,
+        blockedAddress: null,
+      })
+      expect(defects.reported).toEqual([])
+      expect(JSON.stringify(logs.map(({ message }) => message))).not.toContain(wrongPassphrase)
+    },
+  )
 
   it('writes nothing while a Channel fails again with the same reason', async () => {
     const impostorId = await impostor()

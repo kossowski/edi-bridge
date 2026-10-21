@@ -404,6 +404,7 @@ const deliveryReasons: Record<ChannelTestFailureReason, string> = {
 const deliveryProblems: Partial<Record<ChannelTestFailureReason, ProblemReason>> = {
   hostKeyMismatch: 'hostKeyMismatch',
   addressBlocked: 'addressBlocked',
+  passphraseRejected: 'passphraseRejected',
 }
 
 const glnOwners = { workspace: 'The Workspace', tradingPartner: 'The Trading Partner' } as const

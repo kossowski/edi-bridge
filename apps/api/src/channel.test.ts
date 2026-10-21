@@ -117,6 +117,7 @@ describe('POST /channels', () => {
       ...sftpSettings,
       id: channel.id,
       credential: { lastFour: null },
+      passphrase: null,
       hostKeyFingerprint: null,
       pollProblem: null,
     })
@@ -284,6 +285,106 @@ describe('the poll problem of an inbound SFTP Channel', () => {
   })
 })
 
+describe('the passphrase of an SFTP private key', () => {
+  const passphrase = 'harbour lights 1907'
+
+  const keySettings = {
+    ...sftpSettings,
+    authentication: 'privateKey',
+  } as const
+
+  const lockedKey: ChannelInput = {
+    ...keySettings,
+    credential: 'private-key-pem',
+    passphrase,
+  }
+
+  const storedPassphrase = async (id: string) =>
+    opened(id, 'encryptedPassphrase', (await storedRow(id)).encryptedPassphrase)
+
+  it('is stored encrypted for its Channel and shown only as set', async () => {
+    const { channel } = await created(lockedKey)
+
+    expect(channel).toMatchObject({ passphrase: { lastFour: null } })
+    expect(JSON.stringify(await storedRow(channel.id))).not.toContain(passphrase)
+    expect(await storedPassphrase(channel.id)).toBe(passphrase)
+  })
+
+  it('does not decrypt for another column or Channel', async () => {
+    const first = await created(lockedKey)
+    const second = await created(lockedKey)
+    const { encryptedPassphrase } = await storedRow(first.channel.id)
+
+    expect(() => opened(first.channel.id, 'encryptedCredential', encryptedPassphrase)).toThrow()
+    expect(() => opened(second.channel.id, 'encryptedPassphrase', encryptedPassphrase)).toThrow()
+  })
+
+  it('is shown as not set on a Channel without one', async () => {
+    const withoutPassphrase = await created({ ...keySettings, credential: 'private-key-pem' })
+    const withPassword = await created(sftpInbox)
+
+    expect(withoutPassphrase.channel).toMatchObject({ passphrase: null })
+    expect(withPassword.channel).toMatchObject({ passphrase: null })
+  })
+
+  it('never leaves the API in a create, update, get or list response', async () => {
+    const response = await post(lockedKey)
+    const { channel } = createdChannelSchema.parse(response.json())
+    const updated = await update(channel.id, { ...keySettings, passphrase })
+
+    const bodies = [response.body, updated.body, (await get(channel.id)).body, (await list()).body]
+
+    expect(bodies.join('\n')).not.toContain(passphrase)
+  })
+
+  it.each([
+    ['keeps', {}, passphrase],
+    ['replaces', { passphrase: 'harbour lights 2026' }, 'harbour lights 2026'],
+    ['removes', { passphrase: null }, null],
+  ])('%s the stored passphrase', async (_case, change, expected) => {
+    const { channel } = await created(lockedKey)
+    const response = await update(channel.id, { ...keySettings, ...change })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json()).toMatchObject({
+      passphrase: expected === null ? null : { lastFour: null },
+    })
+    expect(await storedPassphrase(channel.id)).toBe(expected)
+  })
+
+  it('keeps the stored passphrase when a new private key is sent without one', async () => {
+    const { channel } = await created(lockedKey)
+
+    await update(channel.id, { ...keySettings, credential: 'other-private-key-pem' })
+
+    expect(await storedPassphrase(channel.id)).toBe(passphrase)
+  })
+
+  it('is added to a Channel that switches from a password to a private key', async () => {
+    const { channel } = await created(sftpInbox)
+    const response = await update(channel.id, lockedKey)
+
+    expect(response.statusCode).toBe(200)
+    expect(await storedPassphrase(channel.id)).toBe(passphrase)
+  })
+
+  it.each([
+    ['without', {}],
+    ['with', { passphrase: null }],
+  ])('is dropped when the Channel switches to a password, %s a removal', async (_case, removal) => {
+    const { channel } = await created(lockedKey)
+    const response = await update(channel.id, { ...sftpInbox, ...removal })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json()).toMatchObject({ authentication: 'password', passphrase: null })
+    expect(await storedPassphrase(channel.id)).toBeNull()
+  })
+
+  it('answers 400 for a passphrase on a Channel that logs in with a password', async () => {
+    expect((await post({ ...sftpInbox, passphrase })).statusCode).toBe(400)
+  })
+})
+
 describe('the host key fingerprint of an SFTP Channel', () => {
   it('is stored when the Admin pastes it into a new Channel', async () => {
     const { channel } = await created({ ...sftpInbox, hostKeyFingerprint })
@@ -443,6 +544,7 @@ describe('PUT /channels/:id', () => {
       ...changes,
       id: channel.id,
       credential: { lastFour: null },
+      passphrase: null,
       hostKeyFingerprint: null,
       pollProblem: null,
     })
