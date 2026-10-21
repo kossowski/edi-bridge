@@ -5,7 +5,13 @@ import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { GenericContainer, Wait } from 'testcontainers'
 
-import { type SecretBox, secretBox, secretContext, secretKeyBytes } from '@edi-bridge/channels'
+import {
+  type SecretBox,
+  type SecretColumn,
+  secretBox,
+  secretContext,
+  secretKeyBytes,
+} from '@edi-bridge/channels'
 import {
   adjustDocumentStructure,
   type DocumentStructureOrigin,
@@ -579,6 +585,27 @@ export interface SftpLogin {
   password: string
   remotePath: string
   hostKeyFingerprint?: HostKeyFingerprint | null
+  protectedKey?: { privateKey: string; passphrase?: string }
+}
+
+const sealedCredential = (secrets: SecretBox, id: string, login: SftpLogin) => {
+  const seal = (column: SecretColumn, plaintext: string) =>
+    secrets.seal(plaintext, secretContext(id, column))
+
+  if (login.protectedKey === undefined) {
+    return {
+      authentication: 'password',
+      encryptedCredential: seal('encryptedCredential', login.password),
+    } as const
+  }
+
+  const { privateKey, passphrase } = login.protectedKey
+
+  return {
+    authentication: 'privateKey',
+    encryptedCredential: seal('encryptedCredential', privateKey),
+    encryptedPassphrase: passphrase === undefined ? null : seal('encryptedPassphrase', passphrase),
+  } as const
 }
 
 export async function deliverOverSftp(
@@ -600,8 +627,7 @@ export async function deliverOverSftp(
     port: login.port,
     username: login.username,
     remotePath: login.remotePath,
-    authentication: 'password',
-    encryptedCredential: secrets.seal(login.password, secretContext(id, 'encryptedCredential')),
+    ...sealedCredential(secrets, id, login),
     hostKeyFingerprint: login.hostKeyFingerprint ?? null,
   })
 
@@ -660,8 +686,7 @@ export async function receiveOverSftp(
     port: login.port,
     username: login.username,
     remotePath: login.remotePath,
-    authentication: 'password',
-    encryptedCredential: secrets.seal(login.password, secretContext(id, 'encryptedCredential')),
+    ...sealedCredential(secrets, id, login),
     hostKeyFingerprint: login.hostKeyFingerprint ?? null,
     pollingIntervalMinutes,
   })
