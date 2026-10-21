@@ -25,10 +25,11 @@ export const listening = async (server: Server) => {
 }
 
 // ssh2 drops a leading zero byte of the public key, so about one Ed25519 pair in 256 is malformed.
+// One bcrypt round: at 16, each parse blocks the event loop of a test for about 150 ms.
 export const sshKeyPair = (passphrase?: string): utils.KeyPairReturn => {
   const pair = ssh2.utils.generateKeyPairSync(
     'ed25519',
-    passphrase === undefined ? {} : { passphrase, cipher: 'aes256-ctr', rounds: 16 },
+    passphrase === undefined ? {} : { passphrase, cipher: 'aes256-ctr', rounds: 1 },
   )
 
   return ssh2.utils.parseKey(pair.public) instanceof Error ? sshKeyPair(passphrase) : pair
