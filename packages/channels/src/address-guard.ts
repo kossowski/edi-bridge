@@ -1,5 +1,6 @@
 import { lookup } from 'node:dns/promises'
 import { BlockList, isIP } from 'node:net'
+import { z } from 'zod'
 
 export type HostResolver = (host: string) => Promise<readonly string[]>
 
@@ -80,6 +81,36 @@ const embeddedIpv4 = (address: string) => {
 
   return group(0) === 0x2002 ? ipv4Of(group(1), group(2)) : undefined
 }
+
+const maxPrefix = { ipv4: 32, ipv6: 128 } as const
+
+const isRange = (entry: string) => {
+  const [network = '', prefix = '', ...rest] = entry.split('/')
+
+  return (
+    rest.length === 0 &&
+    isIP(network) !== 0 &&
+    /^\d{1,3}$/.test(prefix) &&
+    Number(prefix) <= maxPrefix[ipFamily(network)]
+  )
+}
+
+const allowedHostSchema = z
+  .string()
+  .refine((entry) => isIP(entry) !== 0 || isRange(entry) || z.hostname().safeParse(entry).success, {
+    error: (issue) => `"${String(issue.input)}" is no IP address, CIDR range or host name`,
+  })
+
+export const allowedHostsEnv = z
+  .string()
+  .default('')
+  .transform((value) =>
+    value
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter((entry) => entry !== ''),
+  )
+  .pipe(z.array(allowedHostSchema))
 
 const addAllowedEntry = (allowed: BlockList, hostNames: Set<string>, entry: string) => {
   const [network, prefix] = entry.split('/')

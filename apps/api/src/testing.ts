@@ -7,6 +7,7 @@ import type { LanguageModel } from 'ai'
 import type { FastifyServerOptions, InjectOptions, LightMyRequestResponse } from 'fastify'
 
 import { secretKeyBytes } from '@edi-bridge/channels'
+import { testAllowedHosts } from '@edi-bridge/channels/testing'
 import {
   type CharacterEncoding,
   encodeBase64,
@@ -110,6 +111,7 @@ export const testChannels: ChannelSettings = {
   secretKey: Buffer.alloc(secretKeyBytes, 'test-channel-secret-key'),
   apiPublicUrl: 'http://localhost:3001',
   reachTimeoutMs: 1500,
+  allowedHosts: testAllowedHosts,
 }
 
 const up = () => Promise.resolve()

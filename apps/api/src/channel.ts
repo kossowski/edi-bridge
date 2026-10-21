@@ -38,6 +38,7 @@ export interface ChannelSettings {
   secretKey: Buffer
   apiPublicUrl: string
   reachTimeoutMs: number
+  allowedHosts: readonly string[]
 }
 
 export class ChannelEnvironment extends Context.Service<
