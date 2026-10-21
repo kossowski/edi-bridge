@@ -815,7 +815,7 @@
         },
         "addressBlocked": {
           "title": "{direction, select, inbound {The address of your ERP points to an internal network} other {The address of {tradingPartner} points to an internal network}}",
-          "description": "{direction, select, inbound {The document was translated} other {The document is ready}}, but the server address of the connection points to an internal network, so EDI Bridge did not send the document. Trying again fails until the address on the connection is changed."
+          "description": "{direction, select, inbound {The document was translated} other {The document is ready}}, but the server address of the connection resolves to the internal address {address}, so EDI Bridge did not send the document. Trying again fails until the address on the connection is changed."
         },
         "seededChannel": {
           "title": "Demo connections never send",
@@ -842,6 +842,7 @@
         "completeSetup": "Complete the setup.",
         "fixCauseWithoutTarget": "Fix the cause described here. EDI Bridge cannot process this document again, so {direction, select, inbound {ask {tradingPartner} to send it again} other {send it again from your ERP}}.",
         "checkConnection": "If it keeps failing, check the connection details.",
+        "changeAddress": "Change the server address on the connection. If {address} is right because the server is reached over a private network, ask the Operator to allow it.",
         "acceptHostKey": "Ask {direction, select, inbound {your IT team} other {{tradingPartner}}} whether they replaced the server or its key. If they did, accept the new key on the connection.",
         "processAgain": "Process it again. EDI Bridge uses the original file, so {direction, select, inbound {{tradingPartner} does} other {your ERP does}} not have to send anything again.",
         "tryAgain": "{action, select, reprocess {Try again. EDI Bridge processes the original file once more with the same mapping version.} other {Try again. The finished document is sent once more, nothing is translated again.}}",
@@ -853,6 +854,7 @@
         "mapping": "Open “{name}” at this field",
         "lookupTable": "Add {code} to “{name}”",
         "channel": "Check the connection “{name}”",
+        "channelAddress": "Change the address of “{name}”",
         "tradingPartner": "Open {name}",
         "workspaceGln": "Record your company's GLN",
         "tradingPartnerGln": "Add the GLN of {name}",

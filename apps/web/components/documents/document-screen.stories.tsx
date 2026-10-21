@@ -29,12 +29,14 @@ import {
   endWaitingForTradingPartnerRunEndpoint,
 } from '@edi-bridge/contracts'
 import {
+  blockedAddressRun,
   controlReferenceOf,
   createLookupTableStore,
   interchangeIdOf,
   mappingHandlers,
   runDetailHandlers,
   seedChannels,
+  seedFlows,
   seedMappingDrafts,
   seedMappingVersions,
   seedTradingPartners,
@@ -546,6 +548,70 @@ export const GermanHostKeyMismatchDelivery = meta.story({
       canvas.getByText('Übernehmen Sie den neuen Serverschlüssel', { exact: false }),
     ).toBeVisible()
   },
+})
+
+const blockedAddressTarget = seedChannels.find(
+  ({ id }) =>
+    id === seedFlows.find(({ id }) => id === blockedAddressRun.flow.id)!.destinationChannelId,
+)!
+
+function servingBlockedAddress() {
+  return runDetailHandlers(apiUrl, { runs: [blockedAddressRun] })
+}
+
+export const AddressBlockedDelivery = meta.story({
+  args: { id: blockedAddressRun.id },
+  beforeEach({ msw }) {
+    msw.use(...servingBlockedAddress())
+  },
+  async play({ canvas }) {
+    await expect(
+      await canvas.findByRole('heading', {
+        name: `The address of ${blockedAddressRun.tradingPartner.name} points to an internal network`,
+      }),
+    ).toBeVisible()
+    await expect(canvas.getByText(/resolves to the internal address 10\.20\.0\.15,/)).toBeVisible()
+    await expect(canvas.getByText('You fix this')).toBeVisible()
+    await expect(canvas.queryByText('Just try again')).toBeNull()
+
+    const fix = canvas.getByRole('link', {
+      name: `Change the address of “${blockedAddressTarget.name}”`,
+    })
+
+    const tryAgain = canvas.getByRole('button', { name: 'Try again' })
+
+    await expectFixLink(fix, `/channels/${blockedAddressTarget.id}/edit`)
+    await expect(fix.compareDocumentPosition(tryAgain)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+  },
+})
+
+export const GermanAddressBlockedDelivery = meta.story({
+  args: { id: blockedAddressRun.id },
+  decorators: [german],
+  beforeEach({ msw }) {
+    msw.use(...servingBlockedAddress())
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByText(/führt zur internen Adresse 10\.20\.0\.15,/)).toBeVisible()
+    await expect(
+      canvas.getByRole('link', { name: `Adresse von „${blockedAddressTarget.name}“ ändern` }),
+    ).toBeVisible()
+  },
+})
+
+export const ViewerAddressBlockedDelivery = meta.story({
+  args: { id: blockedAddressRun.id },
+  ...viewerStory({
+    handlers: servingBlockedAddress(),
+    async play({ canvas }) {
+      await expectFixLink(
+        await canvas.findByRole('link', {
+          name: `Check the connection “${blockedAddressTarget.name}”`,
+        }),
+        `/channels/${blockedAddressTarget.id}`,
+      )
+    },
+  }),
 })
 
 export const DeliveryFailureToErp = meta.story({

@@ -815,7 +815,7 @@
         },
         "addressBlocked": {
           "title": "{direction, select, inbound {Die Adresse Ihres ERP zeigt in ein internes Netz} other {Die Adresse von {tradingPartner} zeigt in ein internes Netz}}",
-          "description": "{direction, select, inbound {Der Beleg wurde übersetzt} other {Der Beleg ist fertig}}, aber die Serveradresse der Verbindung zeigt in ein internes Netz, deshalb hat EDI Bridge den Beleg nicht gesendet. Ein neuer Versuch schlägt fehl, bis die Adresse an der Verbindung geändert ist."
+          "description": "{direction, select, inbound {Der Beleg wurde übersetzt} other {Der Beleg ist fertig}}, aber die Serveradresse der Verbindung führt zur internen Adresse {address}, deshalb hat EDI Bridge den Beleg nicht gesendet. Ein neuer Versuch schlägt fehl, bis die Adresse an der Verbindung geändert ist."
         },
         "seededChannel": {
           "title": "Demo-Verbindungen senden nie",
@@ -842,6 +842,7 @@
         "completeSetup": "Vervollständigen Sie die Einrichtung.",
         "fixCauseWithoutTarget": "Beheben Sie die hier beschriebene Ursache. EDI Bridge kann diesen Beleg nicht erneut verarbeiten, {direction, select, inbound {bitten Sie also {tradingPartner}, ihn erneut zu senden} other {senden Sie ihn also erneut aus Ihrem ERP}}.",
         "checkConnection": "Wenn es weiter fehlschlägt, prüfen Sie die Verbindungsdaten.",
+        "changeAddress": "Ändern Sie die Serveradresse an der Verbindung. Stimmt {address}, weil der Server über ein privates Netz erreichbar ist, bitten Sie den Operator, die Adresse freizugeben.",
         "acceptHostKey": "Fragen Sie {direction, select, inbound {Ihre IT} other {{tradingPartner}}}, ob der Server oder der Serverschlüssel ersetzt wurde. Wenn ja, übernehmen Sie den neuen Serverschlüssel an der Verbindung.",
         "processAgain": "Verarbeiten Sie den Beleg erneut. EDI Bridge nutzt die Originaldatei, {direction, select, inbound {{tradingPartner} muss} other {Ihr ERP muss}} also nichts erneut senden.",
         "tryAgain": "{action, select, reprocess {Versuchen Sie es erneut. EDI Bridge verarbeitet die Originaldatei noch einmal mit derselben Mapping-Version.} other {Versuchen Sie es erneut. Der fertige Beleg wird noch einmal gesendet, nichts wird neu übersetzt.}}",
@@ -853,6 +854,7 @@
         "mapping": "„{name}“ an diesem Feld öffnen",
         "lookupTable": "{code} zu „{name}“ hinzufügen",
         "channel": "Verbindung „{name}“ prüfen",
+        "channelAddress": "Adresse von „{name}“ ändern",
         "tradingPartner": "{name} öffnen",
         "workspaceGln": "GLN Ihres Unternehmens erfassen",
         "tradingPartnerGln": "GLN von {name} erfassen",
