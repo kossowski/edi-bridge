@@ -813,6 +813,10 @@
           "title": "{direction, select, inbound {The server of your ERP showed a different key} other {The server of {tradingPartner} showed a different key}}",
           "description": "{direction, select, inbound {The document was translated} other {The document is ready}}, but the server's key is not the one confirmed for this connection, so EDI Bridge did not send the document. Trying again fails until the new key is accepted on the connection."
         },
+        "addressBlocked": {
+          "title": "{direction, select, inbound {The address of your ERP points to an internal network} other {The address of {tradingPartner} points to an internal network}}",
+          "description": "{direction, select, inbound {The document was translated} other {The document is ready}}, but the server address of the connection points to an internal network, so EDI Bridge did not send the document. Trying again fails until the address on the connection is changed."
+        },
         "seededChannel": {
           "title": "Demo connections never send",
           "description": "This is a demo connection, so EDI Bridge never sends documents over it. The document is ready, but it stays in EDI Bridge, and trying again ends the same way."
@@ -1985,6 +1989,10 @@
         "unexpectedResponse": {
           "title": "The server answered in an unexpected way.",
           "hint": "Check the address. If it is right, ask the other side's IT team to look at their server's log."
+        },
+        "addressBlocked": {
+          "title": "The server address points to an internal network.",
+          "hint": "EDI Bridge does not connect to internal addresses. Check the server address of this connection."
         },
         "seededChannel": {
           "title": "This is a demo connection.",

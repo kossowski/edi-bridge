@@ -108,6 +108,13 @@ function useProblemText(run: FailedRun) {
       }
     }
 
+    case 'addressBlocked': {
+      return {
+        title: t('addressBlocked.title', values),
+        description: t('addressBlocked.description', values),
+      }
+    }
+
     case 'incompleteSetup': {
       return {
         title: t('incompleteSetup.title', values),
