@@ -20,7 +20,8 @@ import {
   TryAgainStep,
   useFreshlyReprocessed,
 } from '@/components/documents/problem-actions'
-import { fixTargetHref } from '@/lib/navigation'
+import { useCanChange } from '@/hooks/use-session'
+import { channelSettingsHref, fixTargetHref } from '@/lib/navigation'
 import { buttonVariants } from '@edi-bridge/ui/components/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@edi-bridge/ui/components/card'
 import { cn } from '@edi-bridge/ui/lib/utils'
@@ -33,6 +34,10 @@ export type WhatToDoStep = { key: string; content: ReactNode }
 // Trying again reprocesses the Run, which needs the Document that retention may have deleted.
 function retryDocumentDeletedAt(run: FailedRun): string | null {
   return retryReprocesses(run) ? run.documentDeletedAt : null
+}
+
+function blockedAddressOf(run: FailedRun) {
+  return run.error.details?.kind === 'blockedAddress' ? run.error.details.address : ''
 }
 
 function useProblemText(run: FailedRun) {
@@ -111,7 +116,7 @@ function useProblemText(run: FailedRun) {
     case 'addressBlocked': {
       return {
         title: t('addressBlocked.title', values),
-        description: t('addressBlocked.description', values),
+        description: t('addressBlocked.description', { ...values, address: blockedAddressOf(run) }),
       }
     }
 
@@ -141,21 +146,27 @@ function FixLink({
   target,
   runId,
   primary,
+  changeAddress = false,
 }: {
   target: FixTarget
   runId: string
   primary: boolean
+  changeAddress?: boolean
 }) {
   const t = useTranslations('Document.problem.fixLink')
+  const canChange = useCanChange()
+  // Only an Admin can open the Channel settings; a Viewer sees the Channel's address on its page.
+  const channelSettings = changeAddress && canChange && target.kind === 'channel'
 
-  const label =
-    target.kind === 'lookupTable'
+  const label = channelSettings
+    ? t('channelAddress', { name: target.name })
+    : target.kind === 'lookupTable'
       ? t('lookupTable', { code: target.code, name: target.name })
       : t(target.kind, { name: target.name })
 
   return (
     <Link
-      href={fixTargetHref(target, runId)}
+      href={channelSettings ? channelSettingsHref(target.channelId) : fixTargetHref(target, runId)}
       className={cn(
         buttonVariants({ variant: primary ? 'default' : 'outline' }),
         'h-auto min-h-8 max-w-full py-1.5 text-left whitespace-normal',
@@ -175,12 +186,23 @@ function StepBody({ text, children }: { text: string; children?: ReactNode }) {
   )
 }
 
-function fixStep(text: string, run: FailedRun, target: FixTarget, primary: boolean): WhatToDoStep {
+type FixLinkOptions = {
+  primary: boolean
+  // Sends an Admin to the Channel settings to change its server address.
+  changeAddress?: boolean
+}
+
+function fixStep(
+  text: string,
+  run: FailedRun,
+  target: FixTarget,
+  { primary, changeAddress = false }: FixLinkOptions,
+): WhatToDoStep {
   return {
     key: 'fix',
     content: (
       <StepBody text={text}>
-        <FixLink primary={primary} runId={run.id} target={target} />
+        <FixLink changeAddress={changeAddress} primary={primary} runId={run.id} target={target} />
       </StepBody>
     ),
   }
@@ -210,8 +232,19 @@ export function useFixSteps(run: FailedRun): WhatToDoStep[] {
             }),
             run,
             target,
-            true,
+            { primary: true },
           ),
+          { key: 'tryAgain', content: <TryAgainStep run={run} secondary /> },
+        ]
+      }
+
+      // A retry is refused until the Channel's host no longer resolves to a blocked address.
+      if (problem.reason === 'addressBlocked' && target) {
+        return [
+          fixStep(t('changeAddress', { address: blockedAddressOf(run) }), run, target, {
+            primary: true,
+            changeAddress: true,
+          }),
           { key: 'tryAgain', content: <TryAgainStep run={run} secondary /> },
         ]
       }
@@ -235,7 +268,7 @@ export function useFixSteps(run: FailedRun): WhatToDoStep[] {
       }
 
       return [
-        ...(target ? [fixStep(t('fixCause'), run, target, true)] : []),
+        ...(target ? [fixStep(t('fixCause'), run, target, { primary: true })] : []),
         ...(mapping
           ? [
               run.documentDeletedAt === null
@@ -259,14 +292,14 @@ export function useFixSteps(run: FailedRun): WhatToDoStep[] {
       // The setup has to be complete before trying again can work.
       if (problem.reason === 'incompleteSetup' && target) {
         return [
-          fixStep(t('completeSetup'), run, target, true),
+          fixStep(t('completeSetup'), run, target, { primary: true }),
           { key: 'tryAgain', content: <TryAgainStep run={run} secondary /> },
         ]
       }
 
       return [
         { key: 'tryAgain', content: <TryAgainStep run={run} secondary={false} /> },
-        ...(target ? [fixStep(t('checkConnection'), run, target, false)] : []),
+        ...(target ? [fixStep(t('checkConnection'), run, target, { primary: false })] : []),
       ]
     }
 

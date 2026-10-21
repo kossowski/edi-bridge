@@ -14,6 +14,7 @@ import {
   regenerateWebhookTokenEndpoint,
 } from '@edi-bridge/contracts'
 import {
+  blockedAddressChannel,
   channelHandlers,
   type ChannelRecord,
   createHandlers,
@@ -144,6 +145,61 @@ export const PollProblemTimedOut = meta.story({
     await expect(
       problem.getByRole('link', { name: 'Check the connection settings' }),
     ).toHaveAttribute('href', `/channels/${sftpInbox.id}/edit`)
+  },
+})
+
+export const PollProblemAddressBlocked = meta.story({
+  args: { id: blockedAddressChannel.id },
+  beforeEach({ msw }) {
+    msw.use(...channelHandlers(apiUrl, { channels: [blockedAddressChannel] }))
+  },
+  async play({ canvas, canvasElement }) {
+    await canvas.findByRole('heading', { level: 2, name: 'Polling failed' })
+    const problem = pollProblemSection(canvasElement)
+    const refused = 'The server address resolves to the internal address 10.20.0.15.'
+    await expect(problem.getByText(refused)).toBeVisible()
+    await expect(problem.getByRole('link', { name: 'Change the server address' })).toHaveAttribute(
+      'href',
+      `/channels/${blockedAddressChannel.id}/edit`,
+    )
+
+    const section = hostKeySection(canvasElement)
+    await userEvent.click(section.getByRole('button', { name: /^Test connection/ }))
+    await expect(await section.findByText(refused)).toBeVisible()
+    await expect(section.getByRole('link', { name: 'Change the server address' })).toHaveAttribute(
+      'href',
+      `/channels/${blockedAddressChannel.id}/edit`,
+    )
+  },
+})
+
+export const PollProblemAddressBlockedGerman = meta.story({
+  args: { id: blockedAddressChannel.id },
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="de" messages={messagesDe} timeZone="Europe/Berlin">
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
+  beforeEach({ msw }) {
+    msw.use(...channelHandlers(apiUrl, { channels: [blockedAddressChannel] }))
+  },
+  async play({ canvas, canvasElement }) {
+    await canvas.findByRole('heading', { level: 2, name: 'Abfrage fehlgeschlagen' })
+    const refused = 'Die Serveradresse führt zur internen Adresse 10.20.0.15.'
+
+    const problem = within(
+      within(canvasElement).getByRole('region', { name: 'Abfrage fehlgeschlagen' }),
+    )
+
+    await expect(problem.getByText(refused)).toBeVisible()
+    await expect(problem.getByRole('link', { name: 'Serveradresse ändern' })).toBeVisible()
+
+    const section = within(within(canvasElement).getByRole('region', { name: 'Serverschlüssel' }))
+    await userEvent.click(section.getByRole('button', { name: /^Verbindung testen/ }))
+    await expect(await section.findByText(refused)).toBeVisible()
+    await expect(section.getByRole('link', { name: 'Serveradresse ändern' })).toBeVisible()
   },
 })
 

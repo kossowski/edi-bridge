@@ -21,6 +21,7 @@ import { EditLink } from '@/components/edit-link'
 import { useCanChange } from '@/hooks/use-session'
 import { ApiError } from '@/lib/api/client'
 import { channelQuery } from '@/lib/api/queries'
+import { channelSettingsHref } from '@/lib/navigation'
 import { Badge } from '@edi-bridge/ui/components/badge'
 import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 
@@ -138,7 +139,7 @@ function ChannelActions({ channel }: { channel: Channel }) {
   return (
     <>
       {channel.direction === 'inbound' && <ManualSubmissionSheet defaultChannelId={channel.id} />}
-      <EditLink href={`/channels/${channel.id}/edit`} />
+      <EditLink href={channelSettingsHref(channel.id)} />
     </>
   )
 }

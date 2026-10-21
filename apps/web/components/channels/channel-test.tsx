@@ -4,10 +4,14 @@ import { Alert02Icon, CheckmarkCircle02Icon, Loading03Icon } from '@hugeicons/co
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useMutation, type UseMutationResult, useQueryClient } from '@tanstack/react-query'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
+import Link from 'next/link'
 
+import { failureValues, pollProblemFix } from '@/components/channels/poll-problem-fix'
+import { linkClass } from '@/components/detail-parts'
 import { acceptHostKey, testChannel } from '@/lib/api/client'
 import { storeSavedChannel } from '@/lib/api/queries'
 import { Button } from '@edi-bridge/ui/components/button'
+import { cn } from '@edi-bridge/ui/lib/utils'
 
 import type { Channel, ChannelTestResult, TestedHostKey } from '@edi-bridge/contracts'
 
@@ -94,6 +98,7 @@ function TestOutcome({
   accept: AcceptMutation
 }) {
   const t = useTranslations('Channel.test')
+  const tFix = useTranslations('Channel.pollProblem.fix')
   const format = useFormatter()
   const now = useNow({ updateInterval: 30_000 })
 
@@ -134,9 +139,18 @@ function TestOutcome({
         className="text-destructive-text mt-0.5 size-4 shrink-0"
       />
       <div className="flex flex-col gap-1">
-        <p className="text-destructive-text font-medium">{t(`failed.${result.reason}.title`)}</p>
+        <p className="text-destructive-text font-medium">
+          {t(`failed.${result.reason}.title`, failureValues(result))}
+        </p>
         <p>{t(`failed.${result.reason}.hint`)}</p>
         <p>{tested}</p>
+        {result.reason === 'addressBlocked' && (
+          <Link
+            href={pollProblemFix(channel.id, result.reason).href}
+            className={cn(linkClass, 'w-fit')}>
+            {tFix('address')}
+          </Link>
+        )}
         {hostKey}
       </div>
     </div>

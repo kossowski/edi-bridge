@@ -8,7 +8,13 @@ import { desktop, mobile, tablet } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
 import { channelsEndpoint } from '@edi-bridge/contracts'
-import { channelHandlers, createChannels, createHandlers, seedChannels } from '@edi-bridge/mocks'
+import {
+  blockedAddressChannel,
+  channelHandlers,
+  createChannels,
+  createHandlers,
+  seedChannels,
+} from '@edi-bridge/mocks'
 
 import preview from '../../.storybook/preview'
 
@@ -32,8 +38,8 @@ export const Default = meta.story({
 // SAFETY: the seed holds Rheinkauf SFTP inbox, the Channel with a stored poll problem.
 const pollFailedInbox = seedChannels.find(({ name }) => name === 'Rheinkauf SFTP inbox')!
 
-async function findPollFailedRow(canvasElement: HTMLElement) {
-  const link = await within(canvasElement).findByRole('link', { name: 'Rheinkauf SFTP inbox' })
+async function findChannelRow(canvasElement: HTMLElement, name = pollFailedInbox.name) {
+  const link = await within(canvasElement).findByRole('link', { name })
 
   // SAFETY: every Channel name link sits inside the row of its Channel.
   return within(link.closest('tr')!)
@@ -42,7 +48,7 @@ async function findPollFailedRow(canvasElement: HTMLElement) {
 export const PollProblem = meta.story({
   ...desktop,
   async play({ canvas, canvasElement }) {
-    const row = await findPollFailedRow(canvasElement)
+    const row = await findChannelRow(canvasElement)
 
     await expect(row.getByText(/^Polling failed since/)).toBeVisible()
     await expect(row.getByText('The server showed a different key.')).toBeVisible()
@@ -58,8 +64,29 @@ export const PollProblem = meta.story({
   },
 })
 
+export const PollProblemAddressBlocked = meta.story({
+  ...desktop,
+  beforeEach({ msw }) {
+    msw.use(...channelHandlers(apiUrl, { channels: [blockedAddressChannel] }))
+  },
+  async play({ canvasElement }) {
+    const row = await findChannelRow(canvasElement, blockedAddressChannel.name)
+
+    await expect(row.getByText(/^Polling failed since/)).toBeVisible()
+    await expect(
+      row.getByText('The server address resolves to the internal address 10.20.0.15.'),
+    ).toBeVisible()
+
+    // The fix link waits for the session, which loads apart from the Channels.
+    const fix = await row.findByRole('link', { name: 'Change the server address' })
+
+    await expect(fix).toBeVisible()
+    await expect(fix).toHaveAttribute('href', `/channels/${blockedAddressChannel.id}/edit`)
+  },
+})
+
 async function expectOnlyPollingFailed(canvasElement: HTMLElement) {
-  const row = await findPollFailedRow(canvasElement)
+  const row = await findChannelRow(canvasElement)
 
   await expect(row.getByText(/^Polling failed since/)).toBeVisible()
   await expect(row.getByText('The server showed a different key.')).not.toBeVisible()

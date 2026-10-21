@@ -50,9 +50,17 @@ describe('pollProblemFix', () => {
     })
   })
 
+  it('sends a blocked address to the server address in the settings', () => {
+    expect(pollProblemFix(id, 'addressBlocked')).toEqual({
+      target: 'address',
+      href: `/channels/${id}/edit`,
+    })
+  })
+
   it('sends every other reason to the settings of the Channel', () => {
     const others = channelTestFailureReasons.filter(
-      (reason) => reason !== 'hostKeyMismatch' && reason !== 'loginRejected',
+      (reason) =>
+        reason !== 'hostKeyMismatch' && reason !== 'loginRejected' && reason !== 'addressBlocked',
     )
 
     for (const reason of others) {
