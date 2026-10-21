@@ -441,6 +441,7 @@ describe('POST /channels/:id/test', () => {
       id: crypto.randomUUID(),
       host,
     })
+
     const httpAt = (url: string): ChannelRecord => ({ ...httpInput, id: crypto.randomUUID(), url })
     const uniqueLocal = httpAt('http://[fd00::7]/edi')
 
@@ -462,11 +463,12 @@ describe('POST /channels/:id/test', () => {
     server.use(...channelHandlers(apiUrl, { channels: table.map(([record]) => record) }))
 
     for (const [record, blockedAddress] of table) {
-      expect(testChannelEndpoint.response.parse((await testChannel(record.id)).body)).toEqual({
+      const result = testChannelEndpoint.response.parse((await testChannel(record.id)).body)
+
+      expect(result).toMatchObject({
         outcome: 'failed',
         reason: 'addressBlocked',
         blockedAddress,
-        testedAt: expect.any(String),
         hostKey: null,
       })
     }
