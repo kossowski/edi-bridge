@@ -8,6 +8,7 @@ import {
   type SecretBox,
   type SecretColumn,
   secretContext,
+  sftpCredential,
 } from '@edi-bridge/channels'
 import {
   type AcceptHostKeyBody,
@@ -164,7 +165,6 @@ const kinds: KindHandlings = {
       secret,
     ) => {
       const credential = secret('encryptedCredential') ?? ''
-      const passphrase = secret('encryptedPassphrase')
 
       return Effect.flatMap(ChannelReach, (reach) =>
         reach.sftp({
@@ -173,10 +173,7 @@ const kinds: KindHandlings = {
           username,
           remotePath,
           hostKeyFingerprint,
-          credential:
-            authentication === 'password'
-              ? { password: credential }
-              : { privateKey: credential, ...(passphrase !== null && { passphrase }) },
+          credential: sftpCredential(authentication, credential, secret('encryptedPassphrase')),
         }),
       )
     },

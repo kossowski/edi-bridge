@@ -2,7 +2,7 @@ import type { HostKeyFingerprint, SftpAuthentication } from '@edi-bridge/contrac
 
 import { type SecretBox, secretContext } from './secret'
 
-import type { SftpLogin } from './channel-reach'
+import type { SftpCredential, SftpLogin } from './channel-reach'
 
 export interface SftpChannel {
   id: string
@@ -15,6 +15,15 @@ export interface SftpChannel {
   encryptedPassphrase: string | null
   hostKeyFingerprint: HostKeyFingerprint | null
 }
+
+export const sftpCredential = (
+  authentication: SftpAuthentication,
+  credential: string,
+  passphrase: string | null = null,
+): SftpCredential =>
+  authentication === 'password'
+    ? { password: credential }
+    : { privateKey: credential, ...(passphrase !== null && { passphrase }) }
 
 // The database checks that an SFTP Channel has all its settings, so a missing one is a defect.
 export const sftpLogin = (secrets: SecretBox, channel: SftpChannel): SftpLogin => {
@@ -45,7 +54,7 @@ export const sftpLogin = (secrets: SecretBox, channel: SftpChannel): SftpLogin =
 
   const passphrase =
     encryptedPassphrase === null
-      ? undefined
+      ? null
       : secrets.open(encryptedPassphrase, secretContext(id, 'encryptedPassphrase'))
 
   return {
@@ -54,9 +63,6 @@ export const sftpLogin = (secrets: SecretBox, channel: SftpChannel): SftpLogin =
     username,
     remotePath,
     hostKeyFingerprint,
-    credential:
-      authentication === 'password'
-        ? { password: credential }
-        : { privateKey: credential, ...(passphrase !== undefined && { passphrase }) },
+    credential: sftpCredential(authentication, credential, passphrase),
   }
 }
