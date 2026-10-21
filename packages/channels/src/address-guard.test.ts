@@ -197,6 +197,25 @@ describe('channelReach with an allow list', () => {
       'succeeded',
     )
   })
+
+  it('matches an allowed host name with or without a trailing dot', async () => {
+    const reachVia = (allowedHost: string, channelHost: string) =>
+      channelReach({
+        timeoutMs,
+        addressPolicy: addressPolicy([allowedHost], resolving(channelHost, '127.0.0.1')),
+      })
+
+    for (const [allowedHost, channelHost] of [
+      ['erp.partner.test.', 'erp.partner.test'],
+      ['erp.partner.test', 'erp.partner.test.'],
+    ] as const) {
+      expect(
+        await succeeded(
+          reachVia(allowedHost, channelHost).http(httpAt(`http://${channelHost}:${erpPort()}/`)),
+        ),
+      ).toBe('succeeded')
+    }
+  })
 })
 
 describe('channelReach connects to the checked address', () => {

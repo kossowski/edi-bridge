@@ -14,6 +14,9 @@ const systemResolver: HostResolver = async (host) =>
 
 const ipFamily = (address: string) => (isIP(address) === 6 ? 'ipv6' : 'ipv4')
 
+// A fully qualified name ends with a dot and names the same host as the name without it.
+const hostNameKey = (host: string) => host.toLowerCase().replace(/\.$/, '')
+
 // An IPv4 rule of a BlockList also matches the IPv4-mapped IPv6 form of the address.
 const blockedRanges = new BlockList()
 
@@ -45,7 +48,7 @@ const addAllowedEntry = (allowed: BlockList, hostNames: Set<string>, entry: stri
   } else if (isIP(entry) !== 0) {
     allowed.addAddress(entry, ipFamily(entry))
   } else {
-    hostNames.add(entry.toLowerCase())
+    hostNames.add(hostNameKey(entry))
   }
 }
 
@@ -72,6 +75,6 @@ export const blockedAddressOf = (
   host: string,
   addresses: readonly string[],
 ) =>
-  policy.allowedHostNames.has(host.toLowerCase())
+  policy.allowedHostNames.has(hostNameKey(host))
     ? undefined
     : addresses.find((address) => isBlocked(policy, address))
