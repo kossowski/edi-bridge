@@ -557,4 +557,64 @@ describe('a Channel', () => {
 
     expect(stored.seeded).toBe(false)
   })
+
+  describe('poll problem', () => {
+    const since = new Date('2026-10-20T07:15:00.000Z')
+
+    async function insertSftp(
+      direction: 'inbound' | 'outbound',
+      pollProblem: Pick<typeof channels.$inferInsert, 'pollProblemReason' | 'pollProblemSince'>,
+    ) {
+      const workspace = await insertWorkspace(connection.db)
+
+      return only(
+        connection.db
+          .insert(channels)
+          .values({
+            workspaceId: workspace.id,
+            type: 'sftp',
+            direction,
+            name: `Hansemarkt SFTP ${direction}`,
+            host: 'sftp.hansemarkt.example',
+            port: 22,
+            username: 'nordwind',
+            remotePath: '/outbox',
+            authentication: 'password',
+            encryptedCredential: 'encrypted',
+            pollingIntervalMinutes: direction === 'inbound' ? 1 : null,
+            ...pollProblem,
+          })
+          .returning(),
+      )
+    }
+
+    it('is stored on an inbound SFTP Channel with the time of its first failure', async () => {
+      const stored = await insertSftp('inbound', {
+        pollProblemReason: 'hostKeyMismatch',
+        pollProblemSince: since,
+      })
+
+      expect(stored).toMatchObject({
+        pollProblemReason: 'hostKeyMismatch',
+        pollProblemSince: since,
+      })
+    })
+
+    it('is none on a new Channel', async () => {
+      const stored = await insertSftp('inbound', {})
+
+      expect(stored).toMatchObject({ pollProblemReason: null, pollProblemSince: null })
+    })
+
+    it('rejects a reason without the time of its first failure', async () => {
+      await expect(insertSftp('inbound', { pollProblemReason: 'timedOut' })).rejects.toThrow()
+      await expect(insertSftp('inbound', { pollProblemSince: since })).rejects.toThrow()
+    })
+
+    it('rejects a poll problem on a Channel that is never polled', async () => {
+      await expect(
+        insertSftp('outbound', { pollProblemReason: 'timedOut', pollProblemSince: since }),
+      ).rejects.toThrow()
+    })
+  })
 })

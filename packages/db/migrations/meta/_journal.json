@@ -239,6 +239,13 @@
       "when": 1792527801908,
       "tag": "0033_trading_partner_message_types",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1792576055380,
+      "tag": "0034_channel_poll_problem",
+      "breakpoints": true
     }
   ]
 }
