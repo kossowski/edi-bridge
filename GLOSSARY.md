@@ -138,6 +138,11 @@ An address of a Channel's host that EDI Bridge refuses to connect to, unless the
 _Avoid_: Internal IP, private host, forbidden address
 _On screen_: Internal address (DE: interne Adresse)
 
+**Passphrase**:
+The secret that unlocks the private key an SFTP Channel logs in with, when that key is protected; stored encrypted and never shown again, like the other Channel secrets. A missing or wrong passphrase leaves the key locked, so the Channel test, delivery and polling fail until the Channel is corrected; not a Defect.
+_Avoid_: Key password, private key password
+_On screen_: Passphrase (DE: Passphrase)
+
 **Document Structure**:
 The known shape of a non-EDIFACT Document (fields, nesting, repetitions), derived from a sample Document or a JSON Schema; it forms the source or target side of a Mapping.
 _Avoid_: Source schema, format definition, layout

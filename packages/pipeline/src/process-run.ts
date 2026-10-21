@@ -398,6 +398,7 @@ const deliveryReasons: Record<ChannelTestFailureReason, string> = {
   permissionDenied: 'The Channel refused to take the file',
   unexpectedResponse: 'The Channel answered unexpectedly',
   addressBlocked: 'The host of the Channel resolves to a blocked address',
+  passphraseRejected: 'The passphrase of the Channel does not unlock its private key',
 }
 
 const deliveryProblems: Partial<Record<ChannelTestFailureReason, ProblemReason>> = {

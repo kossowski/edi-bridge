@@ -91,6 +91,8 @@ export {
   type CreatedChannel,
   createChannelEndpoint,
   createdChannelSchema,
+  type HiddenSecret,
+  hiddenSecretSchema,
   type HostKeyFingerprint,
   hostKeyFingerprintSchema,
   type HostKeyState,

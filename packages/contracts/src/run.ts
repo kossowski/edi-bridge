@@ -30,6 +30,7 @@ export const problemReasons = [
   'unreachable',
   'hostKeyMismatch',
   'addressBlocked',
+  'passphraseRejected',
   'incompleteSetup',
   'defect',
 ] as const
@@ -43,6 +44,12 @@ export const fixers = ['you', 'retry', 'tradingPartner'] as const
 export const fixerSchema = z.enum(fixers)
 
 export type Fixer = z.infer<typeof fixerSchema>
+
+const channelProblemReasons: ReadonlySet<ProblemReason> = new Set([
+  'hostKeyMismatch',
+  'addressBlocked',
+  'passphraseRejected',
+])
 
 export function whoFixes(run: {
   failureStage: FailureStage | null
@@ -61,10 +68,8 @@ export function whoFixes(run: {
     }
 
     case 'delivery': {
-      // A retry fails until an Admin accepts the server's new host key or changes the Channel's host.
-      return run.problem?.reason === 'hostKeyMismatch' || run.problem?.reason === 'addressBlocked'
-        ? 'you'
-        : 'retry'
+      // A retry fails until an Admin accepts the server's new host key or changes the Channel.
+      return run.problem !== null && channelProblemReasons.has(run.problem.reason) ? 'you' : 'retry'
     }
 
     case 'parse':

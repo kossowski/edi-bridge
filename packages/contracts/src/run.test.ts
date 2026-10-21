@@ -121,6 +121,18 @@ describe('whoFixes', () => {
     }
   })
 
+  it('leaves a rejected passphrase to the Workspace, since a retry fails until the Channel changes', () => {
+    for (const direction of ['inbound', 'outbound'] as const) {
+      expect(
+        whoFixes({
+          failureStage: 'delivery',
+          direction,
+          problem: { reason: 'passphraseRejected' },
+        }),
+      ).toBe('you')
+    }
+  })
+
   it('offers trying again for a defect at every Failure Stage', () => {
     for (const failureStage of failureStages) {
       for (const direction of ['inbound', 'outbound'] as const) {
@@ -247,6 +259,31 @@ describe('runDetailSchema', () => {
     expect(
       runDetailSchema.safeParse({ ...blocked, error: { ...blocked.error, details: null } }).success,
     ).toBe(false)
+  })
+
+  it('names the Channel to change when its private key could not be unlocked', () => {
+    const rejected = {
+      ...unreadable,
+      direction: 'outbound',
+      failureStage: 'delivery',
+      error: {
+        code: 'passphraseRejected',
+        message: 'The passphrase of the Channel does not unlock its private key',
+        position: null,
+        details: null,
+      },
+      problem: {
+        reason: 'passphraseRejected',
+        whoFixes: 'you',
+        fixTarget: {
+          kind: 'channel',
+          channelId: '00000003-0000-4000-8000-000000000003',
+          name: 'Hansemarkt SFTP outbox',
+        },
+      },
+    }
+
+    expect(runDetailSchema.parse(rejected)).toEqual(rejected)
   })
 
   it('records the HTTP status the receiving system answered on a delivery failure', () => {

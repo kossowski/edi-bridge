@@ -284,6 +284,71 @@ describe('the poll problem of a Channel', () => {
   })
 })
 
+describe('the passphrase of an SFTP private key', () => {
+  const passphrase = 'open sesame'
+  const lockedKey = { ...inboundSftp, authentication: 'privateKey', passphrase } as const
+
+  it('is accepted next to a private key when creating or updating the Channel', () => {
+    expect(channelInputSchema.parse(lockedKey)).toMatchObject({ passphrase })
+    expect(channelUpdateSchema.parse(lockedKey)).toMatchObject({ passphrase })
+    expect(channelInputSchema.parse(outboundSftp)).not.toHaveProperty('passphrase')
+  })
+
+  it('is kept when an update omits it and removed when an update sets it to null', () => {
+    const withoutPassphrase = { ...lockedKey, passphrase: undefined }
+
+    expect(channelUpdateSchema.parse(withoutPassphrase)).toMatchObject({ passphrase: undefined })
+    expect(channelUpdateSchema.parse({ ...lockedKey, passphrase: null })).toMatchObject({
+      passphrase: null,
+    })
+    expect(channelInputSchema.safeParse({ ...lockedKey, passphrase: null }).success).toBe(false)
+  })
+
+  it('rejects an empty passphrase', () => {
+    expect(channelInputSchema.safeParse({ ...lockedKey, passphrase: '' }).success).toBe(false)
+    expect(channelUpdateSchema.safeParse({ ...lockedKey, passphrase: '' }).success).toBe(false)
+  })
+
+  it('belongs only to a private key', () => {
+    const withPassword = { ...lockedKey, authentication: 'password' }
+
+    expect(channelInputSchema.safeParse(withPassword).success).toBe(false)
+    expect(channelUpdateSchema.safeParse(withPassword).success).toBe(false)
+    expect(channelUpdateSchema.safeParse({ ...withPassword, passphrase: null }).success).toBe(true)
+    expect(channelInputSchema.safeParse({ ...http, passphrase }).success).toBe(true)
+    expect(channelInputSchema.parse({ ...http, passphrase })).not.toHaveProperty('passphrase')
+  })
+
+  it('is read back only as stored, never with any of its characters', () => {
+    const lockedChannel = {
+      ...sftpChannel,
+      authentication: 'privateKey',
+      passphrase: { lastFour: null },
+    }
+
+    expect(channelSchema.parse(lockedChannel)).toEqual(lockedChannel)
+    expect(channelSchema.parse({ ...lockedChannel, passphrase: null })).toMatchObject({
+      passphrase: null,
+    })
+    expect(channelSchema.safeParse({ ...lockedChannel, passphrase }).success).toBe(false)
+    expect(
+      channelSchema.safeParse({ ...lockedChannel, passphrase: { lastFour: 'same' } }).success,
+    ).toBe(false)
+    expect(channelSchema.safeParse({ ...lockedChannel, authentication: 'password' }).success).toBe(
+      false,
+    )
+  })
+
+  it('fails a Channel test and polling with passphraseRejected when it is wrong or missing', () => {
+    const testedAt = '2026-10-21T08:30:00.000Z'
+    const rejected = { outcome: 'failed', reason: 'passphraseRejected', testedAt, hostKey: null }
+    const pollProblem = { reason: 'passphraseRejected', since: testedAt }
+
+    expect(channelTestResultSchema.parse(rejected)).toEqual(rejected)
+    expect(channelSchema.parse({ ...sftpChannel, pollProblem })).toMatchObject({ pollProblem })
+  })
+})
+
 describe('webhookAuthorization', () => {
   it('presents the webhook token as a bearer token in the Authorization header', () => {
     const webhookToken = `whk_${'Ab1'.repeat(10)}a1`
