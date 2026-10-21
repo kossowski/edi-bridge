@@ -115,7 +115,7 @@ const setPollProblem = (channel: InboundChannel, pollProblem: PollProblem) =>
     )
   })
 
-// The same reason keeps the time of its first failure; the same problem again writes nothing.
+// A poll problem tells since when polling fails, so a new failure for the same reason keeps that time.
 const storePollProblem = (channel: InboundChannel, cause: Cause.Cause<unknown>, since: Date) =>
   Option.match(downloadFailure(cause), {
     onNone: () => Effect.void,
