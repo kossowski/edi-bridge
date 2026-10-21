@@ -436,29 +436,32 @@ describe('POST /channels/:id/test', () => {
   })
 
   it('refuses a Channel whose host is an internal address and names the address', async () => {
-    const sftp: ChannelRecord = { ...sftpInput, id: crypto.randomUUID(), host: '10.20.0.15' }
-    const loopback: ChannelRecord = { ...sftpInput, id: crypto.randomUUID(), host: 'localhost' }
-
-    const http: ChannelRecord = {
-      ...httpInput,
+    const sftpAt = (host: string): ChannelRecord => ({
+      ...sftpInput,
       id: crypto.randomUUID(),
-      url: 'http://192.168.1.20:8080/edi',
-    }
+      host,
+    })
+    const httpAt = (url: string): ChannelRecord => ({ ...httpInput, id: crypto.randomUUID(), url })
+    const uniqueLocal = httpAt('http://[fd00::7]/edi')
 
-    const metadata: ChannelRecord = {
-      ...httpInput,
-      id: crypto.randomUUID(),
-      url: 'http://[fd00::7]/edi',
-    }
+    const table = [
+      [sftpAt('10.20.0.15'), '10.20.0.15'],
+      [sftpAt('localhost'), '127.0.0.1'],
+      [sftpAt('0.0.0.0'), '0.0.0.0'],
+      [sftpAt('::'), '::'],
+      [sftpAt('::ffff:10.0.0.1'), '::ffff:10.0.0.1'],
+      [sftpAt('::ffff:127.0.0.1'), '::ffff:127.0.0.1'],
+      [sftpAt('0:0:0:0:0:0:0:1'), '0:0:0:0:0:0:0:1'],
+      [sftpAt('fe80::1'), 'fe80::1'],
+      [httpAt('http://192.168.1.20:8080/edi'), '192.168.1.20'],
+      [httpAt('http://169.254.169.254/latest'), '169.254.169.254'],
+      [httpAt('http://[::ffff:127.0.0.1]/edi'), '::ffff:7f00:1'],
+      [uniqueLocal, 'fd00::7'],
+    ] as const
 
-    server.use(...channelHandlers(apiUrl, { channels: [sftp, loopback, http, metadata] }))
+    server.use(...channelHandlers(apiUrl, { channels: table.map(([record]) => record) }))
 
-    for (const [record, blockedAddress] of [
-      [sftp, '10.20.0.15'],
-      [loopback, '127.0.0.1'],
-      [http, '192.168.1.20'],
-      [metadata, 'fd00::7'],
-    ] as const) {
+    for (const [record, blockedAddress] of table) {
       expect(testChannelEndpoint.response.parse((await testChannel(record.id)).body)).toEqual({
         outcome: 'failed',
         reason: 'addressBlocked',
@@ -469,14 +472,17 @@ describe('POST /channels/:id/test', () => {
     }
   })
 
-  it('reaches a Channel whose host is a public address', async () => {
-    const existing: ChannelRecord = { ...sftpInput, id: crypto.randomUUID(), host: '172.32.0.1' }
-    server.use(...channelHandlers(apiUrl, { channels: [existing] }))
+  it.each(['172.32.0.1', '::ffff:8.8.8.8', '2001:db8::1'])(
+    'reaches a Channel whose host is the public address %s',
+    async (host) => {
+      const existing: ChannelRecord = { ...sftpInput, id: crypto.randomUUID(), host }
+      server.use(...channelHandlers(apiUrl, { channels: [existing] }))
 
-    expect(testChannelEndpoint.response.parse((await testChannel(existing.id)).body)).toMatchObject(
-      { outcome: 'succeeded' },
-    )
-  })
+      expect(
+        testChannelEndpoint.response.parse((await testChannel(existing.id)).body),
+      ).toMatchObject({ outcome: 'succeeded' })
+    },
+  )
 
   it('answers 404 for an unknown Channel', async () => {
     server.use(...channelHandlers(apiUrl, { channels: [] }))

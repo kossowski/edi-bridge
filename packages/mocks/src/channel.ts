@@ -493,8 +493,44 @@ export function refusesHostKey(record: ChannelRecord) {
 }
 
 // The mock resolves no host name but localhost, so only an address literal reaches another one.
-const internalAddress =
-  /^(?:127\.|10\.|192\.168\.|169\.254\.|172\.(?:1[6-9]|2\d|3[01])\.|::1$|f[cd][0-9a-f]{0,2}:|fe[89ab][0-9a-f]:)/i
+const internalIpv4 = /^(?:0\.0\.0\.0$|127\.|10\.|192\.168\.|169\.254\.|172\.(?:1[6-9]|2\d|3[01])\.)/
+
+const hexGroup = (high: string, low: string) => ((Number(high) << 8) | Number(low)).toString(16)
+
+function ipv6Groups(address: string): number[] {
+  const hex = address.replace(
+    /(\d+)\.(\d+)\.(\d+)\.(\d+)$/,
+    (_, a: string, b: string, c: string, d: string) => `${hexGroup(a, b)}:${hexGroup(c, d)}`,
+  )
+
+  const [head = '', tail] = hex.split('::')
+
+  const parse = (part: string | undefined) =>
+    part ? part.split(':').map((group) => Number.parseInt(group, 16)) : []
+
+  const [before, after] = [parse(head), parse(tail)]
+
+  return [...before, ...Array.from({ length: 8 - before.length - after.length }, () => 0), ...after]
+}
+
+function isInternal(address: string) {
+  if (!address.includes(':')) {
+    return internalIpv4.test(address)
+  }
+
+  const groups = ipv6Groups(address)
+  const [first = 0, , , , , sixth = 0, seventh = 0, last = 0] = groups
+
+  if (groups.slice(0, 5).every((group) => group === 0) && sixth === 0xffff) {
+    return internalIpv4.test([seventh >> 8, seventh & 0xff, last >> 8, last & 0xff].join('.'))
+  }
+
+  return (
+    (groups.slice(0, 7).every((group) => group === 0) && last <= 1) ||
+    (first & 0xfe_00) === 0xfc_00 ||
+    (first & 0xff_c0) === 0xfe_80
+  )
+}
 
 function hostOf(record: ChannelRecord): string | undefined {
   switch (record.type) {
@@ -511,7 +547,7 @@ function blockedAddressOf(record: ChannelRecord): string | undefined {
   const host = hostOf(record)
   const address = host === 'localhost' ? '127.0.0.1' : host
 
-  return address !== undefined && internalAddress.test(address) ? address : undefined
+  return address !== undefined && isInternal(address) ? address : undefined
 }
 
 function testedHostKey(
