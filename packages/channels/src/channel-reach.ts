@@ -13,7 +13,7 @@ import type {
 } from '@edi-bridge/contracts'
 
 import { type AddressPolicy, blockedAddressOf } from './address-guard'
-import { encryptedKey, unlocksKey } from './private-key'
+import { lockedKey } from './private-key'
 
 export class ChannelUnreachable extends Data.TaggedError('ChannelUnreachable')<{
   readonly reason: ChannelTestFailureReason
@@ -230,18 +230,13 @@ export type SftpUse<A> = (
 ) => void
 
 // Unchecked without a fingerprint, so Channels set up before host key checks keep working.
-const passphraseRejected = (credential: SftpCredential) =>
-  'privateKey' in credential &&
-  encryptedKey(credential.privateKey) &&
-  !unlocksKey(credential.privateKey, credential.passphrase)
-
 export const sftpSession = <A>(
   login: SftpLogin,
   { timeoutMs, addressPolicy }: ConnectOptions,
   use: SftpUse<A>,
 ) =>
   Effect.flatMap(connectAddresses(login.host, addressPolicy), (addresses) =>
-    passphraseRejected(login.credential)
+    lockedKey(login.credential)
       ? Effect.fail(unreachable('passphraseRejected'))
       : firstConnecting(addresses, timeoutMs, (address, connectTimeoutMs) =>
           Effect.scoped(
