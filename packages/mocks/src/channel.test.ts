@@ -20,8 +20,10 @@ import {
   createChannel,
   createChannels,
   createChannelStore,
+  refusesHostKey,
   seedChannels,
   seedConnectionFailures,
+  serverHostKey,
   toChannel,
 } from './channel'
 import { seedFlows } from './flow'
@@ -604,5 +606,66 @@ describe('the host key of an SFTP Channel', () => {
     }
 
     expect(states).toEqual(new Set(['matches', 'unchecked', 'mismatch']))
+  })
+})
+
+describe('the poll problem of an inbound SFTP Channel', () => {
+  const pollProblem = { reason: 'timedOut', since: '2026-10-20T07:15:00.000Z' } as const
+
+  async function getChannel(id: string) {
+    const response = await send('GET', toPath(channelEndpoint.path, { id }))
+
+    return channelEndpoint.response.parse(await response.json())
+  }
+
+  it('serves null for a polled Channel without one and leaves it out elsewhere', () => {
+    const inbound: ChannelRecord = { ...sftpInput, id: crypto.randomUUID() }
+
+    const outbound: ChannelRecord = {
+      ...sftpInputWithoutPollingInterval,
+      id: crypto.randomUUID(),
+      direction: 'outbound',
+    }
+
+    expect(toChannel(inbound, apiUrl)).toHaveProperty('pollProblem', null)
+    expect(toChannel(outbound, apiUrl)).not.toHaveProperty('pollProblem')
+    expect(
+      toChannel(createChannel({ type: 'webhook', direction: 'inbound' }), apiUrl),
+    ).not.toHaveProperty('pollProblem')
+  })
+
+  it('is served on the Channel and in the Channel list', async () => {
+    const existing: ChannelRecord = { ...sftpInput, id: crypto.randomUUID(), pollProblem }
+    server.use(...channelHandlers(apiUrl, { channels: [existing] }))
+
+    expect(await getChannel(existing.id)).toMatchObject({ pollProblem })
+    expect(await listChannels()).toMatchObject([{ id: existing.id, pollProblem }])
+  })
+
+  it('stays when the Channel is edited or its host key accepted', async () => {
+    const existing: ChannelRecord = { ...sftpInput, id: crypto.randomUUID(), pollProblem }
+    server.use(...channelHandlers(apiUrl, { channels: [existing] }))
+
+    await send('PUT', toPath(updateChannelEndpoint.path, existing), {
+      ...sftpInput,
+      name: 'Renamed',
+    })
+    await send('PUT', toPath(acceptHostKeyEndpoint.path, existing), {
+      hostKeyFingerprint: serverHostKey(existing.host),
+    })
+
+    expect(await getChannel(existing.id)).toMatchObject({ name: 'Renamed', pollProblem })
+  })
+
+  it('is seeded as a host key mismatch on an inbound Channel whose server changed its key', async () => {
+    server.use(...channelHandlers(apiUrl))
+    const seeded = seedChannels.filter((record) => 'pollProblem' in record && record.pollProblem)
+
+    expect(seeded).toHaveLength(1)
+    expect(seeded[0]).toMatchObject({ type: 'sftp', direction: 'inbound' })
+    expect(refusesHostKey(seeded[0]!)).toBe(true)
+    expect(await getChannel(seeded[0]!.id)).toMatchObject({
+      pollProblem: { reason: 'hostKeyMismatch' },
+    })
   })
 })

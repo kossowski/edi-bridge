@@ -19,6 +19,7 @@ import {
   type HostKeyFingerprint,
   hostKeyFingerprintSchema,
   type MaskedSecret,
+  type PollProblem,
   regenerateWebhookTokenEndpoint,
   sftpAuthentications,
   testChannelEndpoint,
@@ -39,9 +40,12 @@ import type { FlowRecord } from './flow'
 
 type WebhookInput = Extract<ChannelInput, { type: 'webhook' }>
 
+type InboundSftpInput = Extract<ChannelInput, { type: 'sftp'; direction: 'inbound' }>
+
 // What the server stores: the plaintext secrets stay here and only leave masked, via toChannel.
 export type ChannelRecord = { id: string } & (
-  | Exclude<ChannelInput, { type: 'webhook' }>
+  | Exclude<ChannelInput, WebhookInput | InboundSftpInput>
+  | (InboundSftpInput & { pollProblem?: PollProblem | null })
   | (WebhookInput & { token: string })
 )
 
@@ -72,12 +76,20 @@ function webhookUrl(apiUrl: string, id: string) {
 
 export function toChannel(record: ChannelRecord, apiUrl: string): Channel {
   switch (record.type) {
-    case 'sftp':
-      return channelSchema.parse({
+    case 'sftp': {
+      const channel = {
         ...record,
         credential: hidden,
         hostKeyFingerprint: record.hostKeyFingerprint ?? null,
-      })
+      }
+
+      return channelSchema.parse(
+        record.direction === 'inbound'
+          ? { ...channel, pollProblem: record.pollProblem ?? null }
+          : channel,
+      )
+    }
+
     case 'webhook': {
       const { token, ...rest } = record
 
@@ -216,17 +228,23 @@ function generateChannel(
 
 const seedTrafficPartners = seedTradingPartners.filter(hasTraffic)
 
-// The second partner's Channels predate the host key check; the third partner replaced its server.
+const replacedServerPartnerIndex = 2
+
+// The second partner's Channels predate the host key check.
 function seedHostKey(host: string, index: number) {
   switch (index) {
     case 1:
       return null
-    case 2:
+    case replacedServerPartnerIndex:
       return serverHostKey(`old.${host}`)
     default:
       return serverHostKey(host)
   }
 }
+
+const replacedServerPollProblem = {
+  pollProblem: { reason: 'hostKeyMismatch', since: '2026-10-14T06:42:00.000Z' },
+} as const
 
 const erpSeeds: ReadonlyArray<ChannelRecord> = [
   {
@@ -270,15 +288,19 @@ const tradingPartnerSeeds = seedTrafficPartners.flatMap(
       },
     )
 
-    return (['inbound', 'outbound'] as const).map((direction, offset) =>
-      sftpChannel(
+    return (['inbound', 'outbound'] as const).map((direction, offset) => {
+      const channel = sftpChannel(
         seedId(3, erpSeeds.length + index * 2 + offset + 1),
         direction,
         shortName,
         connection,
         index === 1 ? 5 : 1,
-      ),
-    )
+      )
+
+      return index === replacedServerPartnerIndex && direction === 'inbound'
+        ? { ...channel, ...replacedServerPollProblem }
+        : channel
+    })
   },
 )
 
@@ -389,6 +411,7 @@ function applyUpdate(
     return {
       record: {
         ...update,
+        ...(existing.direction === 'inbound' && { pollProblem: existing.pollProblem }),
         id: existing.id,
         credential: update.credential ?? existing.credential,
         hostKeyFingerprint:
