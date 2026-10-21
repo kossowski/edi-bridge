@@ -6,6 +6,7 @@ import type { TestedHostKey } from '@edi-bridge/contracts'
 
 import { channelReach, ChannelUnreachable, type HttpDestination, type SftpLogin } from './index'
 import {
+  keyUnlockedByWrongPassphrase,
   listening,
   mismatchingHostKeyFingerprint,
   startTestErp,
@@ -144,6 +145,40 @@ describe('channelReach for an SFTP Channel', () => {
 
     expect(exit).toEqual(Exit.fail(new ChannelUnreachable({ reason: 'passphraseRejected' })))
     expect(JSON.stringify(exit)).not.toContain(passphrase)
+  })
+
+  it('logs in with a legacy PEM key and its passphrase', async () => {
+    expect(await outcome(reach.sftp({ ...sftpOutbox(), credential: sftp.legacyKey }))).toEqual({
+      outcome: 'succeeded',
+    })
+  })
+
+  it('reports a legacy PEM key without a passphrase as a rejected passphrase', async () => {
+    expect(
+      await outcome(
+        reach.sftp({ ...sftpOutbox(), credential: { privateKey: sftp.legacyKey.privateKey } }),
+      ),
+    ).toEqual({ outcome: 'failed', reason: 'passphraseRejected' })
+  })
+
+  it('reports a legacy PEM key with a wrong passphrase as a rejected passphrase', async () => {
+    expect(
+      await outcome(
+        reach.sftp({
+          ...sftpOutbox(),
+          credential: { ...sftp.legacyKey, passphrase: wrongPassphrase },
+        }),
+      ),
+    ).toEqual({ outcome: 'failed', reason: 'passphraseRejected' })
+  })
+
+  it('reports a wrong passphrase that decrypts the key into another one', async () => {
+    const credential = keyUnlockedByWrongPassphrase()
+
+    const exit = await Effect.runPromiseExit(reach.sftp({ ...sftpOutbox(), credential }))
+
+    expect(exit).toEqual(Exit.fail(new ChannelUnreachable({ reason: 'passphraseRejected' })))
+    expect(JSON.stringify(exit)).not.toContain(credential.passphrase)
   })
 
   it('reports a wrong passphrase before it checks the host key', async () => {
