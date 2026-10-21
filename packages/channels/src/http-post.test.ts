@@ -12,13 +12,12 @@ import {
   postHttp,
   secretBox,
   secretKeyBytes,
-  addressPolicy,
 } from './index'
-import { listening, startTestErp, type TestErp, testAllowedHosts } from './testing'
-
-const allowed = addressPolicy(testAllowedHosts)
+import { listening, startTestErp, type TestErp, testAddressPolicy } from './testing'
 
 const timeoutMs = 1500
+
+const options = { timeoutMs, addressPolicy: testAddressPolicy }
 
 let erp: TestErp
 
@@ -74,7 +73,7 @@ const failure = (effect: Effect.Effect<void, DeliveryFailed>) =>
 
 describe('postHttp', () => {
   it('posts the document with its media type and the authorization', async () => {
-    await Effect.runPromise(postHttp(destination(), order(), { timeoutMs, addressPolicy: allowed }))
+    await Effect.runPromise(postHttp(destination(), order(), options))
 
     expect(erp.received).toHaveLength(1)
     expect(erp.received[0]).toMatchObject({
@@ -89,12 +88,7 @@ describe('postHttp', () => {
   })
 
   it('sends no authorization header when the destination has none', async () => {
-    await Effect.runPromise(
-      postHttp({ url: erp.url, authorization: null }, order(), {
-        timeoutMs,
-        addressPolicy: allowed,
-      }),
-    )
+    await Effect.runPromise(postHttp({ url: erp.url, authorization: null }, order(), options))
 
     expect(erp.received[0]?.headers).not.toHaveProperty('authorization')
   })
@@ -102,12 +96,7 @@ describe('postHttp', () => {
   it('reports a rejected authorization with the answered status', async () => {
     for (const status of [401, 403]) {
       expect(
-        await failure(
-          postHttp(destination(`${erp.url}?status=${status}`), order(), {
-            timeoutMs,
-            addressPolicy: allowed,
-          }),
-        ),
+        await failure(postHttp(destination(`${erp.url}?status=${status}`), order(), options)),
       ).toEqual(
         new DeliveryFailed({ reason: 'loginRejected', details: { kind: 'httpResponse', status } }),
       )
@@ -117,12 +106,7 @@ describe('postHttp', () => {
   it('reports any other answer but a 2xx as an unexpected response with its status', async () => {
     for (const status of [301, 404, 422, 503]) {
       expect(
-        await failure(
-          postHttp(destination(`${erp.url}?status=${status}`), order(), {
-            timeoutMs,
-            addressPolicy: allowed,
-          }),
-        ),
+        await failure(postHttp(destination(`${erp.url}?status=${status}`), order(), options)),
       ).toEqual(
         new DeliveryFailed({
           reason: 'unexpectedResponse',
@@ -146,17 +130,9 @@ describe('postHttp', () => {
 
     try {
       await Effect.runPromise(
-        postHttp(destination(`http://127.0.0.1:${port}/?status=200`), order(), {
-          timeoutMs,
-          addressPolicy: allowed,
-        }),
+        postHttp(destination(`http://127.0.0.1:${port}/?status=200`), order(), options),
       )
-      await failure(
-        postHttp(destination(`http://127.0.0.1:${port}/?status=503`), order(), {
-          timeoutMs,
-          addressPolicy: allowed,
-        }),
-      )
+      await failure(postHttp(destination(`http://127.0.0.1:${port}/?status=503`), order(), options))
 
       await vi.waitFor(() => {
         expect(answers.map((answer) => answer.closed)).toEqual([true, true])
@@ -171,23 +147,13 @@ describe('postHttp', () => {
     const port = await refusedPort()
 
     expect(
-      await failure(
-        postHttp(destination(`http://127.0.0.1:${port}/`), order(), {
-          timeoutMs,
-          addressPolicy: allowed,
-        }),
-      ),
+      await failure(postHttp(destination(`http://127.0.0.1:${port}/`), order(), options)),
     ).toEqual(new DeliveryFailed({ reason: 'hostUnreachable' }))
   })
 
   it('reports a host that never answers as timed out', async () => {
     expect(
-      await failure(
-        postHttp(destination(`http://127.0.0.1:${silentPort}/`), order(), {
-          timeoutMs,
-          addressPolicy: allowed,
-        }),
-      ),
+      await failure(postHttp(destination(`http://127.0.0.1:${silentPort}/`), order(), options)),
     ).toEqual(new DeliveryFailed({ reason: 'timedOut' }))
   })
 })
@@ -196,7 +162,7 @@ const secrets = secretBox(Buffer.alloc(secretKeyBytes, 'test-channel-secret-key'
 
 const channelId = '9a4c2e71-3b8d-4f05-b6e2-7d1f0c8a5e39'
 
-const deliver = httpChannelDelivery({ secrets, timeoutMs, addressPolicy: allowed })
+const deliver = httpChannelDelivery({ secrets, ...options })
 
 const erpChannel = (): HttpChannel => ({
   id: channelId,

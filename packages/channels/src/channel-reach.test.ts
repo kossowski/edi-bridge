@@ -9,7 +9,6 @@ import {
   type ChannelUnreachable,
   type HttpDestination,
   type SftpLogin,
-  addressPolicy,
 } from './index'
 import {
   listening,
@@ -18,12 +17,10 @@ import {
   startTestSftpServer,
   type TestErp,
   type TestSftpServer,
-  testAllowedHosts,
+  testAddressPolicy,
 } from './testing'
 
-const allowed = addressPolicy(testAllowedHosts)
-
-const reach = channelReach({ timeoutMs: 1500, addressPolicy: allowed })
+const reach = channelReach({ timeoutMs: 1500, addressPolicy: testAddressPolicy })
 
 let sftp: TestSftpServer
 

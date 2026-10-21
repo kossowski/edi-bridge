@@ -9,13 +9,12 @@ import {
   secretBox,
   secretKeyBytes,
   sftpChannelDownload,
-  addressPolicy,
 } from '@edi-bridge/channels'
 import {
   mismatchingHostKeyFingerprint,
   startTestSftpServer,
   type TestSftpServer,
-  testAllowedHosts,
+  testAddressPolicy,
 } from '@edi-bridge/channels/testing'
 import { channels, connect, type Connection, documents, runs, workspaces } from '@edi-bridge/db'
 import { startTestDatabase, type TestDatabase } from '@edi-bridge/db/testing'
@@ -122,7 +121,7 @@ const sftpLogin = {
 const sftpDownload = sftpChannelDownload({
   secrets: testSecrets,
   timeoutMs: 5000,
-  addressPolicy: addressPolicy(testAllowedHosts),
+  addressPolicy: testAddressPolicy,
 })
 
 const inMemory = (channelId: string) => remotePaths.has(channelId)
@@ -797,7 +796,7 @@ describe('the polling of inbound SFTP Channels', () => {
     await pollProblemStored(impostorId, { reason: 'hostKeyMismatch', since: polling.startedAt })
   })
 
-  it('stores the blocked address of a Channel at an internal address, without a report', async () => {
+  it('stores the blocked address of a Channel, without a report', async () => {
     const internalId = await receiveOverSftp(connection.db, workspace, {
       ...sftpLogin,
       host: '10.0.4.17',

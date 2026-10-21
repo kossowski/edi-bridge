@@ -4,13 +4,13 @@ import { randomBytes } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 
-import { addressPolicy, secretBox, secretContext, secretKeyBytes } from '@edi-bridge/channels'
+import { secretBox, secretContext, secretKeyBytes } from '@edi-bridge/channels'
 import {
   startTestErp,
   startTestSftpServer,
   type TestErp,
   type TestSftpServer,
-  testAllowedHosts,
+  testAddressPolicy,
 } from '@edi-bridge/channels/testing'
 import { channels, connect, type Connection, documents, mappings, runs } from '@edi-bridge/db'
 import { startTestDatabase, type TestDatabase } from '@edi-bridge/db/testing'
@@ -95,7 +95,7 @@ beforeAll(async () => {
     redisUrl: testRedis.url,
     db: connection.db,
     secrets: testSecrets,
-    addressPolicy: addressPolicy(testAllowedHosts),
+    addressPolicy: testAddressPolicy,
     requeueInterval: '100 millis',
     stuckAfter: '1 hour',
     pollingMinute: '100 millis',
@@ -401,7 +401,7 @@ describe('the worker', () => {
         redisUrl: unmonitoredRedis.url,
         db: connection.db,
         secrets: testSecrets,
-        addressPolicy: addressPolicy(testAllowedHosts),
+        addressPolicy: testAddressPolicy,
         requeueInterval: '1 hour',
         stuckAfter: '1 hour',
         pollingMinute: '1 hour',

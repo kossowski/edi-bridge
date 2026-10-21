@@ -7,16 +7,13 @@ import {
   secretKeyBytes,
   type SftpChannel,
   sftpChannelDownload,
-  addressPolicy,
 } from './index'
 import {
   mismatchingHostKeyFingerprint,
   startTestSftpServer,
   type TestSftpServer,
-  testAllowedHosts,
+  testAddressPolicy,
 } from './testing'
-
-const allowed = addressPolicy(testAllowedHosts)
 
 const timeoutMs = 1500
 
@@ -34,7 +31,7 @@ const secrets = secretBox(Buffer.alloc(secretKeyBytes, 'test-channel-secret-key'
 
 const channelId = '8a3f1c6e-2b94-4d7a-9e05-6c1d8b2f4a93'
 
-const download = sftpChannelDownload({ secrets, timeoutMs, addressPolicy: allowed })
+const download = sftpChannelDownload({ secrets, timeoutMs, addressPolicy: testAddressPolicy })
 
 const inboundChannel = (remotePath: string): SftpChannel => ({
   id: channelId,

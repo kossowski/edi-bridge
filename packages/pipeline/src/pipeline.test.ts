@@ -10,7 +10,6 @@ import {
   secretBox,
   secretKeyBytes,
   sftpChannelDelivery,
-  addressPolicy,
 } from '@edi-bridge/channels'
 import {
   mismatchingHostKeyFingerprint,
@@ -18,7 +17,7 @@ import {
   startTestSftpServer,
   type TestErp,
   type TestSftpServer,
-  testAllowedHosts,
+  testAddressPolicy,
 } from '@edi-bridge/channels/testing'
 import { type CharacterSet, withCheckDigit } from '@edi-bridge/contracts'
 import {
@@ -625,13 +624,13 @@ const receiveInvoice = async (
 const sftpDelivery: DeliveryService = sftpChannelDelivery({
   secrets: testSecrets,
   timeoutMs: 1500,
-  addressPolicy: addressPolicy(testAllowedHosts),
+  addressPolicy: testAddressPolicy,
 })
 
 const deliveryByChannelType = channelDelivery({
   secrets: testSecrets,
   timeoutMs: 1500,
-  addressPolicy: addressPolicy(testAllowedHosts),
+  addressPolicy: testAddressPolicy,
 })
 
 beforeEach(() => {
@@ -1630,7 +1629,7 @@ describe('the processing of a Run', () => {
     expect(ranStages(run)).toEqual(['receipt', 'mapping', 'validation', 'delivery'])
   })
 
-  it('fails a Run at delivery when its SFTP Channel points at an internal address, naming the address and the Channel to fix', async () => {
+  it('fails a Run at delivery when its SFTP Channel points at a blocked address, naming the address and the Channel to fix', async () => {
     const internal = await seedInvoiceWorkspace(connection.db, 'Internal Foods')
 
     const channelId = await deliverOverSftp(connection.db, internal, {

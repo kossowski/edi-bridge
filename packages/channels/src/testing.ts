@@ -7,11 +7,15 @@ import type { Server } from 'node:net'
 
 import { hostKeyFingerprintSchema } from '@edi-bridge/contracts'
 
+import { addressPolicy } from './address-guard'
+
 const sftpImage =
   'atmoz/sftp:alpine@sha256:7e439fabeae536fa254340724c042e11999924d906417dbb5c73602ad518813f'
 
 // The test servers and Testcontainers listen on the loopback interface of the test machine.
 export const testAllowedHosts = ['localhost', '127.0.0.1', '::1']
+
+export const testAddressPolicy = addressPolicy(testAllowedHosts)
 
 export const listening = async (server: Server) => {
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
