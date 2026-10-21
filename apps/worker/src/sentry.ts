@@ -47,15 +47,24 @@ const crashIntegrations = new Set([
 ])
 
 type DefectTags = {
-  workspace: string
-  run: string
+  workspace?: string
+  run?: string
   tradingPartner?: string
   channel?: string
   failureCode: DefectCode
 }
 
+// A defect of a poll or the sweep has no Run, and one of the whole loop no Workspace either.
 const tagsOf = ({ workspaceId, runId, tradingPartnerId, channelId, code }: DefectReport) => {
-  const tags: DefectTags = { workspace: workspaceId, run: runId, failureCode: code }
+  const tags: DefectTags = { failureCode: code }
+
+  if (workspaceId !== null) {
+    tags.workspace = workspaceId
+  }
+
+  if (runId !== null) {
+    tags.run = runId
+  }
 
   if (tradingPartnerId !== null) {
     tags.tradingPartner = tradingPartnerId

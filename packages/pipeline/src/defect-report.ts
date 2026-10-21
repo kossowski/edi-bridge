@@ -1,17 +1,25 @@
-import { Context, Effect } from 'effect'
+import { Cause, Context, Effect, Result } from 'effect'
 
-export type DefectCode = 'processingDefect' | 'channelDefect' | 'deliveryDefect'
+export type DefectCode =
+  | 'processingDefect'
+  | 'channelDefect'
+  | 'deliveryDefect'
+  | 'sweepDefect'
+  | 'pollingDefect'
 
 export type DefectCause = { name: string; frames: string[] }
 
+// A defect of the sweep or the polling loop has no Run, and one of the loop no Workspace either.
 export type DefectReport = {
-  workspaceId: string
-  runId: string
+  workspaceId: string | null
+  runId: string | null
   tradingPartnerId: string | null
   channelId: string | null
   code: DefectCode
   cause: DefectCause
 }
+
+export type RunDefectIds = { workspaceId: string; runId: string; tradingPartnerId: string | null }
 
 export type DefectReporterService = {
   report: (report: DefectReport) => Effect.Effect<void>
@@ -39,6 +47,14 @@ export const defectCauseOf = (cause: unknown): DefectCause => {
   }
 }
 
+const defectSubjectOf = ({ runId, channelId, code }: Omit<DefectReport, 'cause'>) => {
+  if (runId !== null) {
+    return `of Run ${runId}`
+  }
+
+  return channelId === null ? code : `of Channel ${channelId}`
+}
+
 // A reporter that breaks or hangs must not hide the defect it reports or hold the worker job.
 export const reportDefect = (report: Omit<DefectReport, 'cause'>, cause: unknown) =>
   Effect.gen(function* () {
@@ -48,15 +64,22 @@ export const reportDefect = (report: Omit<DefectReport, 'cause'>, cause: unknown
   }).pipe(
     Effect.timeout(reportTimeout),
     Effect.catchCause((failure) =>
-      Effect.logError(`Defect of Run ${report.runId} not reported`, failure),
+      Effect.logError(`Defect ${defectSubjectOf(report)} not reported`, failure),
     ),
   )
 
+// An expected failure, such as an unreachable queue or SFTP server, is no defect.
+export const reportDefectOf = (
+  report: Omit<DefectReport, 'cause'>,
+  cause: Cause.Cause<unknown>,
+) => {
+  const defect = Cause.findDefect(cause)
+
+  return Result.isSuccess(defect) ? reportDefect(report, defect.success) : Effect.void
+}
+
 // A defect the pipeline finds itself has no cause to report but its own.
-export const reportFoundDefect = (
-  message: string,
-  ids: Omit<DefectReport, 'channelId' | 'code' | 'cause'>,
-) =>
+export const reportFoundDefect = (message: string, ids: RunDefectIds) =>
   Effect.gen(function* () {
     const defect = new Error(message)
 
