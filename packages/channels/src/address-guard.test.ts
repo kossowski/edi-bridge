@@ -92,6 +92,15 @@ const blockedAddresses = [
   '::ffff:127.0.0.1',
   '::ffff:10.0.0.1',
   '::ffff:169.254.169.254',
+  '100.64.0.1',
+  '100.127.255.254',
+  '::127.0.0.1',
+  '::a00:1',
+  '64:ff9b::a9fe:a9fe',
+  '64:ff9b::6440:1',
+  '64:ff9b:1::808:808',
+  '2002:a00:1::',
+  '2002:7f00:1::1',
 ]
 
 // A URL writes an IPv4-mapped IPv6 address in hexadecimal.
@@ -99,6 +108,7 @@ const urlForms = new Map([
   ['::ffff:127.0.0.1', '::ffff:7f00:1'],
   ['::ffff:10.0.0.1', '::ffff:a00:1'],
   ['::ffff:169.254.169.254', '::ffff:a9fe:a9fe'],
+  ['::127.0.0.1', '::7f00:1'],
 ])
 
 describe('channelReach with an address policy', () => {
@@ -164,6 +174,37 @@ describe('channelReach for a host name', () => {
     expect(await failure(reachVia().sftp(sftpLoginAt('sftp.nowhere.test')))).toMatchObject({
       reason: 'hostUnreachable',
     })
+  })
+})
+
+// Each form embeds 8.8.8.8, so a lookup that also returns them still reaches the allowed address.
+const embeddedPublicAddresses = ['::808:808', '64:ff9b::808:808', '2002:808:808::']
+
+describe('channelReach for IPv6 forms that embed an IPv4 address', () => {
+  const reachVia = (allowedHosts: string[], ...addresses: string[]) =>
+    channelReach({
+      timeoutMs,
+      addressPolicy: addressPolicy(allowedHosts, resolving('erp.partner.test', ...addresses)),
+    })
+
+  const erpByName = () => httpAt(`http://erp.partner.test:${erpPort()}/`)
+
+  it('reaches a host whose IPv6 addresses embed a public IPv4 address', async () => {
+    for (const address of embeddedPublicAddresses) {
+      expect(await succeeded(reachVia(['127.0.0.1'], '127.0.0.1', address).http(erpByName()))).toBe(
+        'succeeded',
+      )
+    }
+  })
+
+  it('allows an IPv6 form whose embedded IPv4 address is on the allow list', async () => {
+    for (const address of ['::a00:1', '64:ff9b::a00:1', '2002:a00:1::']) {
+      expect(
+        await succeeded(
+          reachVia(['127.0.0.1', '10.0.0.0/8'], '127.0.0.1', address).http(erpByName()),
+        ),
+      ).toBe('succeeded')
+    }
   })
 })
 

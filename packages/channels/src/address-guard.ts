@@ -23,6 +23,7 @@ const blockedRanges = new BlockList()
 for (const [network, prefix] of [
   ['0.0.0.0', 8],
   ['10.0.0.0', 8],
+  ['100.64.0.0', 10],
   ['127.0.0.0', 8],
   ['169.254.0.0', 16],
   ['172.16.0.0', 12],
@@ -36,8 +37,47 @@ for (const [network, prefix] of [
   ['::1', 128],
   ['fe80::', 10],
   ['fc00::', 7],
+  // RFC 8215 lets the operator choose where in this local-use NAT64 prefix the IPv4 address sits.
+  ['64:ff9b:1::', 48],
 ] as const) {
   blockedRanges.addSubnet(network, prefix, 'ipv6')
+}
+
+const hexGroups = (part: string) =>
+  part === '' ? [] : part.split(':').map((group) => Number.parseInt(group, 16))
+
+// A URL writes the trailing dotted IPv4 part of an IPv6 address in hexadecimal.
+const ipv6Groups = (address: string) => {
+  const [head = '', tail] = new URL(`http://[${address.replace(/%.*$/, '')}]`).hostname
+    .slice(1, -1)
+    .split('::')
+
+  const headGroups = hexGroups(head)
+  const tailGroups = tail === undefined ? [] : hexGroups(tail)
+
+  return [
+    ...headGroups,
+    ...Array.from({ length: 8 - headGroups.length - tailGroups.length }, () => 0),
+    ...tailGroups,
+  ]
+}
+
+const ipv4Of = (high: number, low: number) =>
+  [high >> 8, high & 0xff, low >> 8, low & 0xff].join('.')
+
+// IPv4-compatible (::/96), NAT64 (64:ff9b::/96) and 6to4 (2002::/16) addresses reach an IPv4 address.
+const embeddedIpv4 = (address: string) => {
+  const groups = ipv6Groups(address)
+  const group = (index: number) => groups[index] ?? 0
+  const zeroFrom32To96 = groups.slice(2, 6).every((value) => value === 0)
+  const compatible = group(0) === 0 && group(1) === 0
+  const nat64 = group(0) === 0x64 && group(1) === 0xff9b
+
+  if (zeroFrom32To96 && (compatible || nat64)) {
+    return ipv4Of(group(6), group(7))
+  }
+
+  return group(0) === 0x2002 ? ipv4Of(group(1), group(2)) : undefined
 }
 
 const addAllowedEntry = (allowed: BlockList, hostNames: Set<string>, entry: string) => {
@@ -66,9 +106,20 @@ export const addressPolicy = (
   return { allowedAddresses, allowedHostNames, resolve }
 }
 
-const isBlocked = (policy: AddressPolicy, address: string) =>
-  blockedRanges.check(address, ipFamily(address)) &&
-  !policy.allowedAddresses.check(address, ipFamily(address))
+const isAllowed = (policy: AddressPolicy, address: string) =>
+  policy.allowedAddresses.check(address, ipFamily(address))
+
+const isBlockedAddress = (policy: AddressPolicy, address: string) =>
+  blockedRanges.check(address, ipFamily(address)) && !isAllowed(policy, address)
+
+const isBlocked = (policy: AddressPolicy, address: string) => {
+  const ipv4 = isIP(address) === 6 ? embeddedIpv4(address) : undefined
+
+  return (
+    isBlockedAddress(policy, address) ||
+    (ipv4 !== undefined && !isAllowed(policy, address) && isBlockedAddress(policy, ipv4))
+  )
+}
 
 export const blockedAddressOf = (
   policy: AddressPolicy,
