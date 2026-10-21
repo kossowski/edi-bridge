@@ -426,8 +426,7 @@ const requesting = (url: string, init: RequestInit, pinned: PinnedAgent) =>
 
       return response
     },
-    catch: (error) =>
-      requestFailure(fetchFailure.parse(error), !pinned.connected()),
+    catch: (error) => requestFailure(fetchFailure.parse(error), !pinned.connected()),
   })
 
 // The URL keeps its host name, so TLS still checks the certificate against it.
