@@ -4,6 +4,7 @@ import { expect, within } from 'storybook/test'
 
 import { MappingComparisonScreen } from '@/components/mappings/mapping-comparison-screen'
 import { viewerStory } from '@/components/session/session-story-helpers'
+import { loadWait } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
 import { mappingComparisonEndpoint, toPath } from '@edi-bridge/contracts'
@@ -51,7 +52,10 @@ const meta = preview.meta({
 
 export const Default = meta.story({
   async play({ canvas }) {
-    await expect(await canvas.findByRole('heading', { name: 'Mapping differences' })).toBeVisible()
+    // The heading waits for the versions list and both versions to load.
+    await expect(
+      await canvas.findByRole('heading', { name: 'Mapping differences' }, loadWait),
+    ).toBeVisible()
     await expect(
       await canvas.findByText(/differences: \d+ added/, {}, { timeout: 5000 }),
     ).toBeVisible()

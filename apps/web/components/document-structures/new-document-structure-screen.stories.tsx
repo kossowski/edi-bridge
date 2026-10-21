@@ -6,7 +6,7 @@ import { toFile } from '@/components/document-structures/document-structure-stor
 import { NewDocumentStructureScreen } from '@/components/document-structures/new-document-structure-screen'
 import { CanChangeOnly } from '@/components/session/can-change-only'
 import { viewerStory } from '@/components/session/session-story-helpers'
-import { darkMode, expectNoPageScroll, german, mobile } from '@/components/story-helpers'
+import { darkMode, expectNoPageScroll, german, loadWait, mobile } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import {
   createDocumentStructureEndpoint,
@@ -139,6 +139,10 @@ export const Reading = meta.story({
   async play({ canvas, canvasElement }) {
     await drop(canvasElement, invoiceExport)
     await expect(await canvas.findByRole('heading', { name: readingTitle })).toBeVisible()
+    // The heading shows while the file opens; the columns follow once it is read.
+    await expect(
+      await canvas.findByText('Found 12 columns, separated by semicolons', {}, loadWait),
+    ).toBeVisible()
     const steps = [...canvas.getAllByRole('list')[0]!.children]
 
     await expect(steps[0]).toHaveTextContent('Opening the file: done')
@@ -481,7 +485,9 @@ export const GermanReading = meta.story({
     await expect(
       await canvas.findByRole('heading', { name: 'Rechnungsexport_2026-10-08.csv wird gelesen' }),
     ).toBeVisible()
-    await expect(canvas.getByText('12 Spalten gefunden, getrennt durch Semikolons')).toBeVisible()
+    await expect(
+      await canvas.findByText('12 Spalten gefunden, getrennt durch Semikolons', {}, loadWait),
+    ).toBeVisible()
     await expect(canvas.getByText(/^Felder in einfachen Worten benennen/)).toBeVisible()
   },
 })

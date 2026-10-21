@@ -24,9 +24,26 @@ function failingUpdate(status: number) {
   )
 }
 
+async function waitForListboxClosed() {
+  // The closing listbox stays on the page until its next frame, which a busy runner delays.
+  await waitFor(() => expect(screen.queryByRole('listbox')).toBeNull())
+}
+
 async function choose(trigger: HTMLElement, option: string | RegExp) {
   await userEvent.click(trigger)
   await userEvent.click(await screen.findByRole('option', { name: option }))
+  await waitForListboxClosed()
+}
+
+async function expectOptions(trigger: HTMLElement, options: RegExp[]) {
+  await userEvent.click(trigger)
+  await waitFor(async () => {
+    const labels = screen.getAllByRole('option').map((option) => option.textContent)
+    await expect(labels).toHaveLength(options.length)
+    await Promise.all(options.map((option, index) => expect(labels[index]).toMatch(option)))
+  })
+  await userEvent.keyboard('{Escape}')
+  await waitForListboxClosed()
 }
 
 const meta = preview.meta({
@@ -100,19 +117,12 @@ export const OutboundMessageType = meta.story({
       'Choose an inbound connection',
     )
 
-    await userEvent.click(canvas.getByRole('combobox', { name: 'Inbound connection' }))
-    await expect(
-      (await screen.findAllByRole('option')).map((option) => option.textContent),
-    ).toEqual([expect.stringMatching(/^ERP webhook/)])
-    await userEvent.keyboard('{Escape}')
-    await waitFor(() => expect(screen.queryByRole('listbox')).toBeNull())
-
-    await userEvent.click(canvas.getByRole('combobox', { name: 'Destination connection' }))
-    await expect(
-      (await screen.findAllByRole('option')).map((option) => option.textContent),
-    ).toEqual([expect.stringMatching(/^Hansemarkt SFTP outbox/)])
-    await userEvent.keyboard('{Escape}')
-    await waitFor(() => expect(screen.queryByRole('listbox')).toBeNull())
+    await expectOptions(canvas.getByRole('combobox', { name: 'Inbound connection' }), [
+      /^ERP webhook/,
+    ])
+    await expectOptions(canvas.getByRole('combobox', { name: 'Destination connection' }), [
+      /^Hansemarkt SFTP outbox/,
+    ])
   },
 })
 

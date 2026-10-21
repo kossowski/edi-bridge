@@ -141,7 +141,7 @@ const transitionWait = { timeout: 5000 }
 // A dialog, alert dialog or sheet fades in.
 export async function findOpenDialog(
   canvasElement: HTMLElement,
-  name: string,
+  name: string | RegExp,
   role: 'alertdialog' | 'dialog' = 'dialog',
 ) {
   const dialog = await page(canvasElement).findByRole(role, { name }, transitionWait)

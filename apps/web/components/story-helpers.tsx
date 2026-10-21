@@ -24,6 +24,9 @@ export {
   waitForMenuClosed,
 } from '@edi-bridge/ui/testing/checks'
 
+// On a busy runner the mock API can answer after the default second.
+export const loadWait = { timeout: 5000 }
+
 export async function closeSelectPopup(close: () => Promise<void>) {
   const popup = screen.getByRole('listbox').closest('[data-base-ui-portal]')
   await expect(popup).toBeInTheDocument()

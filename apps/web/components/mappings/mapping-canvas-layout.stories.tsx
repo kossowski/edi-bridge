@@ -18,7 +18,7 @@ import {
 } from '@/components/mappings/mapping-canvas-story-helpers'
 import { transformsHiddenKey } from '@/components/mappings/transform-list'
 import { viewerStory } from '@/components/session/session-story-helpers'
-import { laptop, page } from '@/components/story-helpers'
+import { findOpenDialog, laptop, page, waitForFocusInside } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
 import { mappingVersionsEndpoint, type MappingVersionEntry } from '@edi-bridge/contracts'
@@ -287,7 +287,7 @@ export const PublishManyRoutes = meta.story({
     await findDrawnRow(canvasElement, source('despatchNumber'))
     await userEvent.click(canvas.getByRole('button', { name: /^Publish/ }))
 
-    const dialog = await page(canvasElement).findByRole('dialog', { name: /^Publish Version/ })
+    const dialog = await findOpenDialog(canvasElement, /^Publish Version/)
 
     // The routes load from the mock API after the dialog opens, which can pass the default second.
     const routes = await within(dialog).findByRole(
@@ -303,6 +303,8 @@ export const PublishManyRoutes = meta.story({
 
     const last = within(dialog).getAllByRole('checkbox').at(-1)!
 
+    // The dialog moves the focus to the change note a frame after it opens.
+    await waitForFocusInside(dialog)
     last.focus()
     await userEvent.keyboard(' ')
     await expect(last).toBeChecked()
