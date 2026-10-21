@@ -202,7 +202,6 @@ function StepBody({ text, children }: { text: string; children?: ReactNode }) {
 
 type FixLinkOptions = {
   primary: boolean
-  // Sends an Admin to the Channel settings to change this setting.
   channelSetting?: ChannelSetting
 }
 
