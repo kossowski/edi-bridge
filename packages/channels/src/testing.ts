@@ -40,7 +40,6 @@ export const wrongPassphrase = 'wrong-key-passphrase'
 const legacyPem = (passphrase: string) =>
   ({ type: 'sec1', format: 'pem', cipher: 'aes-256-cbc', passphrase }) as const
 
-// An older key with a Proc-Type: 4,ENCRYPTED header, as ssh-keygen -m PEM or OpenSSL write it.
 export const legacyPemKeyPair = (passphrase: string) => {
   const privateKey = generateKeyPairSync('ec', {
     namedCurve: 'prime256v1',
@@ -54,18 +53,19 @@ export const legacyPemKeyPair = (passphrase: string) => {
     throw parsed
   }
 
-  return { privateKey, public: `${parsed.type} ${parsed.getPublicSSH().toString('base64')}` }
+  return {
+    private: privateKey,
+    public: `${parsed.type} ${parsed.getPublicSSH().toString('base64')}`,
+  }
 }
 
-// A wrong passphrase can decrypt a legacy PEM key into bytes ssh2 still parses; this one always does.
-export const keyUnlockedByWrongPassphrase = () => {
-  const rsaKey = () =>
-    generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey.export({ format: 'jwk' })
+const rsaJwk = () =>
+  generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey.export({ format: 'jwk' })
 
-  const mismatched = createPrivateKey({
-    key: { ...rsaKey(), n: z.string().parse(rsaKey().n) },
-    format: 'jwk',
-  })
+export const keyWithForeignPublicPart = () => {
+  const foreignModulus = z.string().parse(rsaJwk().n)
+
+  const mismatched = createPrivateKey({ key: { ...rsaJwk(), n: foreignModulus }, format: 'jwk' })
 
   return {
     privateKey: z
@@ -114,7 +114,7 @@ export async function startTestSftpServer() {
     password,
     privateKey: keyPair.private,
     protectedKey: { privateKey: protectedKeyPair.private, passphrase },
-    legacyKey: { privateKey: legacyKeyPair.privateKey, passphrase },
+    legacyKey: { privateKey: legacyKeyPair.private, passphrase },
     hostKeyFingerprint,
     home: `/home/${username}`,
     exec: async (command: string) => container.exec(['sh', '-c', command]),

@@ -6,7 +6,7 @@ import type { TestedHostKey } from '@edi-bridge/contracts'
 
 import { channelReach, ChannelUnreachable, type HttpDestination, type SftpLogin } from './index'
 import {
-  keyUnlockedByWrongPassphrase,
+  keyWithForeignPublicPart,
   listening,
   mismatchingHostKeyFingerprint,
   startTestErp,
@@ -172,8 +172,8 @@ describe('channelReach for an SFTP Channel', () => {
     ).toEqual({ outcome: 'failed', reason: 'passphraseRejected' })
   })
 
-  it('reports a wrong passphrase that decrypts the key into another one', async () => {
-    const credential = keyUnlockedByWrongPassphrase()
+  it('reports a key whose private part does not match its public part as a rejected passphrase', async () => {
+    const credential = keyWithForeignPublicPart()
 
     const exit = await Effect.runPromiseExit(reach.sftp({ ...sftpOutbox(), credential }))
 
