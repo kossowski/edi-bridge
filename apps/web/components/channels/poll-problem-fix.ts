@@ -1,6 +1,11 @@
+import { channelSettingsHref } from '@/lib/navigation'
+
 import type { Channel, ChannelTestFailureReason, PollProblem } from '@edi-bridge/contracts'
 
-export type PollProblemFix = { target: 'hostKey' | 'credentials' | 'settings'; href: string }
+export type PollProblemFix = {
+  target: 'hostKey' | 'credentials' | 'settings'
+  href: string
+}
 
 type ChannelKind = { type: string; direction: string }
 
@@ -22,13 +27,13 @@ export function pollProblemFix(
     case 'hostKeyMismatch':
       return { target: 'hostKey', href: `/channels/${channelId}#channel-host-key` }
     case 'loginRejected':
-      return { target: 'credentials', href: `/channels/${channelId}/edit` }
+      return { target: 'credentials', href: channelSettingsHref(channelId) }
     default:
-      return { target: 'settings', href: `/channels/${channelId}/edit` }
+      return { target: 'settings', href: channelSettingsHref(channelId) }
   }
 }
 
-// Every failure message takes the address, so one call fits each reason.
+// Only the addressBlocked title takes the address; the other titles ignore it.
 export function failureValues(failure: { blockedAddress?: string | undefined }) {
   return { address: failure.blockedAddress ?? '' }
 }

@@ -4,6 +4,7 @@ import messages from '../messages/en.json'
 import {
   accountMenuItems,
   activeSidebarItem,
+  channelSettingsHref,
   documentHref,
   fixTargetHref,
   interchangeHref,
@@ -74,6 +75,12 @@ describe('interchangeHref', () => {
 describe('documentHref', () => {
   it('opens the document page', () => {
     expect(documentHref('run-1')).toBe('/documents/run-1')
+  })
+})
+
+describe('channelSettingsHref', () => {
+  it('opens the settings of the Channel', () => {
+    expect(channelSettingsHref('channel-1')).toBe('/channels/channel-1/edit')
   })
 })
 

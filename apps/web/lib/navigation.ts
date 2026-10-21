@@ -223,6 +223,10 @@ export function tradingPartnerHref(id: string, tab?: 'documents' | 'connections'
   return tab === undefined ? href : `${href}?${new URLSearchParams({ tab })}`
 }
 
+export function channelSettingsHref(id: string) {
+  return `${navigationItems.channels.href}/${id}/edit`
+}
+
 export function flowHref(id: string) {
   return `${navigationItems.flows.href}/${id}`
 }
