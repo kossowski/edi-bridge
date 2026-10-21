@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import addonMsw from 'msw-storybook-addon'
 import { NextIntlClientProvider } from 'next-intl'
 import { type ReactNode, useState } from 'react'
+import { configure } from 'storybook/test'
 
 import { apiUrl } from '@/lib/api/config'
 import { startMockWorker } from '@/lib/api/mock-worker'
@@ -19,6 +20,9 @@ function StoryQueryProvider({ children }: { children: ReactNode }) {
 
   return <QueryClientProvider client={client}>{children}</QueryClientProvider>
 }
+
+// A busy machine can answer from the mock API after the default second of `findBy…` and `waitFor`.
+configure({ asyncUtilTimeout: 5000 })
 
 export default definePreview({
   addons: [
