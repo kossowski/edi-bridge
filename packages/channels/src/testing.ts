@@ -23,17 +23,22 @@ export const listening = async (server: Server) => {
   return z.object({ port: z.number() }).parse(server.address()).port
 }
 
+// ssh2 drops a leading zero byte of the public key, so about one Ed25519 pair in 256 is malformed.
+export const sshKeyPair = (passphrase?: string): utils.KeyPairReturn => {
+  const pair = utils.generateKeyPairSync(
+    'ed25519',
+    passphrase === undefined ? {} : { passphrase, cipher: 'aes256-ctr', rounds: 16 },
+  )
+
+  return utils.parseKey(pair.public) instanceof Error ? sshKeyPair(passphrase) : pair
+}
+
 export async function startTestSftpServer() {
   const username = 'edi_bridge'
   const password = 'edi-bridge-sftp-password'
   const passphrase = 'edi-bridge-key-passphrase'
-  const keyPair = utils.generateKeyPairSync('ed25519')
-
-  const protectedKeyPair = utils.generateKeyPairSync('ed25519', {
-    passphrase,
-    cipher: 'aes256-ctr',
-    rounds: 16,
-  })
+  const keyPair = sshKeyPair()
+  const protectedKeyPair = sshKeyPair(passphrase)
 
   const container = await new GenericContainer(sftpImage)
     .withPlatform('linux/amd64')
