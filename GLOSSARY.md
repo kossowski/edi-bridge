@@ -128,6 +128,11 @@ A configured endpoint through which Documents enter or leave EDI Bridge, e.g. an
 _Avoid_: Connector, endpoint, port
 _On screen_: Connection (DE: Verbindung)
 
+**Poll problem**:
+Why an inbound SFTP Channel could not be polled, stored with the time of the first failure and cleared by the next successful poll; not a Defect.
+_Avoid_: Poll error, connection error
+_On screen_: Polling failed (DE: Abfrage fehlgeschlagen)
+
 **Document Structure**:
 The known shape of a non-EDIFACT Document (fields, nesting, repetitions), derived from a sample Document or a JSON Schema; it forms the source or target side of a Mapping.
 _Avoid_: Source schema, format definition, layout

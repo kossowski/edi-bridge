@@ -11,6 +11,7 @@ import {
   useChannelKindLabel,
   useChannelTradingPartners,
 } from '@/components/channels/channel-parts'
+import { PollProblemSummary } from '@/components/channels/poll-problem'
 import { rowLinkClass } from '@/components/detail-parts'
 import { ListTable, NewLink } from '@/components/list-table'
 import { channelsQuery } from '@/lib/api/queries'
@@ -35,6 +36,7 @@ function ChannelRow({
         <Link href={`/channels/${channel.id}`} className={rowLinkClass}>
           {channel.name}
         </Link>
+        <PollProblemSummary channel={channel} />
       </TableCell>
       <TableCell>{kindLabel(channel)}</TableCell>
       <TableCell>{tradingPartnerName}</TableCell>

@@ -1939,6 +1939,17 @@
         "viewOnly": "Ein Admin kann den Serverschlüssel bestätigen."
       }
     },
+    "pollProblem": {
+      "title": "Abfrage fehlgeschlagen",
+      "since": "Seit <time>{since}</time>. EDI Bridge versucht es {minutes, plural, one {jede Minute} other {alle # Minuten}} erneut. Dieser Hinweis verschwindet nach der nächsten erfolgreichen Abfrage.",
+      "listSince": "Abfrage fehlgeschlagen seit <time>{since}</time>",
+      "fix": {
+        "hostKey": "Verbindung testen, dann neuen Schlüssel übernehmen",
+        "credentials": "Anmeldedaten ändern",
+        "settings": "Verbindungseinstellungen prüfen"
+      },
+      "viewOnly": "Ein Admin kann die Verbindung korrigieren."
+    },
     "test": {
       "button": "Verbindung testen",
       "pending": "Wird getestet…",

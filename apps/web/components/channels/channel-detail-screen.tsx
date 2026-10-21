@@ -13,6 +13,7 @@ import {
   useChannelTradingPartners,
 } from '@/components/channels/channel-parts'
 import { TestConnection } from '@/components/channels/channel-test'
+import { PollProblemSection } from '@/components/channels/poll-problem'
 import { WebhookAccess } from '@/components/channels/webhook-token'
 import { Fact, linkClass, LoadFailure, Section } from '@/components/detail-parts'
 import { ManualSubmissionSheet } from '@/components/documents/manual-submission-sheet'
@@ -157,6 +158,7 @@ function ChannelView({ channel }: { channel: Channel }) {
         </Fact>
         <ConnectionFacts channel={channel} />
       </dl>
+      <PollProblemSection channel={channel} />
       {channel.type === 'sftp' && <HostKey channel={channel} />}
       {channel.type === 'webhook' && (
         <Section id="channel-webhook" title={t('webhook.title')}>

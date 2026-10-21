@@ -1,13 +1,14 @@
 import { delay, http, HttpResponse } from 'msw'
 import { NextIntlClientProvider } from 'next-intl'
-import { expect } from 'storybook/test'
+import { expect, within } from 'storybook/test'
 
 import { ChannelsScreen } from '@/components/channels/channels-screen'
 import { viewerStory } from '@/components/session/session-story-helpers'
+import { desktop, mobile, tablet } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
 import { channelsEndpoint } from '@edi-bridge/contracts'
-import { channelHandlers, createChannels, createHandlers } from '@edi-bridge/mocks'
+import { channelHandlers, createChannels, createHandlers, seedChannels } from '@edi-bridge/mocks'
 
 import preview from '../../.storybook/preview'
 
@@ -26,6 +27,56 @@ export const Default = meta.story({
     await expect(canvas.getAllByText('Own systems')[0]).toBeVisible()
     await expect(canvas.getByRole('link', { name: 'Hansemarkt SFTP inbox' })).toBeVisible()
   },
+})
+
+// SAFETY: the seed holds Rheinkauf SFTP inbox, the Channel with a stored poll problem.
+const pollFailedInbox = seedChannels.find(({ name }) => name === 'Rheinkauf SFTP inbox')!
+
+async function findPollFailedRow(canvasElement: HTMLElement) {
+  const link = await within(canvasElement).findByRole('link', { name: 'Rheinkauf SFTP inbox' })
+
+  // SAFETY: every Channel name link sits inside the row of its Channel.
+  return within(link.closest('tr')!)
+}
+
+export const PollProblem = meta.story({
+  ...desktop,
+  async play({ canvas, canvasElement }) {
+    const row = await findPollFailedRow(canvasElement)
+
+    await expect(row.getByText(/^Polling failed since/)).toBeVisible()
+    await expect(row.getByText('The server showed a different key.')).toBeVisible()
+
+    // The fix link waits for the session, which loads apart from the Channels.
+    const fix = await row.findByRole('link', {
+      name: 'Test the connection, then accept the new key',
+    })
+
+    await expect(fix).toBeVisible()
+    await expect(fix).toHaveAttribute('href', `/channels/${pollFailedInbox.id}#channel-host-key`)
+    await expect(canvas.getAllByText(/^Polling failed since/)).toHaveLength(1)
+  },
+})
+
+async function expectOnlyPollingFailed(canvasElement: HTMLElement) {
+  const row = await findPollFailedRow(canvasElement)
+
+  await expect(row.getByText(/^Polling failed since/)).toBeVisible()
+  await expect(row.getByText('The server showed a different key.')).not.toBeVisible()
+  // Waits for the fix link, rendered once the session loads, before proving it hidden.
+  await expect(
+    await row.findByText('Test the connection, then accept the new key'),
+  ).not.toBeVisible()
+}
+
+export const PollProblemMobile = meta.story({
+  ...mobile,
+  play: ({ canvasElement }) => expectOnlyPollingFailed(canvasElement),
+})
+
+export const PollProblemTablet = meta.story({
+  ...tablet,
+  play: ({ canvasElement }) => expectOnlyPollingFailed(canvasElement),
 })
 
 export const Empty = meta.story({
@@ -86,6 +137,8 @@ export const German = meta.story({
   async play({ canvas }) {
     await expect(await canvas.findByRole('link', { name: 'ERP webhook' })).toBeVisible()
     await expect(canvas.getAllByText('Eingehender Webhook')[0]).toBeVisible()
+    await expect(canvas.getByText(/^Abfrage fehlgeschlagen seit/)).toBeVisible()
+    await expect(canvas.getByText('14.10.2026, 08:42')).toBeVisible()
   },
 })
 
@@ -105,6 +158,10 @@ export const Viewer = meta.story({
     async play({ canvas }) {
       await expect(await canvas.findByRole('link', { name: 'ERP webhook' })).toBeVisible()
       await expect(canvas.queryByRole('link', { name: 'New connection' })).toBeNull()
+      await expect(canvas.getByText(/^Polling failed since/)).toBeVisible()
+      await expect(
+        canvas.queryByRole('link', { name: 'Test the connection, then accept the new key' }),
+      ).toBeNull()
     },
   }),
 })
