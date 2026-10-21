@@ -550,9 +550,12 @@ export const GermanHostKeyMismatchDelivery = meta.story({
   },
 })
 
+// SAFETY: blockedAddressRun runs a seeded Flow.
+const blockedAddressFlow = seedFlows.find(({ id }) => id === blockedAddressRun.flow.id)!
+
+// SAFETY: every seeded Flow delivers to a seeded Channel.
 const blockedAddressTarget = seedChannels.find(
-  ({ id }) =>
-    id === seedFlows.find(({ id }) => id === blockedAddressRun.flow.id)!.destinationChannelId,
+  ({ id }) => id === blockedAddressFlow.destinationChannelId,
 )!
 
 function servingBlockedAddress() {
