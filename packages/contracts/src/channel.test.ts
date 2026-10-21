@@ -203,6 +203,58 @@ describe('channelSchema', () => {
   })
 })
 
+describe('the poll problem of a Channel', () => {
+  const pollProblem = { reason: 'hostKeyMismatch', since: '2026-10-20T07:15:00.000Z' } as const
+
+  const outboundSftpChannel = {
+    id: sftpChannel.id,
+    type: 'sftp',
+    direction: 'outbound',
+    name: 'Hansemarkt SFTP outbox',
+    tradingPartnerId,
+    host: 'sftp.hansemarkt.example',
+    port: 22,
+    username: 'nordwind',
+    remotePath: '/inbox',
+    authentication: 'password',
+    credential: { lastFour: null },
+  }
+
+  it('carries the reason and the first failure on an inbound SFTP Channel', () => {
+    expect(channelSchema.parse({ ...sftpChannel, pollProblem })).toMatchObject({ pollProblem })
+    expect(channelSchema.parse({ ...sftpChannel, pollProblem: null })).toMatchObject({
+      pollProblem: null,
+    })
+  })
+
+  it('only takes a reason a Channel test can fail with', () => {
+    const seeded = { ...pollProblem, reason: 'seededChannel' }
+
+    expect(channelSchema.safeParse({ ...sftpChannel, pollProblem: seeded }).success).toBe(false)
+    expect(
+      channelSchema.safeParse({ ...sftpChannel, pollProblem: { ...pollProblem, since: 'today' } })
+        .success,
+    ).toBe(false)
+  })
+
+  it('is absent on a Channel that is never polled', () => {
+    expect(channelSchema.safeParse(outboundSftpChannel).success).toBe(true)
+    expect(channelSchema.safeParse({ ...outboundSftpChannel, pollProblem: null }).success).toBe(
+      false,
+    )
+    expect(channelSchema.safeParse({ ...webhookChannel, pollProblem: null }).success).toBe(false)
+  })
+
+  it('is never taken from a request', () => {
+    expect(channelInputSchema.parse({ ...inboundSftp, pollProblem })).not.toHaveProperty(
+      'pollProblem',
+    )
+    expect(channelUpdateSchema.parse({ ...inboundSftp, pollProblem })).not.toHaveProperty(
+      'pollProblem',
+    )
+  })
+})
+
 describe('webhookAuthorization', () => {
   it('presents the webhook token as a bearer token in the Authorization header', () => {
     const webhookToken = `whk_${'Ab1'.repeat(10)}a1`

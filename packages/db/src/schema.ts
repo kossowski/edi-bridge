@@ -24,6 +24,7 @@ import {
   acknowledgementTimeLimitHours,
   aiDailyTokenLimit,
   type AiReview,
+  channelTestFailureReasons,
   channelTypes,
   characterSets,
   type CsvSettings,
@@ -383,6 +384,8 @@ export const direction = pgEnum('direction', directions)
 
 export const sftpAuthentication = pgEnum('sftp_authentication', sftpAuthentications)
 
+export const pollProblemReason = pgEnum('poll_problem_reason', channelTestFailureReasons)
+
 const allSetOnlyWhen = (kind: SQL, columns: SQL[]) =>
   sql`num_nonnulls(${sql.join(columns, sql`, `)}) = case when ${kind} then ${sql.raw(String(columns.length))} else 0 end`
 
@@ -405,6 +408,8 @@ export const channels = pgTable(
     encryptedCredential: text(),
     hostKeyFingerprint: text(),
     pollingIntervalMinutes: integer(),
+    pollProblemReason: pollProblemReason(),
+    pollProblemSince: timestamp({ withTimezone: true, mode: 'date' }),
     rateLimitPerMinute: integer(),
     encryptedWebhookToken: text(),
     webhookTokenLastFour: text(),
@@ -453,6 +458,10 @@ export const channels = pgTable(
     check(
       'channels_host_key_fingerprint',
       sql`${table.type} = 'sftp' or ${table.hostKeyFingerprint} is null`,
+    ),
+    check(
+      'channels_poll_problem',
+      sql`num_nonnulls(${table.pollProblemReason}, ${table.pollProblemSince}) = 0 or (${table.type} = 'sftp' and ${table.direction} = 'inbound' and num_nonnulls(${table.pollProblemReason}, ${table.pollProblemSince}) = 2)`,
     ),
     check(
       'channels_authorization',

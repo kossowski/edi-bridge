@@ -99,6 +99,8 @@ export {
   maskedSecretSchema,
   maxChannelNameLength,
   pollingIntervalMinutes,
+  type PollProblem,
+  pollProblemSchema,
   receiveWebhookEndpoint,
   regeneratedWebhookTokenSchema,
   type RegeneratedWebhookToken,

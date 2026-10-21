@@ -71,6 +71,27 @@ export const hostKeyFingerprintSchema = z
 
 export type HostKeyFingerprint = z.infer<typeof hostKeyFingerprintSchema>
 
+export const channelTestFailureReasons = [
+  'hostKeyMismatch',
+  'loginRejected',
+  'hostUnreachable',
+  'timedOut',
+  'remotePathMissing',
+  'permissionDenied',
+  'unexpectedResponse',
+] as const
+
+export const channelTestFailureReasonSchema = z.enum(channelTestFailureReasons)
+
+export type ChannelTestFailureReason = z.infer<typeof channelTestFailureReasonSchema>
+
+export const pollProblemSchema = z.strictObject({
+  reason: channelTestFailureReasonSchema,
+  since: z.iso.datetime(),
+})
+
+export type PollProblem = z.infer<typeof pollProblemSchema>
+
 const channelIdentity = {
   name: z.string().trim().min(1).max(maxChannelNameLength),
   tradingPartnerId: z.uuid().nullable(),
@@ -142,6 +163,7 @@ function channelUnion<
   PollingInterval extends z.ZodType,
   Webhook extends Record<string, z.ZodType>,
   Authorization extends z.ZodType,
+  Polling extends Record<string, z.ZodType>,
 >(
   object: <Fields extends Record<string, z.ZodType>>(
     fields: Fields,
@@ -152,9 +174,10 @@ function channelUnion<
     pollingInterval: PollingInterval
     webhook: Webhook
     authorization: Authorization
+    polling: Polling
   },
 ) {
-  const { common, credential, pollingInterval, webhook, authorization } = parts
+  const { common, credential, pollingInterval, webhook, authorization, polling } = parts
 
   return z.discriminatedUnion('type', [
     z.discriminatedUnion('direction', [
@@ -166,6 +189,7 @@ function channelUnion<
         pollingIntervalMinutes: pollingInterval,
         credential,
         hostKeyFingerprint: hostKeyFingerprintSchema.nullable().optional(),
+        ...polling,
       }),
       object({
         ...common,
@@ -199,6 +223,7 @@ export const channelInputSchema = channelUnion(z.object, {
   pollingInterval: pollingIntervalSchema.default(pollingIntervalMinutes.default),
   webhook: {},
   authorization: secretInputSchema.nullable(),
+  polling: {},
 })
 
 export type ChannelInput = z.infer<typeof channelInputSchema>
@@ -210,6 +235,7 @@ export const channelUpdateSchema = channelUnion(z.object, {
   pollingInterval: pollingIntervalSchema,
   webhook: {},
   authorization: secretInputSchema.nullable().optional(),
+  polling: {},
 })
 
 export type ChannelUpdate = z.infer<typeof channelUpdateSchema>
@@ -221,6 +247,7 @@ export const channelSchema = channelUnion(z.strictObject, {
   pollingInterval: pollingIntervalSchema,
   webhook: { url: z.url(), token: maskedSecretSchema },
   authorization: maskedSecretSchema.nullable(),
+  polling: { pollProblem: pollProblemSchema.nullable().optional() },
 })
 
 export type Channel = z.infer<typeof channelSchema>
@@ -288,20 +315,6 @@ export const regenerateWebhookTokenEndpoint: Endpoint<
   path: '/channels/:id/webhook-token',
   response: regeneratedWebhookTokenSchema,
 }
-
-export const channelTestFailureReasons = [
-  'hostKeyMismatch',
-  'loginRejected',
-  'hostUnreachable',
-  'timedOut',
-  'remotePathMissing',
-  'permissionDenied',
-  'unexpectedResponse',
-] as const
-
-export const channelTestFailureReasonSchema = z.enum(channelTestFailureReasons)
-
-export type ChannelTestFailureReason = z.infer<typeof channelTestFailureReasonSchema>
 
 // The API refuses to test a seeded Channel before reaching it, so no reach fails with this reason.
 export const channelTestResultReasonSchema = z.enum([...channelTestFailureReasons, 'seededChannel'])

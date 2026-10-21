@@ -1,0 +1,4 @@
+CREATE TYPE "public"."poll_problem_reason" AS ENUM('hostKeyMismatch', 'loginRejected', 'hostUnreachable', 'timedOut', 'remotePathMissing', 'permissionDenied', 'unexpectedResponse');--> statement-breakpoint
+ALTER TABLE "channels" ADD COLUMN "poll_problem_reason" "poll_problem_reason";--> statement-breakpoint
+ALTER TABLE "channels" ADD COLUMN "poll_problem_since" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "channels" ADD CONSTRAINT "channels_poll_problem" CHECK (num_nonnulls("channels"."poll_problem_reason", "channels"."poll_problem_since") = 0 or ("channels"."type" = 'sftp' and "channels"."direction" = 'inbound' and num_nonnulls("channels"."poll_problem_reason", "channels"."poll_problem_since") = 2));
