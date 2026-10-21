@@ -327,7 +327,7 @@ export const seedChannels: ReadonlyArray<ChannelRecord> = [
   ...postponedOutboundSeeds,
 ].map(parseRecord)
 
-export const internalHost = '10.20.0.15'
+export const blockedHost = '10.20.0.15'
 
 // Not a seed, so the seeded screens keep their Channels.
 export const blockedAddressChannel: ChannelRecord = parseRecord({
@@ -337,11 +337,11 @@ export const blockedAddressChannel: ChannelRecord = parseRecord({
   name: 'Warehouse SFTP inbox',
   remotePath: '/outbox',
   pollingIntervalMinutes: 1,
-  ...sftpConnection(seededFaker(`sftp:${internalHost}`), null, internalHost),
+  ...sftpConnection(seededFaker(`sftp:${blockedHost}`), null, blockedHost),
   pollProblem: {
     reason: 'addressBlocked',
     since: '2026-10-19T05:10:00.000Z',
-    blockedAddress: internalHost,
+    blockedAddress: blockedHost,
   },
 })
 
@@ -493,7 +493,7 @@ export function refusesHostKey(record: ChannelRecord) {
 }
 
 // The mock resolves no host name but localhost, so only an address literal reaches another one.
-const internalIpv4 = /^(?:0\.0\.0\.0$|127\.|10\.|192\.168\.|169\.254\.|172\.(?:1[6-9]|2\d|3[01])\.)/
+const blockedIpv4 = /^(?:0\.0\.0\.0$|127\.|10\.|192\.168\.|169\.254\.|172\.(?:1[6-9]|2\d|3[01])\.)/
 
 const hexGroup = (high: string, low: string) => ((Number(high) << 8) | Number(low)).toString(16)
 
@@ -513,16 +513,16 @@ function ipv6Groups(address: string): number[] {
   return [...before, ...Array.from({ length: 8 - before.length - after.length }, () => 0), ...after]
 }
 
-function isInternal(address: string) {
+function isBlockedAddress(address: string) {
   if (!address.includes(':')) {
-    return internalIpv4.test(address)
+    return blockedIpv4.test(address)
   }
 
   const groups = ipv6Groups(address)
   const [first = 0, , , , , sixth = 0, seventh = 0, last = 0] = groups
 
   if (groups.slice(0, 5).every((group) => group === 0) && sixth === 0xffff) {
-    return internalIpv4.test([seventh >> 8, seventh & 0xff, last >> 8, last & 0xff].join('.'))
+    return blockedIpv4.test([seventh >> 8, seventh & 0xff, last >> 8, last & 0xff].join('.'))
   }
 
   return (
@@ -547,7 +547,7 @@ function blockedAddressOf(record: ChannelRecord): string | undefined {
   const host = hostOf(record)
   const address = host === 'localhost' ? '127.0.0.1' : host
 
-  return address !== undefined && isInternal(address) ? address : undefined
+  return address !== undefined && isBlockedAddress(address) ? address : undefined
 }
 
 function testedHostKey(

@@ -242,7 +242,7 @@ describe('the poll problem of a Channel', () => {
     ).toBe(false)
   })
 
-  it('names the blocked address when polling was refused for an internal address', () => {
+  it('names the address when polling was refused for a blocked address', () => {
     const blocked = {
       reason: 'addressBlocked',
       since: pollProblem.since,
@@ -434,7 +434,7 @@ describe('channelTestResultSchema', () => {
     ).toBe(false)
   })
 
-  it('names the blocked address when a Channel points at an internal address', () => {
+  it('names the address when a Channel points at a blocked address', () => {
     const blocked = {
       outcome: 'failed',
       reason: 'addressBlocked',

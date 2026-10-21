@@ -18,7 +18,7 @@ import {
 
 import type { ValidationErrorCode } from '@edi-bridge/edifact'
 
-import { internalHost } from './channel'
+import { blockedHost } from './channel'
 import { seedFlows } from './flow'
 import { seedLookupTableNamed } from './lookup-table-seed'
 import { publishedVersionsByMapping, seedMappingDrafts } from './mapping'
@@ -136,9 +136,9 @@ const hostKeyMismatchError: GeneratedError = {
 
 const addressBlockedError: GeneratedError = {
   code: 'addressBlocked',
-  message: `The host of the Channel resolves to the internal address ${internalHost}`,
+  message: `The host of the Channel resolves to the blocked address ${blockedHost}`,
   position: null,
-  details: { kind: 'blockedAddress', address: internalHost },
+  details: { kind: 'blockedAddress', address: blockedHost },
 }
 
 // A separate seed keeps the Messages of the other Runs as they were.

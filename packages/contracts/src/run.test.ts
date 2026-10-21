@@ -218,7 +218,7 @@ describe('runDetailSchema', () => {
       failureStage: 'delivery',
       error: {
         code: 'addressBlocked',
-        message: 'The host of the Channel resolves to an internal address',
+        message: 'The host of the Channel resolves to a blocked address',
         position: null,
         details: { kind: 'blockedAddress', address: '169.254.169.254' },
       },

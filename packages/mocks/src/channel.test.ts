@@ -435,7 +435,7 @@ describe('POST /channels/:id/test', () => {
     })
   })
 
-  it('refuses a Channel whose host is an internal address and names the address', async () => {
+  it('refuses a Channel whose host is a blocked address and names the address', async () => {
     const sftpAt = (host: string): ChannelRecord => ({
       ...sftpInput,
       id: crypto.randomUUID(),
@@ -721,7 +721,7 @@ describe('the poll problem of an inbound SFTP Channel', () => {
     })
   })
 
-  it('shows a blocked address on an inbound Channel at an internal address', async () => {
+  it('shows the address on an inbound Channel at a blocked address', async () => {
     server.use(...channelHandlers(apiUrl, { channels: [blockedAddressChannel] }))
     const { id } = blockedAddressChannel
     const pollProblem = { reason: 'addressBlocked', blockedAddress: '10.20.0.15' }
