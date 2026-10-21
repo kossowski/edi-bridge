@@ -15,6 +15,7 @@ import {
 } from '@edi-bridge/contracts'
 
 import {
+  blockedAddressChannel,
   channelHandlers,
   type ChannelRecord,
   createChannel,
@@ -434,6 +435,49 @@ describe('POST /channels/:id/test', () => {
     })
   })
 
+  it('refuses a Channel whose host is an internal address and names the address', async () => {
+    const sftp: ChannelRecord = { ...sftpInput, id: crypto.randomUUID(), host: '10.20.0.15' }
+    const loopback: ChannelRecord = { ...sftpInput, id: crypto.randomUUID(), host: 'localhost' }
+
+    const http: ChannelRecord = {
+      ...httpInput,
+      id: crypto.randomUUID(),
+      url: 'http://192.168.1.20:8080/edi',
+    }
+
+    const metadata: ChannelRecord = {
+      ...httpInput,
+      id: crypto.randomUUID(),
+      url: 'http://[fd00::7]/edi',
+    }
+
+    server.use(...channelHandlers(apiUrl, { channels: [sftp, loopback, http, metadata] }))
+
+    for (const [record, blockedAddress] of [
+      [sftp, '10.20.0.15'],
+      [loopback, '127.0.0.1'],
+      [http, '192.168.1.20'],
+      [metadata, 'fd00::7'],
+    ] as const) {
+      expect(testChannelEndpoint.response.parse((await testChannel(record.id)).body)).toEqual({
+        outcome: 'failed',
+        reason: 'addressBlocked',
+        blockedAddress,
+        testedAt: expect.any(String),
+        hostKey: null,
+      })
+    }
+  })
+
+  it('reaches a Channel whose host is a public address', async () => {
+    const existing: ChannelRecord = { ...sftpInput, id: crypto.randomUUID(), host: '172.32.0.1' }
+    server.use(...channelHandlers(apiUrl, { channels: [existing] }))
+
+    expect(testChannelEndpoint.response.parse((await testChannel(existing.id)).body)).toMatchObject(
+      { outcome: 'succeeded' },
+    )
+  })
+
   it('answers 404 for an unknown Channel', async () => {
     server.use(...channelHandlers(apiUrl, { channels: [] }))
 
@@ -666,6 +710,22 @@ describe('the poll problem of an inbound SFTP Channel', () => {
     expect(refusesHostKey(seeded[0]!)).toBe(true)
     expect(await getChannel(seeded[0]!.id)).toMatchObject({
       pollProblem: { reason: 'hostKeyMismatch' },
+    })
+  })
+
+  it('shows a blocked address on an inbound Channel at an internal address', async () => {
+    server.use(...channelHandlers(apiUrl, { channels: [blockedAddressChannel] }))
+    const { id } = blockedAddressChannel
+    const pollProblem = { reason: 'addressBlocked', blockedAddress: '10.20.0.15' }
+
+    expect(await getChannel(id)).toMatchObject({ type: 'sftp', direction: 'inbound', pollProblem })
+
+    const response = await send('POST', toPath(testChannelEndpoint.path, { id }))
+
+    expect(testChannelEndpoint.response.parse(await response.json())).toMatchObject({
+      outcome: 'failed',
+      reason: 'addressBlocked',
+      blockedAddress: '10.20.0.15',
     })
   })
 })

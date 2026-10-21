@@ -111,6 +111,7 @@ export {
 } from './ai-draft'
 
 export {
+  blockedAddressChannel,
   channelHandlers,
   type ChannelRecord,
   type ChannelStore,

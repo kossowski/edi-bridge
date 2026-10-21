@@ -327,6 +327,24 @@ export const seedChannels: ReadonlyArray<ChannelRecord> = [
   ...postponedOutboundSeeds,
 ].map(parseRecord)
 
+const internalHost = '10.20.0.15'
+
+// Not a seed, so the seeded screens keep their Channels: pass it to channelHandlers to show it.
+export const blockedAddressChannel: ChannelRecord = parseRecord({
+  id: seedId(3, 900),
+  type: 'sftp',
+  direction: 'inbound',
+  name: 'Warehouse SFTP inbox',
+  remotePath: '/outbox',
+  pollingIntervalMinutes: 1,
+  ...sftpConnection(seededFaker(`sftp:${internalHost}`), null, internalHost),
+  pollProblem: {
+    reason: 'addressBlocked',
+    since: '2026-10-19T05:10:00.000Z',
+    blockedAddress: internalHost,
+  },
+})
+
 export function createChannel(
   kind: ChannelKind = channelKinds[0],
   { tradingPartnerIds = [] }: { tradingPartnerIds?: ReadonlyArray<string> } = {},
@@ -450,8 +468,11 @@ const rejectedLogin = seedChannels.find(
     type === 'sftp' && direction === 'outbound' && tradingPartnerId === awaitingContrl?.id,
 )
 
-// A mismatching host key follows from the stored and the presented key, never from this list.
-export type ConnectionFailure = Exclude<ChannelTestResultReason, 'hostKeyMismatch'>
+// A mismatching host key and a blocked address follow from the Channel, never from this list.
+export type ConnectionFailure = Exclude<
+  ChannelTestResultReason,
+  'hostKeyMismatch' | 'addressBlocked'
+>
 
 export const seedConnectionFailures: ReadonlyMap<string, ConnectionFailure> = new Map(
   rejectedLogin ? [[rejectedLogin.id, 'loginRejected']] : [],
@@ -469,6 +490,28 @@ export function refusesHostKey(record: ChannelRecord) {
     record.hostKeyFingerprint != null &&
     record.hostKeyFingerprint !== serverHostKey(record.host)
   )
+}
+
+// The mock resolves no host name but localhost, so only an address literal reaches another one.
+const internalAddress =
+  /^(?:127\.|10\.|192\.168\.|169\.254\.|172\.(?:1[6-9]|2\d|3[01])\.|::1$|f[cd][0-9a-f]{0,2}:|fe[89ab][0-9a-f]:)/i
+
+function hostOf(record: ChannelRecord): string | undefined {
+  switch (record.type) {
+    case 'sftp':
+      return record.host
+    case 'http':
+      return new URL(record.url).hostname.replace(/^\[(.*)\]$/, '$1')
+    case 'webhook':
+      return undefined
+  }
+}
+
+function blockedAddressOf(record: ChannelRecord): string | undefined {
+  const host = hostOf(record)
+  const address = host === 'localhost' ? '127.0.0.1' : host
+
+  return address !== undefined && internalAddress.test(address) ? address : undefined
 }
 
 function testedHostKey(
@@ -493,6 +536,12 @@ function testResult(
   failure: ConnectionFailure | undefined,
 ): ChannelTestResult {
   const testedAt = new Date().toISOString()
+  const blockedAddress = blockedAddressOf(record)
+
+  if (blockedAddress !== undefined) {
+    return { outcome: 'failed', reason: 'addressBlocked', blockedAddress, testedAt, hostKey: null }
+  }
+
   const hostKey = testedHostKey(record, failure)
 
   if (hostKey?.state === 'mismatch') {
