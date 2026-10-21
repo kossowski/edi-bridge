@@ -846,6 +846,7 @@
         "completeSetup": "Complete the setup.",
         "fixCauseWithoutTarget": "Fix the cause described here. EDI Bridge cannot process this document again, so {direction, select, inbound {ask {tradingPartner} to send it again} other {send it again from your ERP}}.",
         "checkConnection": "If it keeps failing, check the connection details.",
+        "correctPassphrase": "Enter the passphrase that belongs to the private key on the connection. If you do not have it, ask {direction, select, inbound {your IT team} other {{tradingPartner}}}.",
         "changeAddress": "Change the server address on the connection. If {address} is right because the server is reached over a private network, ask the Operator to allow it.",
         "acceptHostKey": "Ask {direction, select, inbound {your IT team} other {{tradingPartner}}} whether they replaced the server or its key. If they did, accept the new key on the connection.",
         "processAgain": "Process it again. EDI Bridge uses the original file, so {direction, select, inbound {{tradingPartner} does} other {your ERP does}} not have to send anything again.",
@@ -859,6 +860,7 @@
         "lookupTable": "Add {code} to “{name}”",
         "channel": "Check the connection “{name}”",
         "channelAddress": "Change the address of “{name}”",
+        "channelPassphrase": "Correct the passphrase of “{name}”",
         "tradingPartner": "Open {name}",
         "workspaceGln": "Record your company's GLN",
         "tradingPartnerGln": "Add the GLN of {name}",
@@ -1923,6 +1925,7 @@
         "outbound": "Upload folder"
       },
       "authentication": "Authentication",
+      "passphrase": "Passphrase",
       "pollingInterval": "Polling interval",
       "rateLimit": "Rate limit",
       "url": "URL",
@@ -1957,6 +1960,7 @@
         "hostKey": "Test the connection, then accept the new key",
         "credentials": "Update the login details",
         "address": "Change the server address",
+        "passphrase": "Correct the passphrase",
         "settings": "Check the connection settings"
       },
       "viewOnly": "An Admin can fix the connection."
@@ -2099,6 +2103,14 @@
       "credential": {
         "description": "Stored encrypted and never shown again.",
         "keep": "Stored encrypted and never shown again. Leave blank to keep the current one."
+      },
+      "passphrase": {
+        "label": "Passphrase (optional)",
+        "description": "Only for a private key protected by a passphrase. Stored encrypted and never shown again.",
+        "keep": "Stored encrypted and never shown again. Leave blank to keep the current one; it stays with a new private key until you remove it."
+      },
+      "removePassphrase": {
+        "label": "Remove the stored passphrase"
       },
       "pollingIntervalMinutes": {
         "label": "Polling interval (minutes)",

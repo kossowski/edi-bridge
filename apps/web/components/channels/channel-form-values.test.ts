@@ -5,6 +5,7 @@ import { createChannel, toChannel } from '@edi-bridge/mocks'
 
 import {
   type ChannelFormValues,
+  hasStoredPassphrase,
   toFormValues,
   validateChannelUpdate,
   validateNewChannel,
@@ -42,6 +43,8 @@ describe('toFormValues', () => {
       port: '22',
       pollingIntervalMinutes: '1',
       credential: '',
+      passphrase: '',
+      removePassphrase: false,
     })
   })
 
@@ -123,6 +126,21 @@ describe('validateNewChannel', () => {
     })
   })
 
+  it('sends the passphrase of a private key, and none when it is left blank', () => {
+    const key = { ...sftp, authentication: 'privateKey', credential: 'PEM' } as const
+
+    expect(validateNewChannel({ ...key, passphrase: 'harbour lights' })).toMatchObject({
+      input: { credential: 'PEM', passphrase: 'harbour lights' },
+    })
+    expect(validateNewChannel(key)).not.toHaveProperty('input.passphrase')
+  })
+
+  it('sends no passphrase with a password', () => {
+    expect(validateNewChannel({ ...sftp, passphrase: 'harbour lights' })).not.toHaveProperty(
+      'input.passphrase',
+    )
+  })
+
   it('creates a webhook Channel with only its rate limit', () => {
     expect(validateNewChannel({ ...blank, kind: 'webhook-inbound', name: 'ERP webhook' })).toEqual({
       input: {
@@ -185,6 +203,54 @@ describe('validateChannelUpdate', () => {
     expect(
       validateChannelUpdate({ ...toFormValues(channel), authentication: 'privateKey' }, channel),
     ).toEqual({ errors: { credential: 'required' } })
+  })
+
+  it('keeps, replaces or removes the stored passphrase of a private key', () => {
+    const channel = existing(channelKinds[0], {
+      authentication: 'privateKey',
+      passphrase: { lastFour: null },
+    })
+
+    const values = toFormValues(channel)
+
+    expect(validateChannelUpdate(values, channel)).not.toHaveProperty('input.passphrase')
+    expect(validateChannelUpdate({ ...values, passphrase: 'new one' }, channel)).toMatchObject({
+      input: { passphrase: 'new one' },
+    })
+    expect(validateChannelUpdate({ ...values, removePassphrase: true }, channel)).toMatchObject({
+      input: { passphrase: null },
+    })
+  })
+
+  it('counts a stored passphrase only on a Channel that logs in with a private key', () => {
+    const passphrase = { lastFour: null }
+
+    expect(
+      hasStoredPassphrase(existing(channelKinds[0], { authentication: 'privateKey', passphrase })),
+    ).toBe(true)
+    expect(
+      hasStoredPassphrase(
+        existing(channelKinds[0], { authentication: 'privateKey', passphrase: null }),
+      ),
+    ).toBe(false)
+    expect(
+      hasStoredPassphrase(existing(channelKinds[0], { authentication: 'password', passphrase })),
+    ).toBe(false)
+    expect(hasStoredPassphrase(existing(channelKinds[3]))).toBe(false)
+  })
+
+  it('removes the stored passphrase when the Channel switches to a password', () => {
+    const channel = existing(channelKinds[0], {
+      authentication: 'privateKey',
+      passphrase: { lastFour: null },
+    })
+
+    expect(
+      validateChannelUpdate(
+        { ...toFormValues(channel), authentication: 'password', credential: 's3cret' },
+        channel,
+      ),
+    ).toMatchObject({ input: { authentication: 'password', passphrase: null } })
   })
 
   it('keeps, replaces or removes the Authorization header of an HTTP Channel', () => {

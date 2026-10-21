@@ -30,6 +30,7 @@ import {
 } from '@edi-bridge/contracts'
 import {
   blockedAddressRun,
+  passphraseRejectedRun,
   controlReferenceOf,
   createLookupTableStore,
   interchangeIdOf,
@@ -612,6 +613,74 @@ export const ViewerAddressBlockedDelivery = meta.story({
           name: `Check the connection “${blockedAddressTarget.name}”`,
         }),
         `/channels/${blockedAddressTarget.id}`,
+      )
+    },
+  }),
+})
+
+// SAFETY: passphraseRejectedRun runs a seeded Flow.
+const passphraseFlow = seedFlows.find(({ id }) => id === passphraseRejectedRun.flow.id)!
+
+// SAFETY: every seeded Flow delivers to a seeded Channel.
+const passphraseTarget = seedChannels.find(({ id }) => id === passphraseFlow.destinationChannelId)!
+
+function servingPassphraseRejected() {
+  return runDetailHandlers(apiUrl, { runs: [passphraseRejectedRun] })
+}
+
+export const PassphraseRejectedDelivery = meta.story({
+  args: { id: passphraseRejectedRun.id },
+  beforeEach({ msw }) {
+    msw.use(...servingPassphraseRejected())
+  },
+  async play({ canvas }) {
+    await expect(
+      await canvas.findByRole('heading', {
+        name: `The private key for ${passphraseRejectedRun.tradingPartner.name} could not be unlocked`,
+      }),
+    ).toBeVisible()
+    await expect(
+      canvas.getByText(/^Enter the passphrase that belongs to the private key/),
+    ).toBeVisible()
+    await expect(canvas.getByText('You fix this')).toBeVisible()
+
+    const fix = canvas.getByRole('link', {
+      name: `Correct the passphrase of “${passphraseTarget.name}”`,
+    })
+
+    const tryAgain = canvas.getByRole('button', { name: 'Try again' })
+
+    await expectFixLink(fix, `/channels/${passphraseTarget.id}/edit`)
+    await expect(fix.compareDocumentPosition(tryAgain)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+  },
+})
+
+export const GermanPassphraseRejectedDelivery = meta.story({
+  args: { id: passphraseRejectedRun.id },
+  decorators: [german],
+  beforeEach({ msw }) {
+    msw.use(...servingPassphraseRejected())
+  },
+  async play({ canvas }) {
+    await expect(
+      await canvas.findByText(/^Geben Sie an der Verbindung die Passphrase ein/),
+    ).toBeVisible()
+    await expect(
+      canvas.getByRole('link', { name: `Passphrase von „${passphraseTarget.name}“ korrigieren` }),
+    ).toBeVisible()
+  },
+})
+
+export const ViewerPassphraseRejectedDelivery = meta.story({
+  args: { id: passphraseRejectedRun.id },
+  ...viewerStory({
+    handlers: servingPassphraseRejected(),
+    async play({ canvas }) {
+      await expectFixLink(
+        await canvas.findByRole('link', {
+          name: `Check the connection “${passphraseTarget.name}”`,
+        }),
+        `/channels/${passphraseTarget.id}`,
       )
     },
   }),

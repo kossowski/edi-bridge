@@ -846,6 +846,7 @@
         "completeSetup": "Vervollständigen Sie die Einrichtung.",
         "fixCauseWithoutTarget": "Beheben Sie die hier beschriebene Ursache. EDI Bridge kann diesen Beleg nicht erneut verarbeiten, {direction, select, inbound {bitten Sie also {tradingPartner}, ihn erneut zu senden} other {senden Sie ihn also erneut aus Ihrem ERP}}.",
         "checkConnection": "Wenn es weiter fehlschlägt, prüfen Sie die Verbindungsdaten.",
+        "correctPassphrase": "Geben Sie an der Verbindung die Passphrase ein, die zum privaten Schlüssel gehört. Wenn Sie sie nicht haben, fragen Sie {direction, select, inbound {Ihre IT} other {{tradingPartner}}}.",
         "changeAddress": "Ändern Sie die Serveradresse an der Verbindung. Stimmt {address}, weil der Server über ein privates Netz erreichbar ist, bitten Sie den Operator, die Adresse freizugeben.",
         "acceptHostKey": "Fragen Sie {direction, select, inbound {Ihre IT} other {{tradingPartner}}}, ob der Server oder der Serverschlüssel ersetzt wurde. Wenn ja, übernehmen Sie den neuen Serverschlüssel an der Verbindung.",
         "processAgain": "Verarbeiten Sie den Beleg erneut. EDI Bridge nutzt die Originaldatei, {direction, select, inbound {{tradingPartner} muss} other {Ihr ERP muss}} also nichts erneut senden.",
@@ -859,6 +860,7 @@
         "lookupTable": "{code} zu „{name}“ hinzufügen",
         "channel": "Verbindung „{name}“ prüfen",
         "channelAddress": "Adresse von „{name}“ ändern",
+        "channelPassphrase": "Passphrase von „{name}“ korrigieren",
         "tradingPartner": "{name} öffnen",
         "workspaceGln": "GLN Ihres Unternehmens erfassen",
         "tradingPartnerGln": "GLN von {name} erfassen",
@@ -1923,6 +1925,7 @@
         "outbound": "Upload-Ordner"
       },
       "authentication": "Anmeldung",
+      "passphrase": "Passphrase",
       "pollingInterval": "Abfrageintervall",
       "rateLimit": "Rate Limit",
       "url": "URL",
@@ -1957,6 +1960,7 @@
         "hostKey": "Verbindung testen, dann neuen Schlüssel übernehmen",
         "credentials": "Anmeldedaten ändern",
         "address": "Serveradresse ändern",
+        "passphrase": "Passphrase korrigieren",
         "settings": "Verbindungseinstellungen prüfen"
       },
       "viewOnly": "Ein Admin kann die Verbindung korrigieren."
@@ -2099,6 +2103,14 @@
       "credential": {
         "description": "Wird verschlüsselt gespeichert und nie wieder angezeigt.",
         "keep": "Wird verschlüsselt gespeichert und nie wieder angezeigt. Leer lassen, um den aktuellen Wert zu behalten."
+      },
+      "passphrase": {
+        "label": "Passphrase (optional)",
+        "description": "Nur für einen privaten Schlüssel, der mit einer Passphrase geschützt ist. Wird verschlüsselt gespeichert und nie wieder angezeigt.",
+        "keep": "Wird verschlüsselt gespeichert und nie wieder angezeigt. Leer lassen, um die aktuelle Passphrase zu behalten; sie bleibt auch bei einem neuen privaten Schlüssel, bis Sie sie entfernen."
+      },
+      "removePassphrase": {
+        "label": "Gespeicherte Passphrase entfernen"
       },
       "pollingIntervalMinutes": {
         "label": "Abfrageintervall (Minuten)",

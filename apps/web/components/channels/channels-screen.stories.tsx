@@ -14,6 +14,7 @@ import {
   createChannels,
   createHandlers,
   seedChannels,
+  wrongPassphraseChannel,
 } from '@edi-bridge/mocks'
 
 import preview from '../../.storybook/preview'
@@ -82,6 +83,24 @@ export const PollProblemAddressBlocked = meta.story({
 
     await expect(fix).toBeVisible()
     await expect(fix).toHaveAttribute('href', `/channels/${blockedAddressChannel.id}/edit`)
+  },
+})
+
+export const PollProblemPassphraseRejected = meta.story({
+  ...desktop,
+  beforeEach({ msw }) {
+    msw.use(...channelHandlers(apiUrl, { channels: [wrongPassphraseChannel] }))
+  },
+  async play({ canvasElement }) {
+    const row = await findChannelRow(canvasElement, wrongPassphraseChannel.name)
+
+    await expect(row.getByText(/^Polling failed since/)).toBeVisible()
+    await expect(row.getByText('The private key could not be unlocked.')).toBeVisible()
+
+    // The fix link waits for the session, which loads apart from the Channels.
+    const fix = await row.findByRole('link', { name: 'Correct the passphrase' })
+
+    await expect(fix).toHaveAttribute('href', `/channels/${wrongPassphraseChannel.id}/edit`)
   },
 })
 

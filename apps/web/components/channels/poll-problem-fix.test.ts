@@ -57,10 +57,19 @@ describe('pollProblemFix', () => {
     })
   })
 
+  it('sends a rejected passphrase to the passphrase in the settings', () => {
+    expect(pollProblemFix(id, 'passphraseRejected')).toEqual({
+      target: 'passphrase',
+      href: `/channels/${id}/edit`,
+    })
+  })
+
   it('sends every other reason to the settings of the Channel', () => {
     const others = channelTestFailureReasons.filter(
       (reason) =>
-        reason !== 'hostKeyMismatch' && reason !== 'loginRejected' && reason !== 'addressBlocked',
+        !['hostKeyMismatch', 'loginRejected', 'addressBlocked', 'passphraseRejected'].includes(
+          reason,
+        ),
     )
 
     for (const reason of others) {
