@@ -3,15 +3,23 @@ import { NextIntlClientProvider } from 'next-intl'
 import { expect, screen, userEvent, waitFor, within } from 'storybook/test'
 
 import { ChannelDetailScreen } from '@/components/channels/channel-detail-screen'
+import { isInboundSftp } from '@/components/channels/poll-problem-fix'
 import { viewerStory } from '@/components/session/session-story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
 import {
   acceptHostKeyEndpoint,
   channelEndpoint,
+  type ChannelTestFailureReason,
   regenerateWebhookTokenEndpoint,
 } from '@edi-bridge/contracts'
-import { createHandlers, seedChannels, serverHostKey } from '@edi-bridge/mocks'
+import {
+  channelHandlers,
+  type ChannelRecord,
+  createHandlers,
+  seedChannels,
+  serverHostKey,
+} from '@edi-bridge/mocks'
 
 import preview from '../../.storybook/preview'
 
@@ -28,6 +36,20 @@ const uncheckedInbox = seeded('Alpenfrisch SFTP inbox')
 const replacedKeyOutbox = seeded('Rheinkauf SFTP outbox')
 
 const webhook = seeded('ERP webhook')
+
+const pollFailedInbox = seeded('Rheinkauf SFTP inbox')
+
+const pollFailedSince = '2026-10-20T05:30:00.000Z'
+
+function withPollProblem(reason: ChannelTestFailureReason): ChannelRecord {
+  return isInboundSftp(sftpInbox)
+    ? { ...sftpInbox, pollProblem: { reason, since: pollFailedSince } }
+    : sftpInbox
+}
+
+function pollProblemSection(canvasElement: HTMLElement) {
+  return within(within(canvasElement).getByRole('region', { name: 'Polling failed' }))
+}
 
 function hostOf(channel: (typeof seedChannels)[number]) {
   return channel.type === 'sftp' ? channel.host : ''
@@ -63,6 +85,99 @@ export const InboundSftp = meta.story({
     await expect(canvas.getByText('Polled folder')).toBeVisible()
     await expect(await canvas.findByRole('link', { name: 'Hansemarkt GmbH' })).toBeVisible()
     await expect(canvas.queryByText(/whk_/)).toBeNull()
+    await expect(canvas.queryByRole('region', { name: 'Polling failed' })).toBeNull()
+  },
+})
+
+export const PollProblemHostKeyMismatch = meta.story({
+  args: { id: pollFailedInbox.id },
+  async play({ canvas, canvasElement }) {
+    await canvas.findByRole('heading', { level: 2, name: 'Polling failed' })
+    const problem = pollProblemSection(canvasElement)
+    await expect(problem.getByText('The server showed a different key.')).toBeVisible()
+    await expect(
+      canvasElement.querySelector('time[datetime="2026-10-14T06:42:00.000Z"]'),
+    ).not.toBeNull()
+    await expect(
+      problem.getByText(/This notice clears after the next successful poll\.$/),
+    ).toBeVisible()
+    await expect(
+      problem.getByRole('link', { name: 'Check and accept the new key' }),
+    ).toHaveAttribute('href', `/channels/${pollFailedInbox.id}#channel-host-key`)
+
+    const section = hostKeySection(canvasElement)
+    await userEvent.click(section.getByRole('button', { name: /^Test connection/ }))
+    await userEvent.click(await section.findByRole('button', { name: 'Accept the new key' }))
+    await expect(
+      await section.findByText('Key accepted. EDI Bridge checks it on every connection.'),
+    ).toBeVisible()
+    await expect(problem.getByText('The server showed a different key.')).toBeVisible()
+  },
+})
+
+export const PollProblemLoginRejected = meta.story({
+  args: { id: sftpInbox.id },
+  beforeEach({ msw }) {
+    msw.use(...channelHandlers(apiUrl, { channels: [withPollProblem('loginRejected')] }))
+  },
+  async play({ canvas, canvasElement }) {
+    await canvas.findByRole('heading', { level: 2, name: 'Polling failed' })
+    const problem = pollProblemSection(canvasElement)
+    await expect(problem.getByText('Login was rejected.')).toBeVisible()
+    await expect(problem.getByText(/^Since .+ every minute\./)).toBeVisible()
+    await expect(problem.getByRole('link', { name: 'Update the login details' })).toHaveAttribute(
+      'href',
+      `/channels/${sftpInbox.id}/edit`,
+    )
+  },
+})
+
+export const PollProblemTimedOut = meta.story({
+  args: { id: sftpInbox.id },
+  beforeEach({ msw }) {
+    msw.use(...channelHandlers(apiUrl, { channels: [withPollProblem('timedOut')] }))
+  },
+  async play({ canvas, canvasElement }) {
+    await canvas.findByRole('heading', { level: 2, name: 'Polling failed' })
+    const problem = pollProblemSection(canvasElement)
+    await expect(problem.getByText('The server did not answer in time.')).toBeVisible()
+    await expect(
+      problem.getByRole('link', { name: 'Check the connection settings' }),
+    ).toHaveAttribute('href', `/channels/${sftpInbox.id}/edit`)
+  },
+})
+
+export const PollProblemGerman = meta.story({
+  args: { id: pollFailedInbox.id },
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="de" messages={messagesDe} timeZone="Europe/Berlin">
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
+  async play({ canvas }) {
+    await expect(
+      await canvas.findByRole('heading', { level: 2, name: 'Abfrage fehlgeschlagen' }),
+    ).toBeVisible()
+    await expect(canvas.getByText('14.10.2026, 08:42')).toBeVisible()
+    await expect(
+      canvas.getByRole('link', { name: 'Neuen Serverschlüssel prüfen und übernehmen' }),
+    ).toBeVisible()
+  },
+})
+
+export const PollProblemDark = meta.story({
+  args: { id: pollFailedInbox.id },
+  beforeEach() {
+    document.documentElement.classList.add('dark')
+
+    return () => document.documentElement.classList.remove('dark')
+  },
+  async play({ canvas }) {
+    await expect(
+      await canvas.findByRole('link', { name: 'Check and accept the new key' }),
+    ).toBeVisible()
   },
 })
 
@@ -344,6 +459,19 @@ export const ViewerUncheckedHostKey = meta.story({
       await expect(canvas.getByText('An Admin can confirm the key.')).toBeVisible()
       await expect(canvas.queryByText(/when you edit the connection/)).toBeNull()
       await expect(canvas.queryByRole('button', { name: /^Test connection/ })).toBeNull()
+    },
+  }),
+})
+
+export const ViewerPollProblem = meta.story({
+  args: { id: pollFailedInbox.id },
+  ...viewerStory({
+    async play({ canvas }) {
+      await expect(
+        await canvas.findByRole('heading', { level: 2, name: 'Polling failed' }),
+      ).toBeVisible()
+      await expect(canvas.getByText('An Admin can fix the connection.')).toBeVisible()
+      await expect(canvas.queryByRole('link', { name: 'Check and accept the new key' })).toBeNull()
     },
   }),
 })

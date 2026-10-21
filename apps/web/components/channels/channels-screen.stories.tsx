@@ -1,13 +1,13 @@
 import { delay, http, HttpResponse } from 'msw'
 import { NextIntlClientProvider } from 'next-intl'
-import { expect } from 'storybook/test'
+import { expect, within } from 'storybook/test'
 
 import { ChannelsScreen } from '@/components/channels/channels-screen'
 import { viewerStory } from '@/components/session/session-story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
 import { channelsEndpoint } from '@edi-bridge/contracts'
-import { channelHandlers, createChannels, createHandlers } from '@edi-bridge/mocks'
+import { channelHandlers, createChannels, createHandlers, seedChannels } from '@edi-bridge/mocks'
 
 import preview from '../../.storybook/preview'
 
@@ -25,6 +25,25 @@ export const Default = meta.story({
     await expect(await canvas.findByRole('link', { name: 'ERP webhook' })).toBeVisible()
     await expect(canvas.getAllByText('Own systems')[0]).toBeVisible()
     await expect(canvas.getByRole('link', { name: 'Hansemarkt SFTP inbox' })).toBeVisible()
+  },
+})
+
+// SAFETY: the seed holds Rheinkauf SFTP inbox, the Channel with a stored poll problem.
+const pollFailedInbox = seedChannels.find(({ name }) => name === 'Rheinkauf SFTP inbox')!
+
+export const PollProblem = meta.story({
+  async play({ canvas }) {
+    const link = await canvas.findByRole('link', { name: 'Rheinkauf SFTP inbox' })
+    // SAFETY: every Channel name link sits inside the row of its Channel.
+    const row = within(link.closest('tr')!)
+
+    await expect(row.getByText(/^Polling failed since/)).toBeVisible()
+    await expect(row.getByText('The server showed a different key.')).toBeVisible()
+    await expect(row.getByRole('link', { name: 'Check and accept the new key' })).toHaveAttribute(
+      'href',
+      `/channels/${pollFailedInbox.id}#channel-host-key`,
+    )
+    await expect(canvas.getAllByText(/^Polling failed since/)).toHaveLength(1)
   },
 })
 
@@ -86,6 +105,8 @@ export const German = meta.story({
   async play({ canvas }) {
     await expect(await canvas.findByRole('link', { name: 'ERP webhook' })).toBeVisible()
     await expect(canvas.getAllByText('Eingehender Webhook')[0]).toBeVisible()
+    await expect(canvas.getByText(/^Abfrage fehlgeschlagen seit/)).toBeVisible()
+    await expect(canvas.getByText('14.10.2026, 08:42')).toBeVisible()
   },
 })
 
@@ -105,6 +126,8 @@ export const Viewer = meta.story({
     async play({ canvas }) {
       await expect(await canvas.findByRole('link', { name: 'ERP webhook' })).toBeVisible()
       await expect(canvas.queryByRole('link', { name: 'New connection' })).toBeNull()
+      await expect(canvas.getByText(/^Polling failed since/)).toBeVisible()
+      await expect(canvas.queryByRole('link', { name: 'Check and accept the new key' })).toBeNull()
     },
   }),
 })

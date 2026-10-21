@@ -1939,6 +1939,17 @@
         "viewOnly": "An Admin can confirm the key."
       }
     },
+    "pollProblem": {
+      "title": "Polling failed",
+      "since": "Since <time>{since}</time>. EDI Bridge tries again {minutes, plural, one {every minute} other {every # minutes}}. This notice clears after the next successful poll.",
+      "listSince": "Polling failed since <time>{since}</time>",
+      "fix": {
+        "hostKey": "Check and accept the new key",
+        "credentials": "Update the login details",
+        "settings": "Check the connection settings"
+      },
+      "viewOnly": "An Admin can fix the connection."
+    },
     "test": {
       "button": "Test connection",
       "pending": "Testing…",
