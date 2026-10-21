@@ -137,6 +137,53 @@ describe('a defect reported to Sentry', () => {
   })
 })
 
+describe('a defect reported to Sentry without a Run', () => {
+  const eventsTagged = (channel: string) =>
+    itemsOf('event').filter((event) => JSON.stringify(event).includes(channel))
+
+  it('arrives tagged with the Workspace and Channel of a poll', async () => {
+    await Effect.runPromise(
+      monitoring.defectReporter.report({
+        workspaceId: 'workspace-1',
+        runId: null,
+        tradingPartnerId: null,
+        channelId: 'channel-polled',
+        code: 'channelDefect',
+        cause: { name: 'Error', frames: [] },
+      }),
+    )
+
+    await vi.waitFor(() => {
+      expect(eventsTagged('channel-polled')).toHaveLength(1)
+    })
+    expect(
+      z.object({ tags: z.record(z.string(), z.string()) }).parse(eventsTagged('channel-polled')[0])
+        .tags,
+    ).toEqual({ workspace: 'workspace-1', channel: 'channel-polled', failureCode: 'channelDefect' })
+  })
+
+  it('arrives tagged with its failure code only for a defect of the polling loop', async () => {
+    await Effect.runPromise(
+      monitoring.defectReporter.report({
+        workspaceId: null,
+        runId: null,
+        tradingPartnerId: null,
+        channelId: null,
+        code: 'pollingDefect',
+        cause: { name: 'Error', frames: [] },
+      }),
+    )
+
+    await vi.waitFor(() => {
+      expect(eventsTagged('pollingDefect')).toHaveLength(1)
+    })
+    expect(
+      z.object({ tags: z.record(z.string(), z.string()) }).parse(eventsTagged('pollingDefect')[0])
+        .tags,
+    ).toEqual({ failureCode: 'pollingDefect' })
+  })
+})
+
 describe('an Effect span', () => {
   it('arrives with its child spans', async () => {
     await Effect.runPromise(

@@ -18,9 +18,16 @@ import {
 import { channels, connect, type Connection, documents, runs, workspaces } from '@edi-bridge/db'
 import { startTestDatabase, type TestDatabase } from '@edi-bridge/db/testing'
 
-import { Download, type DownloadService, pollInboundChannels, processRun } from './index'
+import {
+  DefectReporter,
+  Download,
+  type DownloadService,
+  pollInboundChannels,
+  processRun,
+} from './index'
 import {
   addOrdersFlow,
+  breakingDatabase,
   defectReportsIn,
   golden,
   goldenInvoice,
@@ -30,6 +37,7 @@ import {
   pipelineServices,
   readRun,
   receiveOverSftp,
+  recordingDefectReporter,
   seedInvoiceWorkspace,
   testSecrets,
 } from './testing'
@@ -165,7 +173,11 @@ afterEach(async () => {
 
 type PollLog = { message: unknown; cause: Cause.Cause<unknown> }
 
-const startPolling = async (service: DownloadService = download, logs: PollLog[] = []) => {
+const startPolling = async (
+  service: DownloadService = download,
+  logs: PollLog[] = [],
+  { db = connection.db, defects = recordingDefectReporter() } = {},
+) => {
   const recording = recorded(service)
   const scope = await Effect.runPromise(Scope.make())
   const clock = await Effect.runPromise(TestClock.make().pipe(Scope.provide(scope)))
@@ -174,11 +186,25 @@ const startPolling = async (service: DownloadService = download, logs: PollLog[]
 
   await Effect.runPromise(clock.setTime(startedAt))
 
+  let sleeps = 0
+
+  // Counts each sleep of the poller, so a test knows a check ended before the clock moves on.
+  const countingClock: Clock.Clock = {
+    ...clock,
+    sleep: (duration) =>
+      Effect.suspend(() => {
+        sleeps += 1
+
+        return clock.sleep(duration)
+      }),
+  }
+
   const polling = Effect.runFork(
     pollInboundChannels().pipe(
-      pipelineServices(connection.db, inMemoryRunQueue()),
+      Effect.provideService(DefectReporter, defects.service),
+      pipelineServices(db, inMemoryRunQueue()),
       Effect.provideService(Download, recording.service),
-      Effect.provideService(Clock.Clock, clock),
+      Effect.provideService(Clock.Clock, countingClock),
       Effect.provide(
         Logger.layer([Logger.make(({ message, cause }) => logs.push({ message, cause }))]),
       ),
@@ -211,6 +237,7 @@ const startPolling = async (service: DownloadService = download, logs: PollLog[]
     lists,
     operations,
     minutesPass,
+    sleeps: () => sleeps,
     polled,
     // A file is received at the second poll that lists it unchanged.
     pollAgain: async (channelId: string, times = 1) => {
@@ -849,5 +876,208 @@ describe('the polling of inbound SFTP Channels', () => {
     }, wait)
 
     expect(await pollProblemOf(box.channelId)).toMatchObject({ reason: null, since: null })
+  })
+
+  it('reports a defect of a poll to error monitoring with its Channel', async () => {
+    const box = await outbox()
+    const defects = recordingDefectReporter()
+
+    await startPolling(
+      failingWith(box.channelId, () => Effect.die(new Error('listing broke'))),
+      [],
+      { defects },
+    )
+
+    await vi.waitFor(() => {
+      expect(defects.reported).toMatchObject([
+        {
+          workspaceId: workspace.id,
+          runId: null,
+          tradingPartnerId: null,
+          channelId: box.channelId,
+          code: 'channelDefect',
+          cause: { name: 'Error' },
+        },
+      ])
+    }, wait)
+  })
+
+  it('reports a repeating defect of a Channel once until a poll of that Channel succeeds', async () => {
+    const box = await outbox()
+    const defects = recordingDefectReporter()
+    let broken = true
+
+    const polling = await startPolling(
+      {
+        ...download,
+        list: (channel) =>
+          broken ? Effect.die(new Error('listing broke')) : download.list(channel),
+      },
+      [],
+      { defects },
+    )
+
+    const reportsAfterPoll = async (times: number, reports: number) => {
+      await polling.polled(box.channelId, times)
+      await vi.waitFor(() => {
+        expect(defects.reported).toHaveLength(reports)
+      }, wait)
+    }
+
+    await reportsAfterPoll(1, 1)
+    await polling.minutesPass(1)
+    await reportsAfterPoll(2, 1)
+    broken = false
+    await polling.minutesPass(1)
+    await reportsAfterPoll(3, 1)
+    broken = true
+    await polling.minutesPass(1)
+    await reportsAfterPoll(4, 2)
+  })
+
+  it('reports a defect while receiving a file to error monitoring with its Channel', async () => {
+    const box = await outbox({ 'orders.edi': threeOrders })
+    const defects = recordingDefectReporter()
+
+    const polling = await startPolling(
+      { ...download, read: () => Effect.die(new Error('reading broke')) },
+      [],
+      { defects },
+    )
+
+    await polling.pollAgain(box.channelId)
+    await vi.waitFor(() => {
+      expect(defects.reported).toMatchObject([
+        {
+          workspaceId: workspace.id,
+          runId: null,
+          tradingPartnerId: null,
+          channelId: box.channelId,
+          code: 'channelDefect',
+          cause: { name: 'Error' },
+        },
+      ])
+    }, wait)
+  })
+
+  it('reports a defect while removing a stored file to error monitoring with its Channel', async () => {
+    const box = await outbox({ 'orders.edi': threeOrders })
+    const defects = recordingDefectReporter()
+    let removals = 0
+
+    const polling = await startPolling(
+      {
+        ...download,
+        remove: () =>
+          Effect.suspend(() => {
+            removals += 1
+
+            return removals === 1
+              ? Effect.fail(new DownloadFailed({ reason: 'timedOut' }))
+              : Effect.die(new Error('removing broke'))
+          }),
+      },
+      [],
+      { defects },
+    )
+
+    await polling.pollAgain(box.channelId)
+    await polling.polledOnceMore(box.channelId, 3)
+    await vi.waitFor(() => {
+      expect(removals).toBeGreaterThanOrEqual(2)
+      expect(defects.reported).not.toEqual([])
+    }, wait)
+
+    // Each later poll tries the removal again, and the repeating defect is reported once.
+    expect(defects.reported).toMatchObject([
+      { workspaceId: workspace.id, runId: null, channelId: box.channelId, code: 'channelDefect' },
+    ])
+  })
+
+  it('reports no failed poll to error monitoring', async () => {
+    const box = await outbox()
+    const defects = recordingDefectReporter()
+
+    const polling = await startPolling(
+      failingWith(box.channelId, () => Effect.fail(new DownloadFailed({ reason: 'timedOut' }))),
+      [],
+      { defects },
+    )
+
+    await pollProblemStored(box.channelId, { reason: 'timedOut', since: polling.startedAt })
+
+    expect(defects.reported).toEqual([])
+  })
+
+  it('reports a poll problem it could not store as a defect of its Channel', async () => {
+    const box = await outbox()
+    const defects = recordingDefectReporter()
+
+    await startPolling(
+      failingWith(box.channelId, () => Effect.fail(new DownloadFailed({ reason: 'timedOut' }))),
+      [],
+      { db: breakingDatabase(connection.db, 'update'), defects },
+    )
+
+    await vi.waitFor(() => {
+      expect(defects.reported).toMatchObject([
+        { workspaceId: workspace.id, runId: null, channelId: box.channelId, code: 'channelDefect' },
+      ])
+    }, wait)
+  })
+})
+
+describe('the polling loop', () => {
+  it('reports a defect that stops a check of the Channels to error monitoring', async () => {
+    const defects = recordingDefectReporter()
+
+    await startPolling(download, [], { db: breakingDatabase(connection.db, 'select'), defects })
+
+    await vi.waitFor(() => {
+      expect(defects.reported).toMatchObject([
+        {
+          workspaceId: null,
+          runId: null,
+          tradingPartnerId: null,
+          channelId: null,
+          code: 'pollingDefect',
+          cause: { name: 'Error' },
+        },
+      ])
+    }, wait)
+  })
+
+  it('reports a repeating defect of the loop once until a check of the Channels succeeds', async () => {
+    const defects = recordingDefectReporter()
+    let broken = true
+    let checks = 0
+
+    const polling = await startPolling(download, [], {
+      db: breakingDatabase(connection.db, 'select', () => {
+        checks += 1
+
+        return broken
+      }),
+      defects,
+    })
+
+    // The loop sleeps after each check, so the clock moves on only once a check has ended.
+    const reportsAfterCheck = async (times: number, reports: number) => {
+      await vi.waitFor(() => {
+        expect(checks).toBe(times)
+        expect(polling.sleeps()).toBe(times)
+        expect(defects.reported).toHaveLength(reports)
+      }, wait)
+    }
+
+    await reportsAfterCheck(1, 1)
+    await polling.minutesPass(1)
+    await reportsAfterCheck(2, 1)
+    broken = false
+    await polling.minutesPass(1)
+    await reportsAfterCheck(3, 1)
+    broken = true
+    await polling.minutesPass(1)
+    await reportsAfterCheck(4, 2)
   })
 })

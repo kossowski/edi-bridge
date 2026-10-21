@@ -191,7 +191,7 @@ The step at which a Run failed (parse, validation, mapping or delivery), which d
 _Avoid_: Error type, error category
 
 **Defect**:
-An unexpected error in EDI Bridge itself, not in the Document or the setup, that fails a Run; it is fixed by trying again (Retry at delivery, Reprocess with the Run's own Mapping Version at any other Failure Stage) and is reported to error monitoring.
+An unexpected error in EDI Bridge itself, not in the Document or the setup, that fails a Run or stops background work such as polling a Channel or the sweep. A failed Run is fixed by trying again (Retry at delivery, Reprocess with the Run's own Mapping Version at any other Failure Stage). Every Defect is reported to error monitoring; one that repeats in the same background work, such as during a database outage, is reported once until that work succeeds again.
 _Avoid_: Bug, crash
 
 **Retry**:

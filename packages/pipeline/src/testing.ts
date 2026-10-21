@@ -152,6 +152,26 @@ export const defectReportsOf = (runId: string) =>
 export const defectReportsIn = (workspaceId: string) =>
   testDefectReporter.reported.filter((report) => report.workspaceId === workspaceId)
 
+// A Database whose queries of one kind throw while it breaks, as a defect of the query would.
+export const breakingDatabase = (
+  db: Db,
+  method: 'select' | 'update',
+  breaks: () => boolean = () => true,
+) => {
+  // SAFETY: the object inherits every member of db and overrides only the one method.
+  const breaking = Object.create(db) as Db
+
+  const broken = () => {
+    throw new Error(`The ${method} broke`)
+  }
+
+  Object.defineProperty(breaking, method, {
+    get: () => (breaks() ? broken : db[method].bind(db)),
+  })
+
+  return breaking
+}
+
 const noDelivery: DeliveryService = () => Effect.die(new Error('This test delivers nothing'))
 
 export const pipelineServices =
