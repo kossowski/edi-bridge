@@ -5,6 +5,7 @@ import addonMsw from 'msw-storybook-addon'
 import { NextIntlClientProvider } from 'next-intl'
 import { type ReactNode, useState } from 'react'
 
+import { apiUrl } from '@/lib/api/config'
 import { startMockWorker } from '@/lib/api/mock-worker'
 import messages from '@/messages/en.json'
 import { TooltipProvider } from '@edi-bridge/ui/components/tooltip'
@@ -27,7 +28,7 @@ export default definePreview({
       startMockWorker({
         liveEvents: 'quiet',
         quiet: true,
-        serviceWorker: { url: './mockServiceWorker.js' },
+        serviceWorker: { url: `./mock-api-worker.js?api=${encodeURIComponent(apiUrl)}` },
       }),
     ),
   ],
