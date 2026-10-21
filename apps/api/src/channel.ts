@@ -106,6 +106,19 @@ const pollProblemOf = ({ pollProblemReason, pollProblemSince, pollProblemBlocked
         ...(pollProblemBlockedAddress !== null && { blockedAddress: pollProblemBlockedAddress }),
       }
 
+// A password takes no passphrase, so a switch to one drops the stored passphrase.
+const changedPassphrase = (
+  secrets: SecretBox,
+  id: string,
+  { authentication, passphrase }: OfKind<ChannelUpdate, 'sftp'>,
+): Partial<Values> => {
+  if (authentication === 'password' || passphrase === null) {
+    return { encryptedPassphrase: null }
+  }
+
+  return passphrase === undefined ? {} : sealed(secrets, id, 'encryptedPassphrase', passphrase)
+}
+
 const kinds: KindHandlings = {
   sftp: {
     responseFields: (row) => ({
@@ -115,6 +128,7 @@ const kinds: KindHandlings = {
       remotePath: row.remotePath,
       authentication: row.authentication,
       credential: hidden,
+      passphrase: row.encryptedPassphrase === null ? null : hidden,
       hostKeyFingerprint: row.hostKeyFingerprint,
       ...(row.direction === 'inbound' && {
         pollingIntervalMinutes: row.pollingIntervalMinutes,
@@ -133,18 +147,24 @@ const kinds: KindHandlings = {
       }),
     }),
     createdSecrets: (secrets, id, input) => ({
-      columns: sealed(secrets, id, 'encryptedCredential', input.credential),
+      columns: {
+        ...sealed(secrets, id, 'encryptedCredential', input.credential),
+        ...(input.passphrase !== undefined &&
+          sealed(secrets, id, 'encryptedPassphrase', input.passphrase)),
+      },
       webhookToken: null,
     }),
-    changedSecrets: (secrets, id, input) =>
-      input.credential === undefined
-        ? {}
-        : sealed(secrets, id, 'encryptedCredential', input.credential),
+    changedSecrets: (secrets, id, input) => ({
+      ...(input.credential !== undefined &&
+        sealed(secrets, id, 'encryptedCredential', input.credential)),
+      ...changedPassphrase(secrets, id, input),
+    }),
     reach: (
       { host, port, username, remotePath, authentication, hostKeyFingerprint = null },
       secret,
     ) => {
       const credential = secret('encryptedCredential') ?? ''
+      const passphrase = secret('encryptedPassphrase')
 
       return Effect.flatMap(ChannelReach, (reach) =>
         reach.sftp({
@@ -154,7 +174,9 @@ const kinds: KindHandlings = {
           remotePath,
           hostKeyFingerprint,
           credential:
-            authentication === 'password' ? { password: credential } : { privateKey: credential },
+            authentication === 'password'
+              ? { password: credential }
+              : { privateKey: credential, ...(passphrase !== null && { passphrase }) },
         }),
       )
     },
