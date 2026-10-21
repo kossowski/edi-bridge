@@ -21,7 +21,7 @@ function StoryQueryProvider({ children }: { children: ReactNode }) {
   return <QueryClientProvider client={client}>{children}</QueryClientProvider>
 }
 
-// A busy machine can answer from the mock API after the default second of `findBy…` and `waitFor`.
+// Mock API responses took up to 2 s in a quiet stories run, past the default second.
 configure({ asyncUtilTimeout: 5000 })
 
 export default definePreview({
