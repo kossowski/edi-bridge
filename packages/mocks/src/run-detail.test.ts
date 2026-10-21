@@ -574,7 +574,9 @@ describe('the problem of a failed Run', () => {
   })
 
   it('has a delivery refused for a blocked address, fixed by you at its Channel', async () => {
+    // SAFETY: blockedAddressRun is built from a seeded Flow.
     const flow = seedFlows.find(({ id }) => id === blockedAddressRun.flow.id)!
+    // SAFETY: every seeded Flow delivers to a seeded Channel.
     const channel = seedChannels.find(({ id }) => id === flow.destinationChannelId)!
     server.use(...runDetailHandlers(apiUrl, { runs: [blockedAddressRun] }))
 

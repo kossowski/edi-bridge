@@ -145,16 +145,20 @@ export function createRun(
   })
 }
 
+// SAFETY: the seed holds at least one Trading Partner.
+const blockedAddressPartner = seedTradingPartners[0]!
+
+// SAFETY: the seed holds an INVOIC Flow for the first Trading Partner.
 const blockedAddressFlow = seedFlows.find(
   ({ messageType, tradingPartnerId }) =>
-    messageType === 'INVOIC' && tradingPartnerId === seedTradingPartners[0]!.id,
+    messageType === 'INVOIC' && tradingPartnerId === blockedAddressPartner.id,
 )!
 
 // Not a seed, so the seeded screens keep their Runs.
 export const blockedAddressRun: RunSummary = toRunSummary({
   id: seedId(4, 900),
   receivedAt: '2026-10-19T05:12:00.000Z',
-  tradingPartner: seedTradingPartners[0]!,
+  tradingPartner: blockedAddressPartner,
   messageType: blockedAddressFlow.messageType,
   flow: { id: blockedAddressFlow.id, name: blockedAddressFlow.name },
   manualSubmission: false,
