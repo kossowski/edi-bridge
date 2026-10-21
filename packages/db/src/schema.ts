@@ -406,6 +406,7 @@ export const channels = pgTable(
     remotePath: text(),
     authentication: sftpAuthentication(),
     encryptedCredential: text(),
+    encryptedPassphrase: text(),
     hostKeyFingerprint: text(),
     pollingIntervalMinutes: integer(),
     pollProblemReason: pollProblemReason(),
@@ -468,6 +469,10 @@ export const channels = pgTable(
       'channels_poll_problem_blocked_address',
       // The text cast keeps the check off the enum value its migration adds in the same transaction.
       sql`(${table.pollProblemReason}::text is not distinct from 'addressBlocked') = (${table.pollProblemBlockedAddress} is not null)`,
+    ),
+    check(
+      'channels_passphrase',
+      sql`${table.authentication} is not distinct from 'privateKey' or ${table.encryptedPassphrase} is null`,
     ),
     check(
       'channels_authorization',

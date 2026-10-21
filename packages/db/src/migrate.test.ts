@@ -600,6 +600,15 @@ describe('a Channel', () => {
       })
     })
 
+    it('says when the passphrase does not unlock the private key', async () => {
+      const stored = await insertSftp('inbound', {
+        pollProblemReason: 'passphraseRejected',
+        pollProblemSince: since,
+      })
+
+      expect(stored).toMatchObject({ pollProblemReason: 'passphraseRejected' })
+    })
+
     it('is none on a new Channel', async () => {
       const stored = await insertSftp('inbound', {})
 
@@ -614,6 +623,60 @@ describe('a Channel', () => {
     it('rejects a poll problem on a Channel that is never polled', async () => {
       await expect(
         insertSftp('outbound', { pollProblemReason: 'timedOut', pollProblemSince: since }),
+      ).rejects.toThrow()
+    })
+  })
+
+  describe('passphrase', () => {
+    async function insertSftp(
+      authentication: 'password' | 'privateKey',
+      encryptedPassphrase: string | null,
+    ) {
+      const workspace = await insertWorkspace(connection.db)
+
+      return only(
+        connection.db
+          .insert(channels)
+          .values({
+            workspaceId: workspace.id,
+            type: 'sftp',
+            direction: 'outbound',
+            name: 'Hansemarkt SFTP outbox',
+            host: 'sftp.hansemarkt.example',
+            port: 22,
+            username: 'nordwind',
+            remotePath: '/inbox',
+            authentication,
+            encryptedCredential: 'encrypted',
+            encryptedPassphrase,
+          })
+          .returning(),
+      )
+    }
+
+    it('is stored on an SFTP Channel that logs in with a private key', async () => {
+      expect(await insertSftp('privateKey', 'sealed')).toMatchObject({
+        encryptedPassphrase: 'sealed',
+      })
+      expect(await insertSftp('privateKey', null)).toMatchObject({ encryptedPassphrase: null })
+    })
+
+    it('is rejected on a Channel that logs in with a password', async () => {
+      await expect(insertSftp('password', 'sealed')).rejects.toThrow()
+    })
+
+    it('is rejected on a Channel without SFTP settings', async () => {
+      const workspace = await insertWorkspace(connection.db)
+
+      await expect(
+        connection.db.insert(channels).values({
+          workspaceId: workspace.id,
+          type: 'http',
+          direction: 'outbound',
+          name: 'ERP HTTP delivery',
+          url: 'https://erp.nordwind-handel.example/api/edi/documents',
+          encryptedPassphrase: 'sealed',
+        }),
       ).rejects.toThrow()
     })
   })
