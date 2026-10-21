@@ -46,9 +46,14 @@ export const PollProblem = meta.story({
 
     await expect(row.getByText(/^Polling failed since/)).toBeVisible()
     await expect(row.getByText('The server showed a different key.')).toBeVisible()
-    await expect(
-      row.getByRole('link', { name: 'Test the connection, then accept the new key' }),
-    ).toHaveAttribute('href', `/channels/${pollFailedInbox.id}#channel-host-key`)
+
+    // The fix link waits for the session, which loads apart from the Channels.
+    const fix = await row.findByRole('link', {
+      name: 'Test the connection, then accept the new key',
+    })
+
+    await expect(fix).toBeVisible()
+    await expect(fix).toHaveAttribute('href', `/channels/${pollFailedInbox.id}#channel-host-key`)
     await expect(canvas.getAllByText(/^Polling failed since/)).toHaveLength(1)
   },
 })
@@ -58,9 +63,10 @@ async function expectOnlyPollingFailed(canvasElement: HTMLElement) {
 
   await expect(row.getByText(/^Polling failed since/)).toBeVisible()
   await expect(row.getByText('The server showed a different key.')).not.toBeVisible()
+  // Waits for the fix link, rendered once the session loads, before proving it hidden.
   await expect(
-    row.queryByRole('link', { name: 'Test the connection, then accept the new key' }),
-  ).toBeNull()
+    await row.findByText('Test the connection, then accept the new key'),
+  ).not.toBeVisible()
 }
 
 export const PollProblemMobile = meta.story({
