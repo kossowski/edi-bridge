@@ -207,6 +207,10 @@ describe('on-screen names', () => {
       en: 'Document type',
       de: 'Belegart',
     })
+    expect(terms.find(({ term }) => term === 'Poll problem')?.label).toEqual({
+      en: 'Polling failed',
+      de: 'Abfrage fehlgeschlagen',
+    })
   })
 
   it('finds a domain term in the screen text of a message', () => {
