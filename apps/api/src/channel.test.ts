@@ -261,6 +261,27 @@ describe('the poll problem of an inbound SFTP Channel', () => {
     })
     expect(channelsEndpoint.response.parse((await list()).json())).toMatchObject([{ pollProblem }])
   })
+
+  it('names the blocked address of a Channel at an internal address', async () => {
+    const { channel } = await created(sftpInbox)
+
+    await api.connection.db
+      .update(channels)
+      .set({
+        pollProblemReason: 'addressBlocked',
+        pollProblemSince: new Date('2026-10-20T07:15:00.000Z'),
+        pollProblemBlockedAddress: '10.0.4.17',
+      })
+      .where(eq(channels.id, channel.id))
+
+    expect(channelEndpoint.response.parse((await get(channel.id)).json())).toMatchObject({
+      pollProblem: {
+        reason: 'addressBlocked',
+        since: '2026-10-20T07:15:00.000Z',
+        blockedAddress: '10.0.4.17',
+      },
+    })
+  })
 })
 
 describe('the host key fingerprint of an SFTP Channel', () => {

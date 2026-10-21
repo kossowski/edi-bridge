@@ -97,10 +97,14 @@ interface KindHandling<K extends Kind> {
 
 type KindHandlings = { [K in Kind]: KindHandling<K> }
 
-const pollProblemOf = ({ pollProblemReason, pollProblemSince }: Row) =>
+const pollProblemOf = ({ pollProblemReason, pollProblemSince, pollProblemBlockedAddress }: Row) =>
   pollProblemReason === null || pollProblemSince === null
     ? null
-    : { reason: pollProblemReason, since: pollProblemSince.toISOString() }
+    : {
+        reason: pollProblemReason,
+        since: pollProblemSince.toISOString(),
+        ...(pollProblemBlockedAddress !== null && { blockedAddress: pollProblemBlockedAddress }),
+      }
 
 const kinds: KindHandlings = {
   sftp: {

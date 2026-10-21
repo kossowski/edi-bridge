@@ -755,6 +755,7 @@ describe('the polling of inbound SFTP Channels', () => {
       .select({
         reason: channels.pollProblemReason,
         since: channels.pollProblemSince,
+        blockedAddress: channels.pollProblemBlockedAddress,
         // Postgres gives a row a new xmin on every update, so an unchanged one means no write.
         version: sql<string>`xmin::text`,
       })
@@ -764,7 +765,10 @@ describe('the polling of inbound SFTP Channels', () => {
     return stored
   }
 
-  const pollProblemStored = (channelId: string, expected: { reason: string; since: Date }) =>
+  const pollProblemStored = (
+    channelId: string,
+    expected: { reason: string; since: Date; blockedAddress?: string | null },
+  ) =>
     vi.waitFor(
       async () => {
         expect(await pollProblemOf(channelId)).toMatchObject(expected)
@@ -791,6 +795,24 @@ describe('the polling of inbound SFTP Channels', () => {
     const polling = await startPolling()
 
     await pollProblemStored(impostorId, { reason: 'hostKeyMismatch', since: polling.startedAt })
+  })
+
+  it('stores the blocked address of a Channel at an internal address, without a report', async () => {
+    const internalId = await receiveOverSftp(connection.db, workspace, {
+      ...sftpLogin,
+      host: '10.0.4.17',
+      port: 22,
+    })
+
+    const defects = recordingDefectReporter()
+    const polling = await startPolling(download, [], { defects })
+
+    await pollProblemStored(internalId, {
+      reason: 'addressBlocked',
+      since: polling.startedAt,
+      blockedAddress: '10.0.4.17',
+    })
+    expect(defects.reported).toEqual([])
   })
 
   it('writes nothing while a Channel fails again with the same reason', async () => {
@@ -847,6 +869,31 @@ describe('the polling of inbound SFTP Channels', () => {
     await pollProblemStored(box.channelId, {
       reason: 'loginRejected',
       since: new Date(polling.startedAt.getTime() + 60_000),
+    })
+  })
+
+  it('rewrites the blocked address when the host resolves to another one', async () => {
+    const box = await outbox()
+    let blockedAddress = '10.0.4.17'
+
+    const polling = await startPolling(
+      failingWith(box.channelId, () =>
+        Effect.fail(new DownloadFailed({ reason: 'addressBlocked', blockedAddress })),
+      ),
+    )
+
+    await pollProblemStored(box.channelId, {
+      reason: 'addressBlocked',
+      since: polling.startedAt,
+      blockedAddress: '10.0.4.17',
+    })
+    blockedAddress = 'fd00::7'
+    await polling.minutesPass(1)
+
+    await pollProblemStored(box.channelId, {
+      reason: 'addressBlocked',
+      since: polling.startedAt,
+      blockedAddress: 'fd00::7',
     })
   })
 

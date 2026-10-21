@@ -1,0 +1,3 @@
+ALTER TYPE "public"."poll_problem_reason" ADD VALUE 'addressBlocked';--> statement-breakpoint
+ALTER TABLE "channels" ADD COLUMN "poll_problem_blocked_address" text;--> statement-breakpoint
+ALTER TABLE "channels" ADD CONSTRAINT "channels_poll_problem_blocked_address" CHECK (("channels"."poll_problem_reason"::text is not distinct from 'addressBlocked') = ("channels"."poll_problem_blocked_address" is not null));
