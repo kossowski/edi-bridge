@@ -76,6 +76,34 @@ describe('uploadSftp', () => {
     expect(await remoteListing('/upload')).not.toContain('.orders-42.edi.part')
   })
 
+  it('logs in with a protected private key and its passphrase', async () => {
+    await Effect.runPromise(
+      uploadSftp(
+        { ...outbox(), credential: sftp.protectedKey },
+        interchange('orders-61.edi'),
+        options,
+      ),
+    )
+
+    expect(await remoteListing('/upload')).toContain('orders-61.edi')
+  })
+
+  it('reports a wrong passphrase and uploads nothing', async () => {
+    expect(
+      await failure(
+        uploadSftp(
+          {
+            ...outbox(),
+            credential: { ...sftp.protectedKey, passphrase: 'wrong-key-passphrase' },
+          },
+          interchange('orders-62.edi'),
+          options,
+        ),
+      ),
+    ).toEqual(new DeliveryFailed({ reason: 'passphraseRejected' }))
+    expect(await remoteListing('/upload')).not.toContain('orders-62.edi')
+  })
+
   it('reports a missing remote path', async () => {
     expect(
       await failure(

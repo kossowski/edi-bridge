@@ -20,7 +20,7 @@ export class ChannelUnreachable extends Data.TaggedError('ChannelUnreachable')<{
   readonly blockedAddress?: string
 }> {}
 
-export type SftpCredential = { password: string } | { privateKey: string }
+export type SftpCredential = { password: string } | { privateKey: string; passphrase?: string }
 
 export interface SftpLogin {
   host: string
@@ -167,6 +167,14 @@ const sftpFailureSchema = z.object({
     .optional()
     .catch(undefined),
 })
+
+// ssh2 parses the key before the handshake, so a locked key fails before the host key check.
+const keyFailureReasonSchema = z
+  .object({ message: z.string() })
+  .transform(({ message }): ChannelTestFailureReason =>
+    /passphrase/i.test(message) ? 'passphraseRejected' : 'loginRejected',
+  )
+  .catch('loginRejected')
 
 export const sftpReason = (error: Error): ChannelTestFailureReason => {
   const { code } = sftpFailureSchema.parse(error)
@@ -342,8 +350,8 @@ const sshSession = <A>(socket: Socket, login: SftpLogin, timeoutMs: number, use:
         },
         ...login.credential,
       })
-    } catch {
-      fail('loginRejected')
+    } catch (error) {
+      fail(keyFailureReasonSchema.parse(error))
     }
 
     return Effect.sync(() => {

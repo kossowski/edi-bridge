@@ -26,13 +26,24 @@ export const listening = async (server: Server) => {
 export async function startTestSftpServer() {
   const username = 'edi_bridge'
   const password = 'edi-bridge-sftp-password'
+  const passphrase = 'edi-bridge-key-passphrase'
   const keyPair = utils.generateKeyPairSync('ed25519')
+
+  const protectedKeyPair = utils.generateKeyPairSync('ed25519', {
+    passphrase,
+    cipher: 'aes256-ctr',
+    rounds: 16,
+  })
 
   const container = await new GenericContainer(sftpImage)
     .withPlatform('linux/amd64')
     .withCommand([`${username}:${password}:::upload`])
     .withCopyContentToContainer([
       { content: `${keyPair.public}\n`, target: `/home/${username}/.ssh/keys/id.pub` },
+      {
+        content: `${protectedKeyPair.public}\n`,
+        target: `/home/${username}/.ssh/keys/protected.pub`,
+      },
     ])
     .withExposedPorts(22)
     .withWaitStrategy(Wait.forLogMessage(/Server listening on/))
@@ -53,6 +64,7 @@ export async function startTestSftpServer() {
     username,
     password,
     privateKey: keyPair.private,
+    protectedKey: { privateKey: protectedKeyPair.private, passphrase },
     hostKeyFingerprint,
     home: `/home/${username}`,
     exec: async (command: string) => container.exec(['sh', '-c', command]),
