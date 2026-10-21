@@ -59,18 +59,29 @@ export const legacyPemKeyPair = (passphrase: string) => {
   }
 }
 
-const rsaJwk = () =>
-  generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey.export({ format: 'jwk' })
+const rsaPkcs1Der = () =>
+  generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey.export({
+    format: 'der',
+    type: 'pkcs1',
+  })
 
+// A 2048-bit PKCS #1 key starts with a 4-byte SEQUENCE header and the version 0 in 3 bytes;
+// its modulus follows as an INTEGER of 4 header bytes and 257 content bytes.
+const modulus = { start: 7, end: 7 + 4 + 257 }
+
+// Node sometimes rejects a JWK whose modulus does not fit its other parts, never such a DER key.
 export const keyWithForeignPublicPart = () => {
-  const foreignModulus = z.string().parse(rsaJwk().n)
+  const mismatched = rsaPkcs1Der()
 
-  const mismatched = createPrivateKey({ key: { ...rsaJwk(), n: foreignModulus }, format: 'jwk' })
+  rsaPkcs1Der().copy(mismatched, modulus.start, modulus.start, modulus.end)
 
   return {
-    privateKey: z
-      .string()
-      .parse(mismatched.export({ ...legacyPem(wrongPassphrase), type: 'pkcs1' })),
+    privateKey: z.string().parse(
+      createPrivateKey({ key: mismatched, format: 'der', type: 'pkcs1' }).export({
+        ...legacyPem(wrongPassphrase),
+        type: 'pkcs1',
+      }),
+    ),
     passphrase: wrongPassphrase,
   }
 }
