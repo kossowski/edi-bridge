@@ -142,7 +142,6 @@ async function pollOrders() {
       username: sftp.username,
       password: sftp.password,
       remotePath,
-      // The worker unlocks the key with the sealed passphrase of the Channel.
       protectedKey: sftp.protectedKey,
     },
     { flowId },
