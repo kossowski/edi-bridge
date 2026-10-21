@@ -18,6 +18,7 @@ import {
   startTestSftpServer,
   type TestSftpServer,
   testAddressPolicy,
+  wrongPassphrase,
 } from './testing'
 
 const timeoutMs = 1500
@@ -74,6 +75,34 @@ describe('uploadSftp', () => {
       "UNB+UNOC:3+4012345000009:14+4098765000002:14+261019:1627+42'",
     )
     expect(await remoteListing('/upload')).not.toContain('.orders-42.edi.part')
+  })
+
+  it('logs in with a protected private key and its passphrase', async () => {
+    await Effect.runPromise(
+      uploadSftp(
+        { ...outbox(), credential: sftp.protectedKey },
+        interchange('orders-61.edi'),
+        options,
+      ),
+    )
+
+    expect(await remoteListing('/upload')).toContain('orders-61.edi')
+  })
+
+  it('reports a wrong passphrase and uploads nothing', async () => {
+    expect(
+      await failure(
+        uploadSftp(
+          {
+            ...outbox(),
+            credential: { ...sftp.protectedKey, passphrase: wrongPassphrase },
+          },
+          interchange('orders-62.edi'),
+          options,
+        ),
+      ),
+    ).toEqual(new DeliveryFailed({ reason: 'passphraseRejected' }))
+    expect(await remoteListing('/upload')).not.toContain('orders-62.edi')
   })
 
   it('reports a missing remote path', async () => {

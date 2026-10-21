@@ -1,16 +1,12 @@
-import { Effect } from 'effect'
+import { Effect, Exit } from 'effect'
 import { createServer as createTcpServer, type Server, type Socket } from 'node:net'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 import type { TestedHostKey } from '@edi-bridge/contracts'
 
+import { channelReach, ChannelUnreachable, type HttpDestination, type SftpLogin } from './index'
 import {
-  channelReach,
-  type ChannelUnreachable,
-  type HttpDestination,
-  type SftpLogin,
-} from './index'
-import {
+  keyWithForeignPublicPart,
   listening,
   mismatchingHostKeyFingerprint,
   startTestErp,
@@ -18,6 +14,7 @@ import {
   type TestErp,
   type TestSftpServer,
   testAddressPolicy,
+  wrongPassphrase,
 } from './testing'
 
 const reach = channelReach({ timeoutMs: 1500, addressPolicy: testAddressPolicy })
@@ -117,6 +114,83 @@ describe('channelReach for an SFTP Channel', () => {
         reach.sftp({ ...sftpOutbox(), credential: { privateKey: 'not a private key' } }),
       ),
     ).toEqual({ outcome: 'failed', reason: 'loginRejected' })
+  })
+
+  it('logs in with a protected private key and its passphrase', async () => {
+    expect(await outcome(reach.sftp({ ...sftpOutbox(), credential: sftp.protectedKey }))).toEqual({
+      outcome: 'succeeded',
+    })
+  })
+
+  it('reports a protected private key without a passphrase as a rejected passphrase', async () => {
+    expect(
+      await outcome(
+        reach.sftp({
+          ...sftpOutbox(),
+          credential: { privateKey: sftp.protectedKey.privateKey },
+        }),
+      ),
+    ).toEqual({ outcome: 'failed', reason: 'passphraseRejected' })
+  })
+
+  it('reports a wrong passphrase without naming it', async () => {
+    const passphrase = wrongPassphrase
+
+    const exit = await Effect.runPromiseExit(
+      reach.sftp({
+        ...sftpOutbox(),
+        credential: { privateKey: sftp.protectedKey.privateKey, passphrase },
+      }),
+    )
+
+    expect(exit).toEqual(Exit.fail(new ChannelUnreachable({ reason: 'passphraseRejected' })))
+    expect(JSON.stringify(exit)).not.toContain(passphrase)
+  })
+
+  it('logs in with a legacy PEM key and its passphrase', async () => {
+    expect(await outcome(reach.sftp({ ...sftpOutbox(), credential: sftp.legacyKey }))).toEqual({
+      outcome: 'succeeded',
+    })
+  })
+
+  it('reports a legacy PEM key without a passphrase as a rejected passphrase', async () => {
+    expect(
+      await outcome(
+        reach.sftp({ ...sftpOutbox(), credential: { privateKey: sftp.legacyKey.privateKey } }),
+      ),
+    ).toEqual({ outcome: 'failed', reason: 'passphraseRejected' })
+  })
+
+  it('reports a legacy PEM key with a wrong passphrase as a rejected passphrase', async () => {
+    expect(
+      await outcome(
+        reach.sftp({
+          ...sftpOutbox(),
+          credential: { ...sftp.legacyKey, passphrase: wrongPassphrase },
+        }),
+      ),
+    ).toEqual({ outcome: 'failed', reason: 'passphraseRejected' })
+  })
+
+  it('reports a key whose private part does not match its public part as a rejected passphrase', async () => {
+    const credential = keyWithForeignPublicPart()
+
+    const exit = await Effect.runPromiseExit(reach.sftp({ ...sftpOutbox(), credential }))
+
+    expect(exit).toEqual(Exit.fail(new ChannelUnreachable({ reason: 'passphraseRejected' })))
+    expect(JSON.stringify(exit)).not.toContain(credential.passphrase)
+  })
+
+  it('reports a wrong passphrase before it checks the host key', async () => {
+    expect(
+      await hostKeyOutcome(
+        reach.sftp({
+          ...sftpOutbox(),
+          credential: { ...sftp.protectedKey, passphrase: wrongPassphrase },
+          hostKeyFingerprint: mismatchingHostKeyFingerprint,
+        }),
+      ),
+    ).toEqual({ outcome: 'failed', reason: 'passphraseRejected', hostKey: undefined })
   })
 
   it('reports a missing remote path', async () => {

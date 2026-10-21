@@ -7,12 +7,17 @@ import {
   secretKeyBytes,
   type SftpChannel,
   sftpChannelDownload,
+  type SftpLogin,
+  listSftp,
+  readSftp,
+  removeSftp,
 } from './index'
 import {
   mismatchingHostKeyFingerprint,
   startTestSftpServer,
   type TestSftpServer,
   testAddressPolicy,
+  wrongPassphrase,
 } from './testing'
 
 const timeoutMs = 1500
@@ -57,6 +62,20 @@ const inbox = async (name: string, files: Record<string, string | Buffer>) => {
 
   return inboundChannel(path)
 }
+
+const downloadOptions = { timeoutMs, addressPolicy: testAddressPolicy }
+
+const protectedLogin = (remotePath: string, passphrase: string | undefined): SftpLogin => ({
+  host: sftp.host,
+  port: sftp.port,
+  username: sftp.username,
+  remotePath,
+  hostKeyFingerprint: null,
+  credential:
+    passphrase === undefined
+      ? { privateKey: sftp.protectedKey.privateKey }
+      : { privateKey: sftp.protectedKey.privateKey, passphrase },
+})
 
 const listedNames = async (channel: SftpChannel) =>
   (await Effect.runPromise(download.list(channel))).map(({ name }) => name).toSorted()
@@ -166,6 +185,52 @@ describe('sftpChannelDownload', () => {
     }
 
     expect(await listedNames(channel)).toEqual(['orders-1.edi'])
+  })
+
+  it('logs in with a protected private key and its passphrase', async () => {
+    await inbox('protected', { 'orders-2.edi': 'UNB' })
+
+    const files = await Effect.runPromise(
+      listSftp(protectedLogin('/upload/protected', sftp.protectedKey.passphrase), downloadOptions),
+    )
+
+    expect(files.map(({ name }) => name)).toEqual(['orders-2.edi'])
+  })
+
+  it('reports a protected private key without its passphrase', async () => {
+    const channel = await inbox('locked-key', { 'orders-3.edi': 'UNB' })
+
+    const locked = protectedLogin('/upload/locked-key', undefined)
+
+    for (const attempt of [
+      listSftp(locked, downloadOptions),
+      readSftp(locked, 'orders-3.edi', downloadOptions),
+      removeSftp(locked, 'orders-3.edi', downloadOptions),
+    ]) {
+      expect(await Effect.runPromise(Effect.flip(attempt))).toEqual(
+        new DownloadFailed({ reason: 'passphraseRejected' }),
+      )
+    }
+
+    expect(await listedNames(channel)).toEqual(['orders-3.edi'])
+  })
+
+  it('reports a protected private key with a wrong passphrase', async () => {
+    const channel = await inbox('wrong-passphrase', { 'orders-3.edi': 'UNB' })
+
+    const rejected = protectedLogin('/upload/wrong-passphrase', wrongPassphrase)
+
+    for (const attempt of [
+      listSftp(rejected, downloadOptions),
+      readSftp(rejected, 'orders-3.edi', downloadOptions),
+      removeSftp(rejected, 'orders-3.edi', downloadOptions),
+    ]) {
+      expect(await Effect.runPromise(Effect.flip(attempt))).toEqual(
+        new DownloadFailed({ reason: 'passphraseRejected' }),
+      )
+    }
+
+    expect(await listedNames(channel)).toEqual(['orders-3.edi'])
   })
 
   it('refuses a credential sealed for another channel', async () => {

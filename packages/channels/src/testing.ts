@@ -1,5 +1,6 @@
+import { createPrivateKey, generateKeyPairSync } from 'node:crypto'
 import { createServer as createHttpServer, type IncomingHttpHeaders } from 'node:http'
-import { utils } from 'ssh2'
+import ssh2, { type utils } from 'ssh2'
 import { GenericContainer, Wait } from 'testcontainers'
 import { z } from 'zod'
 
@@ -23,16 +24,87 @@ export const listening = async (server: Server) => {
   return z.object({ port: z.number() }).parse(server.address()).port
 }
 
+// ssh2 drops a leading zero byte of the public key, so about one Ed25519 pair in 256 is malformed.
+// One bcrypt round: at 16, each parse blocks the event loop of a test for about 150 ms.
+export const sshKeyPair = (passphrase?: string): utils.KeyPairReturn => {
+  const pair = ssh2.utils.generateKeyPairSync(
+    'ed25519',
+    passphrase === undefined ? {} : { passphrase, cipher: 'aes256-ctr', rounds: 1 },
+  )
+
+  return ssh2.utils.parseKey(pair.public) instanceof Error ? sshKeyPair(passphrase) : pair
+}
+
+// A passphrase that does not unlock the protected key of the test SFTP server.
+export const wrongPassphrase = 'wrong-key-passphrase'
+
+const legacyPem = (passphrase: string) =>
+  ({ type: 'sec1', format: 'pem', cipher: 'aes-256-cbc', passphrase }) as const
+
+export const legacyPemKeyPair = (passphrase: string) => {
+  const privateKey = generateKeyPairSync('ec', {
+    namedCurve: 'prime256v1',
+    publicKeyEncoding: { type: 'spki', format: 'pem' },
+    privateKeyEncoding: legacyPem(passphrase),
+  }).privateKey
+
+  const parsed = ssh2.utils.parseKey(privateKey, passphrase)
+
+  if (parsed instanceof Error) {
+    throw parsed
+  }
+
+  return {
+    private: privateKey,
+    public: `${parsed.type} ${parsed.getPublicSSH().toString('base64')}`,
+  }
+}
+
+const rsaPkcs1Der = () =>
+  generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey.export({
+    format: 'der',
+    type: 'pkcs1',
+  })
+
+// A 2048-bit PKCS #1 key starts with a 4-byte SEQUENCE header and the version 0 in 3 bytes;
+// its modulus follows as an INTEGER of 4 header bytes and 257 content bytes.
+const modulus = { start: 7, end: 7 + 4 + 257 }
+
+// Node sometimes rejects a JWK whose modulus does not fit its other parts, never such a DER key.
+export const keyWithForeignPublicPart = () => {
+  const mismatched = rsaPkcs1Der()
+
+  rsaPkcs1Der().copy(mismatched, modulus.start, modulus.start, modulus.end)
+
+  return {
+    privateKey: z.string().parse(
+      createPrivateKey({ key: mismatched, format: 'der', type: 'pkcs1' }).export({
+        ...legacyPem(wrongPassphrase),
+        type: 'pkcs1',
+      }),
+    ),
+    passphrase: wrongPassphrase,
+  }
+}
+
 export async function startTestSftpServer() {
   const username = 'edi_bridge'
   const password = 'edi-bridge-sftp-password'
-  const keyPair = utils.generateKeyPairSync('ed25519')
+  const passphrase = 'edi-bridge-key-passphrase'
+  const keyPair = sshKeyPair()
+  const protectedKeyPair = sshKeyPair(passphrase)
+  const legacyKeyPair = legacyPemKeyPair(passphrase)
 
   const container = await new GenericContainer(sftpImage)
     .withPlatform('linux/amd64')
     .withCommand([`${username}:${password}:::upload`])
     .withCopyContentToContainer([
       { content: `${keyPair.public}\n`, target: `/home/${username}/.ssh/keys/id.pub` },
+      {
+        content: `${protectedKeyPair.public}\n`,
+        target: `/home/${username}/.ssh/keys/protected.pub`,
+      },
+      { content: `${legacyKeyPair.public}\n`, target: `/home/${username}/.ssh/keys/legacy.pub` },
     ])
     .withExposedPorts(22)
     .withWaitStrategy(Wait.forLogMessage(/Server listening on/))
@@ -53,6 +125,8 @@ export async function startTestSftpServer() {
     username,
     password,
     privateKey: keyPair.private,
+    protectedKey: { privateKey: protectedKeyPair.private, passphrase },
+    legacyKey: { privateKey: legacyKeyPair.private, passphrase },
     hostKeyFingerprint,
     home: `/home/${username}`,
     exec: async (command: string) => container.exec(['sh', '-c', command]),
