@@ -1,8 +1,15 @@
 import { Effect } from 'effect'
 import { posix } from 'node:path'
 
-import { sftpReason, sftpSession, timingOut, unreachable, type SftpLogin } from './channel-reach'
-import { DeliveryFailed, type OutboundDocument } from './delivery'
+import {
+  type ConnectOptions,
+  sftpReason,
+  sftpSession,
+  timingOut,
+  unreachable,
+  type SftpLogin,
+} from './channel-reach'
+import { deliveryFailed, type OutboundDocument } from './delivery'
 import { type SftpChannel, sftpLogin } from './sftp-channel'
 
 import type { SecretBox } from './secret'
@@ -10,13 +17,13 @@ import type { SecretBox } from './secret'
 export const uploadSftp = (
   login: SftpLogin,
   document: OutboundDocument,
-  { timeoutMs }: { timeoutMs: number },
+  options: ConnectOptions,
 ) => {
   const target = posix.join(login.remotePath, document.name)
   const partial = posix.join(login.remotePath, `.${document.name}.part`)
 
   return timingOut(
-    sftpSession<void>(login, timeoutMs, (sftp, done) => {
+    sftpSession<void>(login, options, (sftp, done) => {
       const discardPartial = (error: Error) => {
         sftp.unlink(partial, () => {
           done(Effect.fail(unreachable(sftpReason(error))))
@@ -62,14 +69,14 @@ export const uploadSftp = (
         done(Effect.void)
       })
     }),
-    timeoutMs,
-  ).pipe(Effect.mapError(({ reason }) => new DeliveryFailed({ reason })))
+    options.timeoutMs,
+  ).pipe(Effect.mapError(deliveryFailed))
 }
 
 export const sftpChannelDelivery =
-  ({ secrets, timeoutMs }: { secrets: SecretBox; timeoutMs: number }) =>
+  ({ secrets, ...options }: ConnectOptions & { secrets: SecretBox }) =>
   (channel: SftpChannel, document: OutboundDocument) =>
     Effect.flatMap(
       Effect.sync(() => sftpLogin(secrets, channel)),
-      (login) => uploadSftp(login, document, { timeoutMs }),
+      (login) => uploadSftp(login, document, options),
     )

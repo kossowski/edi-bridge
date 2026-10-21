@@ -1,13 +1,13 @@
 import { Effect } from 'effect'
 
 import {
-  fetchFailureReasonSchema,
+  type ConnectOptions,
   type HttpDestination,
+  httpRequest,
   rejectedLoginReason,
   timingOut,
-  unreachable,
 } from './channel-reach'
-import { DeliveryFailed, type OutboundDocument } from './delivery'
+import { DeliveryFailed, deliveryFailed, type OutboundDocument } from './delivery'
 import { type HttpChannel, httpDestination } from './http-channel'
 
 import type { SecretBox } from './secret'
@@ -20,51 +20,32 @@ const answerFailure = (status: number) =>
     }),
   )
 
-const postHeaders = (authorization: string | null, document: OutboundDocument) => {
-  const headers = new Headers({
-    'content-type': document.mediaType ?? 'application/octet-stream',
-  })
-
-  if (authorization !== null) {
-    headers.set('authorization', authorization)
-  }
-
-  return headers
-}
+const postHeaders = (authorization: string | null, document: OutboundDocument) => ({
+  'content-type': document.mediaType ?? 'application/octet-stream',
+  ...(authorization !== null && { authorization }),
+})
 
 export const postHttp = (
   { url, authorization }: HttpDestination,
   document: OutboundDocument,
-  { timeoutMs }: { timeoutMs: number },
+  options: ConnectOptions,
 ) =>
   timingOut(
-    Effect.tryPromise({
-      try: async (signal) => {
-        const response = await fetch(url, {
-          method: 'POST',
-          redirect: 'manual',
-          headers: postHeaders(authorization, document),
-          body: document.content,
-          signal,
-        })
-
-        // An unread body holds its keep-alive connection until garbage collection.
-        await response.body?.cancel()
-
-        return response
-      },
-      catch: (error) => unreachable(fetchFailureReasonSchema.parse(error)),
-    }),
-    timeoutMs,
+    httpRequest(
+      url,
+      { method: 'POST', headers: postHeaders(authorization, document), body: document.content },
+      options,
+    ),
+    options.timeoutMs,
   ).pipe(
-    Effect.mapError(({ reason }) => new DeliveryFailed({ reason })),
+    Effect.mapError(deliveryFailed),
     Effect.flatMap((response) => (response.ok ? Effect.void : answerFailure(response.status))),
   )
 
 export const httpChannelDelivery =
-  ({ secrets, timeoutMs }: { secrets: SecretBox; timeoutMs: number }) =>
+  ({ secrets, ...options }: ConnectOptions & { secrets: SecretBox }) =>
   (channel: HttpChannel, document: OutboundDocument) =>
     Effect.flatMap(
       Effect.sync(() => httpDestination(secrets, channel)),
-      (destination) => postHttp(destination, document, { timeoutMs }),
+      (destination) => postHttp(destination, document, options),
     )

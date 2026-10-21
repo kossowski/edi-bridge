@@ -1,6 +1,8 @@
 import { Context, Data, Effect } from 'effect'
 import { createHash } from 'node:crypto'
+import { connect, isIP, type LookupFunction, type Socket } from 'node:net'
 import { Client, type SFTPWrapper } from 'ssh2'
+import { Agent, buildConnector, fetch, type RequestInit } from 'undici'
 import { z } from 'zod'
 
 import type {
@@ -10,9 +12,12 @@ import type {
   TestedHostKey,
 } from '@edi-bridge/contracts'
 
+import { type AddressPolicy, blockedAddressOf } from './address-guard'
+
 export class ChannelUnreachable extends Data.TaggedError('ChannelUnreachable')<{
   readonly reason: ChannelTestFailureReason
   readonly hostKey?: TestedHostKey
+  readonly blockedAddress?: string
 }> {}
 
 export type SftpCredential = { password: string } | { privateKey: string }
@@ -41,14 +46,9 @@ export class ChannelReach extends Context.Service<
 
 export const unreachable = (reason: ChannelTestFailureReason) => new ChannelUnreachable({ reason })
 
-const unreachableHostCodes = new Set([
-  'ECONNREFUSED',
-  'ECONNRESET',
-  'EHOSTUNREACH',
-  'ENETUNREACH',
-  'ENOTFOUND',
-  'EAI_AGAIN',
-])
+const refusedCodes = ['ECONNREFUSED', 'EHOSTUNREACH', 'ENETUNREACH']
+
+const unreachableHostCodes = new Set([...refusedCodes, 'ECONNRESET', 'ENOTFOUND', 'EAI_AGAIN'])
 
 const timedOutCodes = new Set(['ETIMEDOUT', 'UND_ERR_CONNECT_TIMEOUT'])
 
@@ -62,6 +62,75 @@ const networkReason = (code: string | undefined): ChannelTestFailureReason | und
   }
 
   return unreachableHostCodes.has(code) ? 'hostUnreachable' : undefined
+}
+
+const connectionFailureReasonSchema = z
+  .object({ code: z.string() })
+  .transform(({ code }) => networkReason(code) ?? 'hostUnreachable')
+  .catch('hostUnreachable')
+
+const resolvedAddresses = (host: string, { resolve }: AddressPolicy) =>
+  Effect.tryPromise({
+    try: () => resolve(host),
+    catch: (error) => unreachable(connectionFailureReasonSchema.parse(error)),
+  })
+
+// Connecting to the checked addresses, not the host name, keeps a second lookup from rebinding them.
+const connectAddresses = (
+  host: string,
+  addressPolicy: AddressPolicy | undefined,
+): Effect.Effect<readonly string[], ChannelUnreachable> =>
+  addressPolicy === undefined
+    ? Effect.succeed([host])
+    : Effect.flatMap(resolvedAddresses(host, addressPolicy), (addresses) => {
+        const blockedAddress = blockedAddressOf(addressPolicy, host, addresses)
+
+        return blockedAddress === undefined
+          ? Effect.succeed(addresses)
+          : Effect.fail(new ChannelUnreachable({ reason: 'addressBlocked', blockedAddress }))
+      })
+
+class ConnectFailed extends Data.TaggedError('ConnectFailed')<{
+  readonly reason: ChannelTestFailureReason
+}> {}
+
+const connectFailureCodes = new Set([...refusedCodes, ...timedOutCodes])
+
+const connectFailedAsUnreachable = <A>(
+  effect: Effect.Effect<A, ChannelUnreachable | ConnectFailed>,
+) => Effect.catchTag(effect, 'ConnectFailed', ({ reason }) => Effect.fail(unreachable(reason)))
+
+// An equal share of the timeout per address leaves a silent first address time for the next.
+const firstConnecting = <A>(
+  addresses: readonly string[],
+  timeoutMs: number,
+  attempt: (
+    address: string,
+    connectTimeoutMs: number,
+  ) => Effect.Effect<A, ChannelUnreachable | ConnectFailed>,
+): Effect.Effect<A, ChannelUnreachable> => {
+  const connectTimeoutMs = timeoutMs / Math.max(addresses.length, 1)
+
+  const tryFrom = (index: number): Effect.Effect<A, ChannelUnreachable> => {
+    const address = addresses[index]
+
+    if (address === undefined) {
+      return Effect.fail(unreachable('hostUnreachable'))
+    }
+
+    const attempted = attempt(address, connectTimeoutMs)
+
+    return index + 1 < addresses.length
+      ? Effect.catchTag(attempted, 'ConnectFailed', () => tryFrom(index + 1))
+      : connectFailedAsUnreachable(attempted)
+  }
+
+  return tryFrom(0)
+}
+
+export interface ConnectOptions {
+  timeoutMs: number
+  addressPolicy?: AddressPolicy | undefined
 }
 
 const sshLevelSchema = z.enum([
@@ -155,16 +224,66 @@ const statAndOpenDirectory = (
   })
 }
 
+export type SftpUse<A> = (
+  sftp: SFTPWrapper,
+  done: (outcome: Effect.Effect<A, ChannelUnreachable>) => void,
+  hostKey: TestedHostKey,
+) => void
+
 // Unchecked without a fingerprint, so Channels set up before host key checks keep working.
 export const sftpSession = <A>(
   login: SftpLogin,
-  timeoutMs: number,
-  use: (
-    sftp: SFTPWrapper,
-    done: (outcome: Effect.Effect<A, ChannelUnreachable>) => void,
-    hostKey: TestedHostKey,
-  ) => void,
+  { timeoutMs, addressPolicy }: ConnectOptions,
+  use: SftpUse<A>,
 ) =>
+  Effect.flatMap(connectAddresses(login.host, addressPolicy), (addresses) =>
+    firstConnecting(addresses, timeoutMs, (address, connectTimeoutMs) =>
+      Effect.scoped(
+        Effect.flatMap(tcpConnection(address, login.port, connectTimeoutMs), (socket) =>
+          sshSession(socket, login, timeoutMs, use),
+        ),
+      ),
+    ),
+  )
+
+// The connect wait and ssh2 report socket errors; this keeps a late one from crashing the process.
+const ignoreSocketError = () => {}
+
+// The scope destroys the socket on every path, also when ssh2 refuses the login before taking it.
+const openedSocket = (host: string, port: number) =>
+  Effect.acquireRelease(
+    Effect.sync(() => connect({ host, port }).on('error', ignoreSocketError)),
+    (socket) => Effect.sync(() => socket.destroy()),
+  )
+
+const socketConnecting = (socket: Socket, connectTimeoutMs: number) =>
+  Effect.callback<Socket, ConnectFailed>((resume) => {
+    const timer = setTimeout(() => {
+      resume(Effect.fail(new ConnectFailed({ reason: 'timedOut' })))
+    }, connectTimeoutMs)
+
+    const onError = (error: Error) => {
+      clearTimeout(timer)
+      resume(Effect.fail(new ConnectFailed({ reason: connectionFailureReasonSchema.parse(error) })))
+    }
+
+    socket.once('error', onError)
+    socket.once('connect', () => {
+      clearTimeout(timer)
+      socket.removeListener('error', onError)
+      resume(Effect.succeed(socket))
+    })
+
+    return Effect.sync(() => {
+      clearTimeout(timer)
+      socket.removeListener('error', onError)
+    })
+  })
+
+const tcpConnection = (host: string, port: number, connectTimeoutMs: number) =>
+  Effect.flatMap(openedSocket(host, port), (socket) => socketConnecting(socket, connectTimeoutMs))
+
+const sshSession = <A>(socket: Socket, login: SftpLogin, timeoutMs: number, use: SftpUse<A>) =>
   Effect.callback<A, ChannelUnreachable>((resume) => {
     const client = new Client()
     let settled = false
@@ -214,8 +333,7 @@ export const sftpSession = <A>(
 
     try {
       client.connect({
-        host: login.host,
-        port: login.port,
+        sock: socket,
         username: login.username,
         readyTimeout: timeoutMs,
         hostVerifier: (key: Buffer) => {
@@ -236,8 +354,8 @@ export const sftpSession = <A>(
     })
   })
 
-const reachSftp = (login: SftpLogin, timeoutMs: number) =>
-  sftpSession<TestedHostKey>(login, timeoutMs, (sftp, done, hostKey) => {
+const reachSftp = (login: SftpLogin, options: ConnectOptions) =>
+  sftpSession<TestedHostKey>(login, options, (sftp, done, hostKey) => {
     statAndOpenDirectory(sftp, login.remotePath, (outcome) => {
       done(Effect.as(outcome, hostKey))
     })
@@ -249,23 +367,105 @@ export const rejectedLoginReason = (status: number): ChannelTestFailureReason | 
 const httpStatusReason = (status: number): ChannelTestFailureReason | undefined =>
   rejectedLoginReason(status) ?? (status >= 500 ? 'unexpectedResponse' : undefined)
 
-export const fetchFailureReasonSchema = z
+const fetchFailure = z
   .object({ cause: z.object({ code: z.string() }) })
-  .transform(({ cause }) => networkReason(cause.code) ?? 'unexpectedResponse')
-  .catch('unexpectedResponse')
+  .transform(({ cause: { code } }) => code)
+  .optional()
+  .catch(undefined)
+
+// A socket error can also end a request already sent, so only one that never connected moves on.
+const requestFailure = (code: string | undefined, neverConnected: boolean) => {
+  const reason = networkReason(code) ?? 'unexpectedResponse'
+
+  return neverConnected && code !== undefined && connectFailureCodes.has(code)
+    ? new ConnectFailed({ reason })
+    : unreachable(reason)
+}
+
+const pinnedLookup =
+  (address: string): LookupFunction =>
+  (_hostname, options, callback) => {
+    if (options.all) {
+      callback(null, [{ address, family: isIP(address) }])
+    } else {
+      callback(null, address, isIP(address))
+    }
+  }
+
+interface PinnedAgent {
+  readonly agent: Agent
+  readonly connected: () => boolean
+}
+
+const pinnedAgent = (address: string, connectTimeoutMs: number): PinnedAgent => {
+  const connector = buildConnector({ lookup: pinnedLookup(address), timeout: connectTimeoutMs })
+  let connected = false
+
+  const agent = new Agent({
+    connect: (options, callback) => {
+      connector(options, (...args) => {
+        connected ||= args[0] === null
+        callback(...args)
+      })
+    },
+  })
+
+  return { agent, connected: () => connected }
+}
+
+const requesting = (url: string, init: RequestInit, pinned?: PinnedAgent) =>
+  Effect.tryPromise({
+    try: async (signal) => {
+      const response = await fetch(url, {
+        ...init,
+        redirect: 'manual',
+        signal,
+        ...(pinned && { dispatcher: pinned.agent }),
+      })
+
+      // An unread body holds its keep-alive connection until garbage collection.
+      await response.body?.cancel()
+
+      return response
+    },
+    catch: (error) =>
+      requestFailure(fetchFailure.parse(error), pinned !== undefined && !pinned.connected()),
+  })
+
+// The URL keeps its host name, so TLS still checks the certificate against it.
+export const httpRequest = (
+  url: string,
+  init: RequestInit,
+  { timeoutMs, addressPolicy }: ConnectOptions,
+) => {
+  if (addressPolicy === undefined) {
+    return connectFailedAsUnreachable(requesting(url, init))
+  }
+
+  const host = URL.parse(url)?.hostname.replace(/^\[(.*)\]$/, '$1')
+
+  if (host === undefined) {
+    return Effect.fail(unreachable('hostUnreachable'))
+  }
+
+  return Effect.flatMap(connectAddresses(host, addressPolicy), (addresses) =>
+    firstConnecting(addresses, timeoutMs, (address, connectTimeoutMs) =>
+      Effect.acquireUseRelease(
+        Effect.sync(() => pinnedAgent(address, connectTimeoutMs)),
+        (pinned) => requesting(url, init, pinned),
+        ({ agent }) => Effect.promise(() => agent.destroy()),
+      ),
+    ),
+  )
+}
 
 // HEAD sends no Document; an endpoint that only accepts POST still answers it.
-const reachHttp = ({ url, authorization }: HttpDestination) =>
-  Effect.tryPromise({
-    try: (signal) =>
-      fetch(url, {
-        method: 'HEAD',
-        redirect: 'manual',
-        headers: authorization === null ? {} : { authorization },
-        signal,
-      }),
-    catch: (error) => unreachable(fetchFailureReasonSchema.parse(error)),
-  }).pipe(
+const reachHttp = ({ url, authorization }: HttpDestination, options: ConnectOptions) =>
+  httpRequest(
+    url,
+    { method: 'HEAD', headers: authorization === null ? {} : { authorization } },
+    options,
+  ).pipe(
     Effect.flatMap((response) => {
       const reason = httpStatusReason(response.status)
 
@@ -279,8 +479,9 @@ export const timingOut = <A>(effect: Effect.Effect<A, ChannelUnreachable>, timeo
     orElse: () => Effect.fail(unreachable('timedOut')),
   })
 
-export const channelReach = ({ timeoutMs }: { timeoutMs: number }) =>
+// Optional until the api, pipeline and worker pass a policy, so they keep working meanwhile.
+export const channelReach = (options: ConnectOptions) =>
   ChannelReach.of({
-    sftp: (login) => timingOut(reachSftp(login, timeoutMs), timeoutMs),
-    http: (destination) => timingOut(reachHttp(destination), timeoutMs),
+    sftp: (login) => timingOut(reachSftp(login, options), options.timeoutMs),
+    http: (destination) => timingOut(reachHttp(destination, options), options.timeoutMs),
   })

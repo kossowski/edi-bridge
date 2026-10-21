@@ -36,6 +36,7 @@
     "ioredis": "^6.0.0",
     "postgres": "^3.4.9",
     "ssh2": "^1.17.0",
+    "undici": "^7.30.0",
     "zod": "^4.6.5"
   },
   "devDependencies": {
