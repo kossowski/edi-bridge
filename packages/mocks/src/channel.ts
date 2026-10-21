@@ -493,7 +493,8 @@ export function refusesHostKey(record: ChannelRecord) {
 }
 
 // The mock resolves no host name but localhost, so only an address literal reaches another one.
-const blockedIpv4 = /^(?:0\.0\.0\.0$|127\.|10\.|192\.168\.|169\.254\.|172\.(?:1[6-9]|2\d|3[01])\.)/
+const blockedIpv4 =
+  /^(?:0\.|127\.|10\.|192\.168\.|169\.254\.|172\.(?:1[6-9]|2\d|3[01])\.|100\.(?:6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.)/
 
 const hexGroup = (high: string, low: string) => ((Number(high) << 8) | Number(low)).toString(16)
 
@@ -513,20 +514,39 @@ function ipv6Groups(address: string): number[] {
   return [...before, ...Array.from({ length: 8 - before.length - after.length }, () => 0), ...after]
 }
 
+const ipv4Of = (high: number, low: number) =>
+  [high >> 8, high & 0xff, low >> 8, low & 0xff].join('.')
+
+const startsWith = (groups: number[], prefix: number[]) =>
+  prefix.every((group, index) => groups[index] === group)
+
+// IPv4-compatible, IPv4-mapped, SIIT and NAT64 addresses carry the IPv4 address in the last 32 bits.
+const embeddingPrefixes = [
+  [0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0xffff],
+  [0, 0, 0, 0, 0xffff, 0],
+  [0x64, 0xff9b, 0, 0, 0, 0],
+]
+
 function isBlockedAddress(address: string) {
   if (!address.includes(':')) {
     return blockedIpv4.test(address)
   }
 
   const groups = ipv6Groups(address)
-  const [first = 0, , , , , sixth = 0, seventh = 0, last = 0] = groups
+  const [first = 0, second = 0, third = 0, , , , seventh = 0, last = 0] = groups
 
-  if (groups.slice(0, 5).every((group) => group === 0) && sixth === 0xffff) {
-    return blockedIpv4.test([seventh >> 8, seventh & 0xff, last >> 8, last & 0xff].join('.'))
+  if (groups.slice(0, 7).every((group) => group === 0) && last <= 1) {
+    return true
+  }
+
+  if (embeddingPrefixes.some((prefix) => startsWith(groups, prefix))) {
+    return blockedIpv4.test(ipv4Of(seventh, last))
   }
 
   return (
-    (groups.slice(0, 7).every((group) => group === 0) && last <= 1) ||
+    startsWith(groups, [0x64, 0xff9b, 1]) ||
+    (first === 0x2002 && blockedIpv4.test(ipv4Of(second, third))) ||
     (first & 0xfe_00) === 0xfc_00 ||
     (first & 0xff_c0) === 0xfe_80
   )

@@ -454,6 +454,14 @@ describe('POST /channels/:id/test', () => {
       [sftpAt('::ffff:127.0.0.1'), '::ffff:127.0.0.1'],
       [sftpAt('0:0:0:0:0:0:0:1'), '0:0:0:0:0:0:0:1'],
       [sftpAt('fe80::1'), 'fe80::1'],
+      [sftpAt('0.1.2.3'), '0.1.2.3'],
+      [sftpAt('100.64.0.1'), '100.64.0.1'],
+      [sftpAt('100.127.255.254'), '100.127.255.254'],
+      [sftpAt('::10.0.0.1'), '::10.0.0.1'],
+      [sftpAt('::ffff:0:127.0.0.1'), '::ffff:0:127.0.0.1'],
+      [sftpAt('64:ff9b::192.168.0.1'), '64:ff9b::192.168.0.1'],
+      [sftpAt('64:ff9b:1::808:808'), '64:ff9b:1::808:808'],
+      [sftpAt('2002:a9fe:a9fe::1'), '2002:a9fe:a9fe::1'],
       [httpAt('http://192.168.1.20:8080/edi'), '192.168.1.20'],
       [httpAt('http://169.254.169.254/latest'), '169.254.169.254'],
       [httpAt('http://[::ffff:127.0.0.1]/edi'), '::ffff:7f00:1'],
@@ -474,17 +482,25 @@ describe('POST /channels/:id/test', () => {
     }
   })
 
-  it.each(['172.32.0.1', '::ffff:8.8.8.8', '2001:db8::1'])(
-    'reaches a Channel whose host is the public address %s',
-    async (host) => {
-      const existing: ChannelRecord = { ...sftpInput, id: crypto.randomUUID(), host }
-      server.use(...channelHandlers(apiUrl, { channels: [existing] }))
+  it.each([
+    '172.32.0.1',
+    '100.63.255.255',
+    '100.128.0.1',
+    '::ffff:8.8.8.8',
+    '::8.8.8.8',
+    '::ffff:0:8.8.8.8',
+    '64:ff9b::8.8.8.8',
+    '64:ff9b:2::a00:1',
+    '2002:808:808::1',
+    '2001:db8::1',
+  ])('reaches a Channel whose host is the public address %s', async (host) => {
+    const existing: ChannelRecord = { ...sftpInput, id: crypto.randomUUID(), host }
+    server.use(...channelHandlers(apiUrl, { channels: [existing] }))
 
-      expect(
-        testChannelEndpoint.response.parse((await testChannel(existing.id)).body),
-      ).toMatchObject({ outcome: 'succeeded' })
-    },
-  )
+    expect(testChannelEndpoint.response.parse((await testChannel(existing.id)).body)).toMatchObject(
+      { outcome: 'succeeded' },
+    )
+  })
 
   it('answers 404 for an unknown Channel', async () => {
     server.use(...channelHandlers(apiUrl, { channels: [] }))
