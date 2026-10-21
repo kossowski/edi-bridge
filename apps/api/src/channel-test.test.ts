@@ -232,7 +232,7 @@ describe('POST /channels/:id/test for an HTTP Channel', () => {
   })
 })
 
-describe('POST /channels/:id/test for a Channel at an internal address', () => {
+describe('POST /channels/:id/test for a Channel at a blocked address', () => {
   it('refuses an SFTP Channel whose host is a loopback address off the allow list', async () => {
     expect(await outcomeOf({ ...sftpOutbox(), host: '127.0.0.2' })).toEqual({
       outcome: 'failed',

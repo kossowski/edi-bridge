@@ -262,7 +262,7 @@ describe('the poll problem of an inbound SFTP Channel', () => {
     expect(channelsEndpoint.response.parse((await list()).json())).toMatchObject([{ pollProblem }])
   })
 
-  it('names the blocked address of a Channel at an internal address', async () => {
+  it('names the blocked address of a Channel', async () => {
     const { channel } = await created(sftpInbox)
 
     await api.connection.db

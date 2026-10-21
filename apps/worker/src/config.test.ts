@@ -22,7 +22,7 @@ describe('the Channel secret key', () => {
   })
 })
 
-describe('the hosts a Channel may reach at an internal address', () => {
+describe('the hosts a Channel may reach at a blocked address', () => {
   it('are none by default', () => {
     expect(loadConfig({}).channelAllowedHosts).toEqual([])
   })
