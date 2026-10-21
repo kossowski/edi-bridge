@@ -114,13 +114,11 @@ describe('whoFixes', () => {
   })
 
   it('leaves a blocked address to the Workspace, since a retry is refused until the Channel changes', () => {
-    expect(
-      whoFixes({
-        failureStage: 'delivery',
-        direction: 'outbound',
-        problem: { reason: 'addressBlocked' },
-      }),
-    ).toBe('you')
+    for (const direction of ['inbound', 'outbound'] as const) {
+      expect(
+        whoFixes({ failureStage: 'delivery', direction, problem: { reason: 'addressBlocked' } }),
+      ).toBe('you')
+    }
   })
 
   it('offers trying again for a defect at every Failure Stage', () => {
@@ -236,6 +234,10 @@ describe('runDetailSchema', () => {
     }
 
     expect(runDetailSchema.parse(blocked)).toEqual(blocked)
+    expect(runDetailSchema.parse({ ...blocked, direction: 'inbound' })).toMatchObject({
+      direction: 'inbound',
+      problem: { reason: 'addressBlocked', whoFixes: 'you' },
+    })
     expect(
       runDetailSchema.safeParse({
         ...blocked,
