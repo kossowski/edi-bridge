@@ -4,7 +4,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import addonMsw from 'msw-storybook-addon'
 import { NextIntlClientProvider } from 'next-intl'
 import { type ReactNode, useState } from 'react'
+import { configure } from 'storybook/test'
 
+import { apiUrl } from '@/lib/api/config'
 import { startMockWorker } from '@/lib/api/mock-worker'
 import messages from '@/messages/en.json'
 import { TooltipProvider } from '@edi-bridge/ui/components/tooltip'
@@ -19,6 +21,9 @@ function StoryQueryProvider({ children }: { children: ReactNode }) {
   return <QueryClientProvider client={client}>{children}</QueryClientProvider>
 }
 
+// Mock API responses took up to 2 s in a quiet stories run, past the default second.
+configure({ asyncUtilTimeout: 5000 })
+
 export default definePreview({
   addons: [
     addonA11y(),
@@ -27,7 +32,7 @@ export default definePreview({
       startMockWorker({
         liveEvents: 'quiet',
         quiet: true,
-        serviceWorker: { url: './mockServiceWorker.js' },
+        serviceWorker: { url: `./mock-api-worker.js?api=${encodeURIComponent(apiUrl)}` },
       }),
     ),
   ],
