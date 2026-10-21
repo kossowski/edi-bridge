@@ -21,7 +21,7 @@ import { parse, validate } from '@edi-bridge/edifact'
 import { refusesHostKey, seedChannels } from './channel'
 import { seedFlows } from './flow'
 import { seedLookupTableNamed } from './lookup-table'
-import { blockedAddressRun, createRun, createRuns, seedRuns } from './run'
+import { blockedAddressRun, createRun, createRuns, passphraseRejectedRun, seedRuns } from './run'
 import { runDetailHandlers, seedExpiredDocuments, seedReprocessed } from './run-detail'
 import { createRunStore, interchangeIdOf } from './run-store'
 import { seedTradingPartners } from './trading-partner'
@@ -589,6 +589,24 @@ describe('the problem of a failed Run', () => {
       },
       problem: {
         reason: 'addressBlocked',
+        whoFixes: 'you',
+        fixTarget: { kind: 'channel', channelId: channel.id, name: channel.name },
+      },
+    })
+  })
+
+  it('has a delivery whose private key stayed locked, fixed by you at its Channel', async () => {
+    // SAFETY: passphraseRejectedRun is built from a seeded Flow.
+    const flow = seedFlows.find(({ id }) => id === passphraseRejectedRun.flow.id)!
+    // SAFETY: every seeded Flow delivers to a seeded Channel.
+    const channel = seedChannels.find(({ id }) => id === flow.destinationChannelId)!
+    server.use(...runDetailHandlers(apiUrl, { runs: [passphraseRejectedRun] }))
+
+    expect((await getRun(passphraseRejectedRun.id)).body).toMatchObject({
+      failureStage: 'delivery',
+      error: { code: 'passphraseRejected', position: null, details: null },
+      problem: {
+        reason: 'passphraseRejected',
         whoFixes: 'you',
         fixTarget: { kind: 'channel', channelId: channel.id, name: channel.name },
       },

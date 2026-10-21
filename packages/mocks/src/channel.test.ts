@@ -21,11 +21,13 @@ import {
   createChannel,
   createChannels,
   createChannelStore,
+  passphraseProtectedChannel,
   refusesHostKey,
   seedChannels,
   seedConnectionFailures,
   serverHostKey,
   toChannel,
+  wrongPassphraseChannel,
 } from './channel'
 import { seedFlows } from './flow'
 import { seedTradingPartners } from './trading-partner'
@@ -66,7 +68,9 @@ async function listChannels() {
 function secretsOf(record: ChannelRecord): string[] {
   switch (record.type) {
     case 'sftp':
-      return [record.credential]
+      return record.passphrase === undefined
+        ? [record.credential]
+        : [record.credential, record.passphrase]
     case 'webhook':
       return [record.token]
     case 'http':
@@ -750,6 +754,173 @@ describe('the poll problem of an inbound SFTP Channel', () => {
       outcome: 'failed',
       reason: 'addressBlocked',
       blockedAddress: '10.20.0.15',
+    })
+  })
+})
+
+describe('the passphrase of an SFTP private key', () => {
+  async function getChannel(id: string) {
+    const response = await send('GET', toPath(channelEndpoint.path, { id }))
+
+    return channelEndpoint.response.parse(await response.json())
+  }
+
+  async function testChannel(id: string) {
+    const response = await send('POST', toPath(testChannelEndpoint.path, { id }))
+
+    return testChannelEndpoint.response.parse(await response.json())
+  }
+
+  // SAFETY: the fixture is an SFTP Channel with a passphrase.
+  const protectedKey = passphraseProtectedChannel as Extract<ChannelRecord, { type: 'sftp' }>
+  const passphrase = protectedKey.passphrase!
+
+  const keyInput: InboundSftpInput = {
+    ...sftpInput,
+    authentication: 'privateKey',
+    credential: protectedKey.credential,
+  }
+
+  it('is served as stored without any of its characters, and as null when there is none', async () => {
+    server.use(
+      ...channelHandlers(apiUrl, {
+        channels: [passphraseProtectedChannel, wrongPassphraseChannel],
+      }),
+    )
+    const response = await send('GET', channelsEndpoint.path)
+    const text = await response.text()
+
+    expect(text).not.toContain(passphrase)
+    expect(text).not.toContain(passphrase.slice(-4))
+    expect(await getChannel(passphraseProtectedChannel.id)).toMatchObject({
+      authentication: 'privateKey',
+      passphrase: { lastFour: null },
+    })
+    expect(toChannel({ ...sftpInput, id: crypto.randomUUID() }, apiUrl)).toHaveProperty(
+      'passphrase',
+      null,
+    )
+  })
+
+  it('is stored on create, kept when an update omits it, replaced and removed with null', async () => {
+    const store = createChannelStore([])
+    server.use(...channelHandlers(apiUrl, { channels: store }))
+
+    const created = await send('POST', createChannelEndpoint.path, { ...keyInput, passphrase })
+    const { channel } = createChannelEndpoint.response.parse(await created.json())
+    const path = toPath(updateChannelEndpoint.path, channel)
+
+    expect(channel).toMatchObject({ passphrase: { lastFour: null } })
+    expect(store.get(channel.id)).toMatchObject({ passphrase })
+
+    await send('PUT', path, { ...keyInput, credential: undefined, name: 'Renamed' })
+
+    expect(store.get(channel.id)).toMatchObject({ name: 'Renamed', passphrase })
+
+    await send('PUT', path, { ...keyInput, passphrase: 'another passphrase' })
+
+    expect(store.get(channel.id)).toMatchObject({ passphrase: 'another passphrase' })
+
+    const removed = await send('PUT', path, { ...keyInput, passphrase: null })
+
+    expect(updateChannelEndpoint.response.parse(await removed.json())).toMatchObject({
+      passphrase: null,
+    })
+    expect(store.get(channel.id)).not.toHaveProperty('passphrase')
+  })
+
+  it('is dropped when the Channel switches to a password', async () => {
+    const store = createChannelStore([passphraseProtectedChannel])
+    server.use(...channelHandlers(apiUrl, { channels: store }))
+
+    const response = await send('PUT', toPath(updateChannelEndpoint.path, protectedKey), {
+      ...protectedKey,
+      authentication: 'password',
+      credential: 'a password',
+      passphrase: undefined,
+    })
+
+    expect(updateChannelEndpoint.response.parse(await response.json())).toMatchObject({
+      passphrase: null,
+    })
+    expect(store.get(protectedKey.id)).not.toHaveProperty('passphrase')
+  })
+
+  it('is refused for a password', async () => {
+    server.use(...channelHandlers(apiUrl, { channels: [] }))
+
+    const response = await send('POST', createChannelEndpoint.path, { ...sftpInput, passphrase })
+
+    expect(response.status).toBe(400)
+  })
+
+  it('unlocks a protected key, so the Channel test passes', async () => {
+    server.use(...channelHandlers(apiUrl, { channels: [passphraseProtectedChannel] }))
+
+    expect(await testChannel(protectedKey.id)).toMatchObject({ outcome: 'succeeded' })
+  })
+
+  it('fails the Channel test with passphraseRejected when it is wrong or missing', async () => {
+    const missing: ChannelRecord = { ...keyInput, id: crypto.randomUUID() }
+    server.use(...channelHandlers(apiUrl, { channels: [wrongPassphraseChannel, missing] }))
+
+    for (const { id } of [wrongPassphraseChannel, missing]) {
+      expect(await testChannel(id)).toEqual({
+        outcome: 'failed',
+        reason: 'passphraseRejected',
+        testedAt: expect.any(String),
+        hostKey: null,
+      })
+    }
+  })
+
+  it('passes the Channel test once the right passphrase is given', async () => {
+    server.use(...channelHandlers(apiUrl, { channels: [wrongPassphraseChannel] }))
+
+    await send('PUT', toPath(updateChannelEndpoint.path, wrongPassphraseChannel), {
+      ...keyInput,
+      credential: undefined,
+      passphrase,
+    })
+
+    expect(await testChannel(wrongPassphraseChannel.id)).toMatchObject({ outcome: 'succeeded' })
+  })
+
+  it('is any passphrase for a key the mock does not know, but never none', async () => {
+    const unknownKey =
+      '-----BEGIN ENCRYPTED PRIVATE KEY-----\nMIIFHz\n-----END ENCRYPTED PRIVATE KEY-----'
+
+    const unlocked: ChannelRecord = {
+      ...keyInput,
+      id: crypto.randomUUID(),
+      credential: unknownKey,
+      passphrase: 'whatever',
+    }
+
+    const locked: ChannelRecord = { ...keyInput, id: crypto.randomUUID(), credential: unknownKey }
+
+    const plainKey: ChannelRecord = {
+      ...keyInput,
+      id: crypto.randomUUID(),
+      credential: '-----BEGIN OPENSSH PRIVATE KEY-----\nb3Blbn\n-----END OPENSSH PRIVATE KEY-----',
+    }
+
+    server.use(...channelHandlers(apiUrl, { channels: [unlocked, locked, plainKey] }))
+
+    expect(await testChannel(unlocked.id)).toMatchObject({ outcome: 'succeeded' })
+    expect(await testChannel(locked.id)).toMatchObject({ reason: 'passphraseRejected' })
+    expect(await testChannel(plainKey.id)).toMatchObject({ outcome: 'succeeded' })
+  })
+
+  it('shows a poll problem on an inbound Channel with a wrong passphrase', async () => {
+    server.use(...channelHandlers(apiUrl, { channels: [wrongPassphraseChannel] }))
+
+    expect(await getChannel(wrongPassphraseChannel.id)).toMatchObject({
+      type: 'sftp',
+      direction: 'inbound',
+      authentication: 'privateKey',
+      passphrase: { lastFour: null },
+      pollProblem: { reason: 'passphraseRejected' },
     })
   })
 })

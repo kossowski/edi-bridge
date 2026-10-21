@@ -41,6 +41,7 @@ export type GeneratedErrorCode =
   | 'destinationUnavailable'
   | 'hostKeyMismatch'
   | 'addressBlocked'
+  | 'passphraseRejected'
   | 'glnMissing'
   | 'channelDefect'
   | 'characterSetUnsupported'
@@ -53,6 +54,7 @@ type ProblemFields = Pick<RunSummary, 'id' | 'messageType' | 'flow' | 'failureSt
   defect?: boolean | undefined
   refusedHostKey?: boolean | undefined
   refusedAddress?: boolean | undefined
+  rejectedPassphrase?: boolean | undefined
 }
 
 export type BrokenPiece =
@@ -97,6 +99,13 @@ const setupErrors: Record<SetupPiece, GeneratedError> = {
     position: null,
     details: null,
   },
+}
+
+const passphraseRejectedError: GeneratedError = {
+  code: 'passphraseRejected',
+  message: 'The passphrase of the Channel does not unlock its private key',
+  position: null,
+  details: null,
 }
 
 // A separate seed keeps the Messages of the other Runs as they were.
@@ -266,6 +275,10 @@ export function problemReasonOf(
 
       if (run.refusedAddress) {
         return 'addressBlocked'
+      }
+
+      if (run.rejectedPassphrase) {
+        return 'passphraseRejected'
       }
 
       return incompleteSetupOf(run) === null ? 'unreachable' : 'incompleteSetup'
@@ -622,6 +635,10 @@ function failureOf(run: RunSummary, faker: Faker, { fault, broken }: FaultyMessa
 
   if (run.problem?.reason === 'addressBlocked') {
     return { error: addressBlockedError, broken: null }
+  }
+
+  if (run.problem?.reason === 'passphraseRejected') {
+    return { error: passphraseRejectedError, broken: null }
   }
 
   const incompleteSetup = incompleteSetupOf(run)

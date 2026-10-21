@@ -119,11 +119,13 @@ export {
   createChannel,
   createChannels,
   createChannelStore,
+  passphraseProtectedChannel,
   randomWebhookToken,
   seedChannels,
   serverHostKey,
   seedConnectionFailures,
   toChannel,
+  wrongPassphraseChannel,
 } from './channel'
 
 export {
@@ -267,6 +269,7 @@ export {
   blockedAddressRun,
   createRun,
   createRuns,
+  passphraseRejectedRun,
   type RunFields,
   runsHandler,
   seedRuns,

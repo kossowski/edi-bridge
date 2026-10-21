@@ -34,6 +34,7 @@ const reasons = {
   destinationUnavailable: 'unreachable',
   hostKeyMismatch: 'hostKeyMismatch',
   addressBlocked: 'addressBlocked',
+  passphraseRejected: 'passphraseRejected',
   glnMissing: 'incompleteSetup',
   channelDefect: 'incompleteSetup',
   characterSetUnsupported: 'incompleteSetup',
@@ -138,7 +139,9 @@ function fixTargetOf(
     }
 
     case 'you': {
-      return reason === 'hostKeyMismatch' || reason === 'addressBlocked'
+      return reason === 'hostKeyMismatch' ||
+        reason === 'addressBlocked' ||
+        reason === 'passphraseRejected'
         ? destinationChannelTarget(run, sources)
         : brokenPieceTarget(run, broken, mapping, sources)
     }
