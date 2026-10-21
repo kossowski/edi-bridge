@@ -21,7 +21,7 @@ import { parse, validate } from '@edi-bridge/edifact'
 import { refusesHostKey, seedChannels } from './channel'
 import { seedFlows } from './flow'
 import { seedLookupTableNamed } from './lookup-table'
-import { createRun, createRuns, seedRuns } from './run'
+import { blockedAddressRun, createRun, createRuns, seedRuns } from './run'
 import { runDetailHandlers, seedExpiredDocuments, seedReprocessed } from './run-detail'
 import { createRunStore, interchangeIdOf } from './run-store'
 import { seedTradingPartners } from './trading-partner'
@@ -567,6 +567,26 @@ describe('the problem of a failed Run', () => {
       error: { code: 'hostKeyMismatch', position: null },
       problem: {
         reason: 'hostKeyMismatch',
+        whoFixes: 'you',
+        fixTarget: { kind: 'channel', channelId: channel.id, name: channel.name },
+      },
+    })
+  })
+
+  it('has a delivery refused for a blocked address, fixed by you at its Channel', async () => {
+    const flow = seedFlows.find(({ id }) => id === blockedAddressRun.flow.id)!
+    const channel = seedChannels.find(({ id }) => id === flow.destinationChannelId)!
+    server.use(...runDetailHandlers(apiUrl, { runs: [blockedAddressRun] }))
+
+    expect((await getRun(blockedAddressRun.id)).body).toMatchObject({
+      failureStage: 'delivery',
+      error: {
+        code: 'addressBlocked',
+        position: null,
+        details: { kind: 'blockedAddress', address: '10.20.0.15' },
+      },
+      problem: {
+        reason: 'addressBlocked',
         whoFixes: 'you',
         fixTarget: { kind: 'channel', channelId: channel.id, name: channel.name },
       },

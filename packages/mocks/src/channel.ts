@@ -327,9 +327,9 @@ export const seedChannels: ReadonlyArray<ChannelRecord> = [
   ...postponedOutboundSeeds,
 ].map(parseRecord)
 
-const internalHost = '10.20.0.15'
+export const internalHost = '10.20.0.15'
 
-// Not a seed, so the seeded screens keep their Channels: pass it to channelHandlers to show it.
+// Not a seed, so the seeded screens keep their Channels.
 export const blockedAddressChannel: ChannelRecord = parseRecord({
   id: seedId(3, 900),
   type: 'sftp',
