@@ -154,6 +154,12 @@ describe('channelReach for a host name', () => {
     })
   })
 
+  it('refuses an HTTP Channel whose URL has no host it can check', async () => {
+    expect(await failure(reachVia().http(httpAt('not a url')))).toMatchObject({
+      reason: 'hostUnreachable',
+    })
+  })
+
   it('reports a host name that does not resolve as unreachable', async () => {
     expect(await failure(reachVia().sftp(sftpLoginAt('sftp.nowhere.test')))).toMatchObject({
       reason: 'hostUnreachable',

@@ -336,10 +336,14 @@ export const httpRequest = (
   init: RequestInit,
   addressPolicy: AddressPolicy | undefined,
 ) => {
+  if (addressPolicy === undefined) {
+    return requesting(url, init)
+  }
+
   const host = URL.parse(url)?.hostname.replace(/^\[(.*)\]$/, '$1')
 
-  if (addressPolicy === undefined || host === undefined) {
-    return requesting(url, init)
+  if (host === undefined) {
+    return Effect.fail(unreachable('hostUnreachable'))
   }
 
   return Effect.flatMap(connectAddress(host, addressPolicy), (address) =>
