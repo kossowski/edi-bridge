@@ -186,12 +186,25 @@ const startPolling = async (
 
   await Effect.runPromise(clock.setTime(startedAt))
 
+  let sleeps = 0
+
+  // Counts each sleep of the poller, so a test knows a check ended before the clock moves on.
+  const countingClock: Clock.Clock = {
+    ...clock,
+    sleep: (duration) =>
+      Effect.suspend(() => {
+        sleeps += 1
+
+        return clock.sleep(duration)
+      }),
+  }
+
   const polling = Effect.runFork(
     pollInboundChannels().pipe(
       Effect.provideService(DefectReporter, defects.service),
       pipelineServices(db, inMemoryRunQueue()),
       Effect.provideService(Download, recording.service),
-      Effect.provideService(Clock.Clock, clock),
+      Effect.provideService(Clock.Clock, countingClock),
       Effect.provide(
         Logger.layer([Logger.make(({ message, cause }) => logs.push({ message, cause }))]),
       ),
@@ -224,6 +237,7 @@ const startPolling = async (
     lists,
     operations,
     minutesPass,
+    sleeps: () => sleeps,
     polled,
     // A file is received at the second poll that lists it unchanged.
     pollAgain: async (channelId: string, times = 1) => {
@@ -1047,9 +1061,11 @@ describe('the polling loop', () => {
       defects,
     })
 
+    // The loop sleeps after each check, so the clock moves on only once a check has ended.
     const reportsAfterCheck = async (times: number, reports: number) => {
       await vi.waitFor(() => {
         expect(checks).toBe(times)
+        expect(polling.sleeps()).toBe(times)
         expect(defects.reported).toHaveLength(reports)
       }, wait)
     }
