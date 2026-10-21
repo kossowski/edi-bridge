@@ -96,6 +96,11 @@ interface KindHandling<K extends Kind> {
 
 type KindHandlings = { [K in Kind]: KindHandling<K> }
 
+const pollProblemOf = ({ pollProblemReason, pollProblemSince }: Row) =>
+  pollProblemReason === null || pollProblemSince === null
+    ? null
+    : { reason: pollProblemReason, since: pollProblemSince.toISOString() }
+
 const kinds: KindHandlings = {
   sftp: {
     responseFields: (row) => ({
@@ -106,7 +111,10 @@ const kinds: KindHandlings = {
       authentication: row.authentication,
       credential: hidden,
       hostKeyFingerprint: row.hostKeyFingerprint,
-      ...(row.direction === 'inbound' && { pollingIntervalMinutes: row.pollingIntervalMinutes }),
+      ...(row.direction === 'inbound' && {
+        pollingIntervalMinutes: row.pollingIntervalMinutes,
+        pollProblem: pollProblemOf(row),
+      }),
     }),
     columns: (input) => ({
       host: input.host,
