@@ -227,7 +227,18 @@ const outboundChannel = (): SftpChannel => ({
   remotePath: '/upload',
   authentication: 'password',
   encryptedCredential: secrets.seal(sftp.password, `channels/${channelId}/encryptedCredential`),
+  encryptedPassphrase: null,
   hostKeyFingerprint: null,
+})
+
+const protectedKeyChannel = (passphraseContext: string): SftpChannel => ({
+  ...outboundChannel(),
+  authentication: 'privateKey',
+  encryptedCredential: secrets.seal(
+    sftp.protectedKey.privateKey,
+    `channels/${channelId}/encryptedCredential`,
+  ),
+  encryptedPassphrase: secrets.seal(sftp.protectedKey.passphrase, passphraseContext),
 })
 
 describe('sftpChannelDelivery', () => {
@@ -255,6 +266,29 @@ describe('sftpChannelDelivery', () => {
     )
 
     expect(await remoteListing('/upload')).toContain('desadv-8.edi')
+  })
+
+  it('opens the sealed passphrase of the channel and unlocks its private key', async () => {
+    await Effect.runPromise(
+      deliver(
+        protectedKeyChannel(`channels/${channelId}/encryptedPassphrase`),
+        interchange('desadv-11.edi'),
+      ),
+    )
+
+    expect(await remoteListing('/upload')).toContain('desadv-11.edi')
+  })
+
+  it('refuses a passphrase sealed for another column', async () => {
+    const exit = await Effect.runPromiseExit(
+      deliver(
+        protectedKeyChannel(`channels/${channelId}/encryptedCredential`),
+        interchange('desadv-12.edi'),
+      ),
+    )
+
+    expect(Exit.hasDies(exit)).toBe(true)
+    expect(await remoteListing('/upload')).not.toContain('desadv-12.edi')
   })
 
   it('checks the host key against the fingerprint the channel stores', async () => {

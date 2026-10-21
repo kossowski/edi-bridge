@@ -553,6 +553,7 @@ const sftpChannel = {
   username: 'edi_bridge',
   remotePath: '/upload',
   authentication: 'password' as const,
+  encryptedPassphrase: null,
   encryptedCredential: secrets.seal('password', `channels/${channelId}/encryptedCredential`),
   hostKeyFingerprint: null,
 }

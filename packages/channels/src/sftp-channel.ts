@@ -12,6 +12,7 @@ export interface SftpChannel {
   remotePath: string | null
   authentication: SftpAuthentication | null
   encryptedCredential: string | null
+  encryptedPassphrase: string | null
   hostKeyFingerprint: HostKeyFingerprint | null
 }
 
@@ -25,6 +26,7 @@ export const sftpLogin = (secrets: SecretBox, channel: SftpChannel): SftpLogin =
     remotePath,
     authentication,
     encryptedCredential,
+    encryptedPassphrase,
     hostKeyFingerprint,
   } = channel
 
@@ -41,6 +43,11 @@ export const sftpLogin = (secrets: SecretBox, channel: SftpChannel): SftpLogin =
 
   const credential = secrets.open(encryptedCredential, secretContext(id, 'encryptedCredential'))
 
+  const passphrase =
+    encryptedPassphrase === null
+      ? undefined
+      : secrets.open(encryptedPassphrase, secretContext(id, 'encryptedPassphrase'))
+
   return {
     host,
     port,
@@ -48,6 +55,8 @@ export const sftpLogin = (secrets: SecretBox, channel: SftpChannel): SftpLogin =
     remotePath,
     hostKeyFingerprint,
     credential:
-      authentication === 'password' ? { password: credential } : { privateKey: credential },
+      authentication === 'password'
+        ? { password: credential }
+        : { privateKey: credential, ...(passphrase !== undefined && { passphrase }) },
   }
 }
