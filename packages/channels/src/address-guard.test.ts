@@ -1,5 +1,6 @@
 import { Effect } from 'effect'
 import { createServer as createHttpServer } from 'node:http'
+import { connect, createServer as createTcpServer } from 'node:net'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 import {
@@ -289,9 +290,133 @@ describe('channelReach connects to the checked address', () => {
   })
 })
 
-const blocking = { timeoutMs, addressPolicy: addressPolicy([]) }
-
 const order = { name: 'orders-42-1.json', content: Buffer.from('{"orderNumber":"PO-4711"}') }
+
+// The test servers listen on 127.0.0.1 only, so 127.0.0.2 and 127.0.0.3 refuse the connection.
+const countingLookups = (name: string, ...addresses: string[]) => {
+  const lookups: string[] = []
+
+  const resolve: HostResolver = (host) => {
+    lookups.push(host)
+
+    return resolving(name, ...addresses)(host)
+  }
+
+  return { lookups, resolve }
+}
+
+// Forwards to the SFTP container from 127.0.0.1 only and counts the connections it accepts.
+const startSftpForwarder = async () => {
+  const connections: unknown[] = []
+
+  const forwarder = createTcpServer((socket) => {
+    connections.push(socket)
+
+    const upstream = connect(sftp.port, sftp.host)
+
+    socket.pipe(upstream).pipe(socket)
+    socket.on('error', () => upstream.destroy())
+    upstream.on('error', () => socket.destroy())
+  })
+
+  const port = await listening(forwarder)
+
+  return {
+    port,
+    connections,
+    stop: () => {
+      forwarder.close()
+    },
+  }
+}
+
+describe('channelReach tries the checked addresses in order', () => {
+  const reachVia = (resolve: HostResolver) =>
+    channelReach({ timeoutMs, addressPolicy: addressPolicy(['127.0.0.0/8'], resolve) })
+
+  it('sends an HTTP request to the next address when the first refuses', async () => {
+    const { lookups, resolve } = countingLookups('erp.partner.test', '127.0.0.2', '127.0.0.1')
+
+    expect(
+      await succeeded(reachVia(resolve).http(httpAt(`http://erp.partner.test:${erpPort()}/`))),
+    ).toBe('succeeded')
+    expect(erp.received[0]?.headers.host).toBe(`erp.partner.test:${erpPort()}`)
+    expect(lookups).toEqual(['erp.partner.test'])
+  })
+
+  it('posts a delivery to the next address when the first refuses', async () => {
+    const { resolve } = countingLookups('erp.partner.test', '127.0.0.2', '127.0.0.1')
+
+    await Effect.runPromise(
+      postHttp(httpAt(`http://erp.partner.test:${erpPort()}/`), order, {
+        timeoutMs,
+        addressPolicy: addressPolicy(['127.0.0.0/8'], resolve),
+      }),
+    )
+
+    expect(erp.received).toHaveLength(1)
+  })
+
+  it('does not send an HTTP request again after an answer it rejects', async () => {
+    const { resolve } = countingLookups('erp.partner.test', '127.0.0.1', '127.0.0.1')
+
+    expect(
+      await failure(
+        reachVia(resolve).http(httpAt(`http://erp.partner.test:${erpPort()}/?status=500`)),
+      ),
+    ).toMatchObject({ reason: 'unexpectedResponse' })
+    expect(erp.received).toHaveLength(1)
+  })
+
+  it('reports a host whose every address refuses as unreachable', async () => {
+    const { resolve } = countingLookups('erp.partner.test', '127.0.0.2', '127.0.0.3')
+
+    expect(
+      await failure(reachVia(resolve).http(httpAt(`http://erp.partner.test:${erpPort()}/`))),
+    ).toMatchObject({ reason: 'hostUnreachable' })
+  })
+
+  it('opens the SFTP session at the next address when the first refuses', async () => {
+    const forwarder = await startSftpForwarder()
+    const { lookups, resolve } = countingLookups('sftp.partner.test', '127.0.0.2', '127.0.0.1')
+
+    try {
+      expect(
+        await succeeded(
+          reachVia(resolve).sftp({
+            ...sftpLoginAt('sftp.partner.test', forwarder.port),
+            credential: { password: sftp.password },
+          }),
+        ),
+      ).toBe('succeeded')
+      expect(forwarder.connections).toHaveLength(1)
+      expect(lookups).toEqual(['sftp.partner.test'])
+    } finally {
+      forwarder.stop()
+    }
+  })
+
+  it('does not open another SFTP session after a rejected login', async () => {
+    const forwarder = await startSftpForwarder()
+    const { resolve } = countingLookups('sftp.partner.test', '127.0.0.1', '127.0.0.1')
+
+    try {
+      expect(
+        await failure(
+          reachVia(resolve).sftp({
+            ...sftpLoginAt('sftp.partner.test', forwarder.port),
+            credential: { password: 'wrong-password' },
+          }),
+        ),
+      ).toMatchObject({ reason: 'loginRejected' })
+      expect(forwarder.connections).toHaveLength(1)
+    } finally {
+      forwarder.stop()
+    }
+  })
+})
+
+const blocking = { timeoutMs, addressPolicy: addressPolicy([]) }
 
 const blockedDelivery = (address: string) =>
   new DeliveryFailed({

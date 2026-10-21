@@ -28,15 +28,15 @@ const postHeaders = (authorization: string | null, document: OutboundDocument) =
 export const postHttp = (
   { url, authorization }: HttpDestination,
   document: OutboundDocument,
-  { timeoutMs, addressPolicy }: ConnectOptions,
+  options: ConnectOptions,
 ) =>
   timingOut(
     httpRequest(
       url,
       { method: 'POST', headers: postHeaders(authorization, document), body: document.content },
-      addressPolicy,
+      options,
     ),
-    timeoutMs,
+    options.timeoutMs,
   ).pipe(
     Effect.mapError(deliveryFailed),
     Effect.flatMap((response) => (response.ok ? Effect.void : answerFailure(response.status))),
