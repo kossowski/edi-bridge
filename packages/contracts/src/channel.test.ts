@@ -87,6 +87,7 @@ const sftpChannel: Channel = {
   authentication: 'password',
   credential: { lastFour: null },
   pollingIntervalMinutes: 1,
+  pollProblem: null,
 }
 
 describe('channelInputSchema', () => {
@@ -225,6 +226,10 @@ describe('the poll problem of a Channel', () => {
     expect(channelSchema.parse({ ...sftpChannel, pollProblem: null })).toMatchObject({
       pollProblem: null,
     })
+  })
+
+  it('is always returned for an inbound SFTP Channel', () => {
+    expect(channelSchema.safeParse({ ...sftpChannel, pollProblem: undefined }).success).toBe(false)
   })
 
   it('only takes a reason a Channel test can fail with', () => {
