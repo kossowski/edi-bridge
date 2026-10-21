@@ -6,7 +6,7 @@ import { pollingIntervalMinutes } from '@edi-bridge/contracts'
 import { channels } from '@edi-bridge/db'
 
 import { type DecodedDocument, decodeDocument } from './decode-document'
-import { reportDefectOf } from './defect-report'
+import { logAndReportDefect } from './defect-report'
 import { receive } from './receive'
 import { Database, Download } from './services'
 
@@ -27,11 +27,6 @@ const channelDefect = (channel: InboundChannel) =>
     channelId: channel.id,
     code: 'channelDefect',
   }) as const
-
-const logAndReport = (channel: InboundChannel, message: string) => (cause: Cause.Cause<unknown>) =>
-  Effect.logError(message, cause).pipe(
-    Effect.andThen(reportDefectOf(channelDefect(channel), cause)),
-  )
 
 const fileKey = ({ name, size, modifiedAt }: SftpFile) =>
   JSON.stringify([name, size, modifiedAt.getTime()])
@@ -89,8 +84,8 @@ const receiveFile = (channel: InboundChannel, file: SftpFile, state: ChannelPoll
     yield* storeAndRemove(channel, file, decodeDocument(content), state)
   }).pipe(
     Effect.catchCause(
-      logAndReport(
-        channel,
+      logAndReportDefect(
+        channelDefect(channel),
         `File ${file.name} of Channel ${channel.id} not received or not removed`,
       ),
     ),
@@ -150,7 +145,10 @@ const pollChannel = (channel: InboundChannel, state: ChannelPolling) =>
       if (state.storedNotRemoved.has(fileKey(file))) {
         yield* removeStored(channel, file, state).pipe(
           Effect.catchCause(
-            logAndReport(channel, `Stored file ${file.name} of Channel ${channel.id} not removed`),
+            logAndReportDefect(
+              channelDefect(channel),
+              `Stored file ${file.name} of Channel ${channel.id} not removed`,
+            ),
           ),
         )
       } else if (unchanged(file, previous.get(file.name))) {
@@ -235,15 +233,18 @@ export const pollInboundChannels = (minute: Duration.Input = Duration.minutes(1)
 
         // Each Channel polls in its own fiber, so a failure or defect stops only that Channel.
         yield* pollChannel(channel, state).pipe(
-          // A failed poll is stored on the Channel, a defect is reported instead.
+          // A failed poll stores its reason on the Channel; a defect is reported and stores none.
           Effect.catchCause((cause) =>
-            logAndReport(
-              channel,
+            logAndReportDefect(
+              channelDefect(channel),
               `Inbound Channel ${channel.id} not polled${reasonOf(cause)}`,
             )(cause).pipe(Effect.andThen(storePollProblem(channel, cause, new Date(now)))),
           ),
           Effect.catchCause(
-            logAndReport(channel, `Poll problem of Inbound Channel ${channel.id} not stored`),
+            logAndReportDefect(
+              channelDefect(channel),
+              `Poll problem of Inbound Channel ${channel.id} not stored`,
+            ),
           ),
           Effect.ensuring(
             Effect.sync(() => {
@@ -256,11 +257,7 @@ export const pollInboundChannels = (minute: Duration.Input = Duration.minutes(1)
     })
 
     return yield* pollDue.pipe(
-      Effect.catchCause((cause) =>
-        Effect.logError('Inbound Channels not polled', cause).pipe(
-          Effect.andThen(reportDefectOf(pollingDefect, cause)),
-        ),
-      ),
+      Effect.catchCause(logAndReportDefect(pollingDefect, 'Inbound Channels not polled')),
       Effect.repeat(Schedule.fixed(checkEvery)),
     )
   })

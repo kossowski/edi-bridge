@@ -1,7 +1,7 @@
-import { type Cause, type Duration, Effect, Schedule } from 'effect'
+import { type Duration, Effect, Schedule } from 'effect'
 
 import { sendAcknowledgements } from './acknowledgement'
-import { reportDefectOf } from './defect-report'
+import { logAndReportDefect } from './defect-report'
 import { deleteExpiredDocuments } from './delete-expired-documents'
 import { markOverdueInterchanges } from './mark-overdue-interchanges'
 import { queueReceivedRuns } from './queue-received-runs'
@@ -15,8 +15,7 @@ const sweepDefect = {
   code: 'sweepDefect',
 } as const
 
-const logAndReport = (message: string) => (cause: Cause.Cause<unknown>) =>
-  Effect.logError(message, cause).pipe(Effect.andThen(reportDefectOf(sweepDefect, cause)))
+const logAndReport = (message: string) => logAndReportDefect(sweepDefect, message)
 
 // A failed sweep leaves its Runs as they are, and the next one tries them again.
 export const sweepRunsEvery = ({

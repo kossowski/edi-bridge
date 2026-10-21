@@ -9,7 +9,7 @@ export type DefectCode =
 
 export type DefectCause = { name: string; frames: string[] }
 
-// A defect of the sweep or the polling loop has no Run, and one of the loop no Workspace either.
+// A defect of a poll or the sweep has no Run, and one of the whole polling loop no Workspace either.
 export type DefectReport = {
   workspaceId: string | null
   runId: string | null
@@ -77,6 +77,11 @@ export const reportDefectOf = (
 
   return Result.isSuccess(defect) ? reportDefect(report, defect.success) : Effect.void
 }
+
+// Every failure is logged, and only a defect is reported to error monitoring.
+export const logAndReportDefect =
+  (report: Omit<DefectReport, 'cause'>, message: string) => (cause: Cause.Cause<unknown>) =>
+    Effect.logError(message, cause).pipe(Effect.andThen(reportDefectOf(report, cause)))
 
 // A defect the pipeline finds itself has no cause to report but its own.
 export const reportFoundDefect = (message: string, ids: RunDefectIds) =>

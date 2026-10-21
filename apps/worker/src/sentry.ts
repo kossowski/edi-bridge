@@ -54,7 +54,6 @@ type DefectTags = {
   failureCode: DefectCode
 }
 
-// A defect of a poll or the sweep has no Run, and one of the whole loop no Workspace either.
 const tagsOf = ({ workspaceId, runId, tradingPartnerId, channelId, code }: DefectReport) => {
   const tags: DefectTags = { failureCode: code }
 
