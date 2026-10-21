@@ -527,8 +527,9 @@ describe('the polling of inbound SFTP Channels', () => {
 
     await polling.pollAgain(healthy.channelId)
     await removed(healthy)
-    await polling.polled(badCredentialId, 2)
-    await polling.polled(unreachableId, 2)
+    // A failed poll ends after it stores its poll problem, so the clock moves on until it ran again.
+    await polling.polledOnceMore(badCredentialId, 2)
+    await polling.polledOnceMore(unreachableId, 2)
   })
 
   it('refuses a server whose host key does not match and logs the mismatch with the Channel', async () => {
