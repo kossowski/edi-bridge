@@ -1961,6 +1961,7 @@
       "succeeded": "The connection works.",
       "testedAt": "Tested <when>{time}</when>.",
       "requestFailed": "The test could not run. Try again.",
+      "changeAddress": "Change the server address",
       "failed": {
         "hostKeyMismatch": {
           "title": "The server showed a different key.",
@@ -1991,8 +1992,8 @@
           "hint": "Check the address. If it is right, ask the other side's IT team to look at their server's log."
         },
         "addressBlocked": {
-          "title": "The server address points to an internal network.",
-          "hint": "EDI Bridge does not connect to internal addresses. Check the server address of this connection."
+          "title": "The server address resolves to the internal address {address}.",
+          "hint": "EDI Bridge does not connect to internal addresses. Change the server address, or, if the server is reached over a private network, ask the Operator to allow this address."
         },
         "seededChannel": {
           "title": "This is a demo connection.",

@@ -27,3 +27,8 @@ export function pollProblemFix(
       return { target: 'settings', href: `/channels/${channelId}/edit` }
   }
 }
+
+// Every failure message takes the address, so one call fits each reason.
+export function failureValues(failure: { blockedAddress?: string | undefined }) {
+  return { address: failure.blockedAddress ?? '' }
+}

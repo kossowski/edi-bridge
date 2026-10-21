@@ -8,6 +8,7 @@ import Link from 'next/link'
 import type { ReactNode } from 'react'
 
 import {
+  failureValues,
   isInboundSftp,
   pollProblemFix,
   pollProblemOf,
@@ -74,7 +75,7 @@ function PollProblemNotice({
         <h2 id="channel-poll-problem" className="text-destructive-text font-semibold">
           {t('title')}
         </h2>
-        <p className="font-medium">{tFailed(`${problem.reason}.title`)}</p>
+        <p className="font-medium">{tFailed(`${problem.reason}.title`, failureValues(problem))}</p>
         <p>{tFailed(`${problem.reason}.hint`)}</p>
         <p>{t.rich('since', { ...since, minutes: channel.pollingIntervalMinutes })}</p>
         {canChange ? (
@@ -112,7 +113,9 @@ function PollProblemLine({ channelId, problem }: { channelId: string; problem: P
       <p className="flex flex-wrap gap-x-2 gap-y-0.5">
         <span className="text-destructive-text font-medium">{t.rich('listSince', since)}</span>
         {/* Below xl the reason and fix wrap the Name cell; the Channel page shows them. */}
-        <span className="hidden xl:inline">{tFailed(`${problem.reason}.title`)}</span>
+        <span className="hidden xl:inline">
+          {tFailed(`${problem.reason}.title`, failureValues(problem))}
+        </span>
         {canChange && (
           <FixLink channelId={channelId} problem={problem} className="relative hidden xl:inline" />
         )}

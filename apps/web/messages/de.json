@@ -1961,6 +1961,7 @@
       "succeeded": "Die Verbindung funktioniert.",
       "testedAt": "Getestet <when>{time}</when>.",
       "requestFailed": "Der Test konnte nicht laufen. Versuchen Sie es erneut.",
+      "changeAddress": "Serveradresse ändern",
       "failed": {
         "hostKeyMismatch": {
           "title": "Der Server hat einen anderen Serverschlüssel gezeigt.",
@@ -1991,8 +1992,8 @@
           "hint": "Prüfen Sie die Adresse. Stimmt sie, bitten Sie die IT der Gegenseite, das Protokoll ihres Servers anzusehen."
         },
         "addressBlocked": {
-          "title": "Die Serveradresse zeigt in ein internes Netz.",
-          "hint": "EDI Bridge verbindet sich nicht mit internen Adressen. Prüfen Sie die Serveradresse dieser Verbindung."
+          "title": "Die Serveradresse führt zur internen Adresse {address}.",
+          "hint": "EDI Bridge verbindet sich nicht mit internen Adressen. Ändern Sie die Serveradresse, oder bitten Sie den Operator, diese Adresse freizugeben, wenn der Server über ein privates Netz erreichbar ist."
         },
         "seededChannel": {
           "title": "Das ist eine Demo-Verbindung.",
