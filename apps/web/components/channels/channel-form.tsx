@@ -59,8 +59,10 @@ function useFieldErrorMessage() {
       case 'format':
         return isFieldOfKind(field, 'format') ? t(`format.${field}`) : t('invalid')
       case 'required':
-        // A blank fingerprint is never required: it leaves the Channel unchecked.
-        return isFieldOfKind(field, 'choice') || field === 'hostKeyFingerprint'
+        // A blank fingerprint leaves the Channel unchecked, a blank passphrase the key unlocked.
+        return isFieldOfKind(field, 'choice') ||
+          field === 'hostKeyFingerprint' ||
+          field === 'passphrase'
           ? t('invalid')
           : t(`required.${field}`)
     }
@@ -183,6 +185,42 @@ export function focusFirstError(form: HTMLFormElement | null, errors: ChannelFie
   form?.querySelector<HTMLElement>(`[name="${first}"]`)?.focus()
 }
 
+function PassphraseFields({
+  fields,
+  values,
+  stored,
+}: {
+  fields: ChannelFields
+  values: ChannelFormValues
+  stored: boolean
+}) {
+  const t = useTranslations('ChannelForm.fields')
+
+  return (
+    <>
+      {stored && (
+        <label className="flex w-fit cursor-pointer items-center gap-2 text-sm font-medium">
+          <Checkbox
+            checked={values.removePassphrase}
+            onCheckedChange={(checked) => fields.update('removePassphrase', checked)}
+          />
+          {t('removePassphrase.label')}
+        </label>
+      )}
+      {!values.removePassphrase && (
+        <TextField
+          {...fields.field('passphrase')}
+          autoComplete="new-password"
+          description={stored ? t('passphrase.keep') : t('passphrase.description')}
+          label={t('passphrase.label')}
+          type="password"
+          className="sm:w-80"
+        />
+      )}
+    </>
+  )
+}
+
 export function ChannelKindFields({
   fields,
   values,
@@ -198,6 +236,12 @@ export function ChannelKindFields({
   const kind = channelKindOf(values.kind)
   const credential = field('credential')
   const authorization = field('authorization')
+
+  // A stored passphrase belongs to the stored key, so it only counts while the key stays.
+  const storedPassphrase =
+    channel?.type === 'sftp' &&
+    channel.authentication === 'privateKey' &&
+    channel.passphrase != null
 
   const credentialDescription = channel
     ? t('fields.credential.keep')
@@ -295,6 +339,9 @@ export function ChannelKindFields({
               type="password"
               className="sm:w-80"
             />
+          )}
+          {values.authentication === 'privateKey' && (
+            <PassphraseFields fields={fields} stored={storedPassphrase} values={values} />
           )}
         </Fieldset>
       )}

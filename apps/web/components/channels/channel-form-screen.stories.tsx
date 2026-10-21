@@ -1,12 +1,19 @@
+import { getRouter } from '@storybook/nextjs-vite/navigation.mock'
 import { delay, http, HttpResponse } from 'msw'
 import { NextIntlClientProvider } from 'next-intl'
-import { expect, userEvent, waitFor } from 'storybook/test'
+import { expect, screen, userEvent, waitFor } from 'storybook/test'
 
 import { EditChannelScreen, NewChannelScreen } from '@/components/channels/channel-form-screen'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
 import { channelEndpoint, updateChannelEndpoint } from '@edi-bridge/contracts'
-import { createHandlers, seedChannels } from '@edi-bridge/mocks'
+import {
+  channelHandlers,
+  createChannelStore,
+  createHandlers,
+  passphraseProtectedChannel,
+  seedChannels,
+} from '@edi-bridge/mocks'
 
 import preview from '../../.storybook/preview'
 
@@ -141,6 +148,74 @@ export const EditUncheckedHostKey = meta.story({
   render: () => <EditChannelScreen id={uncheckedInbox.id} />,
   async play({ canvas }) {
     await expect(await canvas.findByLabelText('Host key fingerprint (optional)')).toHaveValue('')
+  },
+})
+
+async function choosePrivateKey(canvas: { getByRole: typeof screen.getByRole }) {
+  await userEvent.click(canvas.getByRole('combobox', { name: 'Authentication' }))
+  await userEvent.click(await screen.findByRole('option', { name: 'Private key' }))
+  await waitFor(() => expect(screen.queryByRole('listbox')).toBeNull())
+}
+
+export const NewPrivateKeyPassphrase = meta.story({
+  async play({ canvas }) {
+    await expect(canvas.queryByLabelText('Passphrase (optional)')).toBeNull()
+    await choosePrivateKey(canvas)
+
+    const passphrase = canvas.getByLabelText('Passphrase (optional)')
+    await expect(passphrase).toHaveAttribute('type', 'password')
+    await expect(passphrase).toHaveValue('')
+    await expect(passphrase).toHaveAccessibleDescription(
+      /^Only for a private key protected by a passphrase/,
+    )
+    await expect(
+      canvas.queryByRole('checkbox', { name: 'Remove the stored passphrase' }),
+    ).toBeNull()
+  },
+})
+
+let protectedStore = createChannelStore([passphraseProtectedChannel])
+
+export const EditStoredPassphrase = meta.story({
+  render: () => <EditChannelScreen id={passphraseProtectedChannel.id} />,
+  beforeEach({ msw }) {
+    protectedStore = createChannelStore([passphraseProtectedChannel])
+    msw.use(...channelHandlers(apiUrl, { channels: protectedStore }))
+  },
+  async play({ canvas }) {
+    const passphrase = await canvas.findByLabelText('Passphrase (optional)')
+    await expect(passphrase).toHaveValue('')
+    await expect(passphrase).toHaveAccessibleDescription(
+      'Stored encrypted and never shown again. Leave blank to keep the current one.',
+    )
+
+    await userEvent.click(canvas.getByRole('checkbox', { name: 'Remove the stored passphrase' }))
+    await expect(canvas.queryByLabelText('Passphrase (optional)')).toBeNull()
+    await userEvent.click(canvas.getByRole('button', { name: 'Save changes' }))
+    await waitFor(() =>
+      expect(getRouter().push).toHaveBeenCalledWith(`/channels/${passphraseProtectedChannel.id}`),
+    )
+    await expect(protectedStore.get(passphraseProtectedChannel.id)).not.toHaveProperty('passphrase')
+  },
+})
+
+export const GermanPassphrase = meta.story({
+  render: () => <EditChannelScreen id={passphraseProtectedChannel.id} />,
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="de" messages={messagesDe} timeZone="Europe/Berlin">
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
+  beforeEach({ msw }) {
+    msw.use(...channelHandlers(apiUrl, { channels: [passphraseProtectedChannel] }))
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByLabelText('Passphrase (optional)')).toBeVisible()
+    await expect(
+      canvas.getByRole('checkbox', { name: 'Gespeicherte Passphrase entfernen' }),
+    ).not.toBeChecked()
   },
 })
 

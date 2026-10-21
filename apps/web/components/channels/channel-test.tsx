@@ -6,7 +6,11 @@ import { useMutation, type UseMutationResult, useQueryClient } from '@tanstack/r
 import { useFormatter, useNow, useTranslations } from 'next-intl'
 import Link from 'next/link'
 
-import { failureValues, pollProblemFix } from '@/components/channels/poll-problem-fix'
+import {
+  failureValues,
+  pollProblemFix,
+  type PollProblemFix,
+} from '@/components/channels/poll-problem-fix'
 import { linkClass } from '@/components/detail-parts'
 import { acceptHostKey, testChannel } from '@/lib/api/client'
 import { storeSavedChannel } from '@/lib/api/queries'
@@ -88,6 +92,16 @@ function TestedKey({
   )
 }
 
+function FixLink({ fix }: { fix: PollProblemFix }) {
+  const t = useTranslations('Channel.pollProblem.fix')
+
+  return (
+    <Link href={fix.href} className={cn(linkClass, 'w-fit')}>
+      {t(fix.target)}
+    </Link>
+  )
+}
+
 function TestOutcome({
   channel,
   result,
@@ -98,7 +112,6 @@ function TestOutcome({
   accept: AcceptMutation
 }) {
   const t = useTranslations('Channel.test')
-  const tFix = useTranslations('Channel.pollProblem.fix')
   const format = useFormatter()
   const now = useNow({ updateInterval: 30_000 })
 
@@ -144,12 +157,8 @@ function TestOutcome({
         </p>
         <p>{t(`failed.${result.reason}.hint`)}</p>
         <p>{tested}</p>
-        {result.reason === 'addressBlocked' && (
-          <Link
-            href={pollProblemFix(channel.id, result.reason).href}
-            className={cn(linkClass, 'w-fit')}>
-            {tFix('address')}
-          </Link>
+        {(result.reason === 'addressBlocked' || result.reason === 'passphraseRejected') && (
+          <FixLink fix={pollProblemFix(channel.id, result.reason)} />
         )}
         {hostKey}
       </div>

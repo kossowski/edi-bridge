@@ -43,6 +43,8 @@ export type ChannelFormValues = {
   remotePath: string
   authentication: SftpAuthentication
   credential: string
+  passphrase: string
+  removePassphrase: boolean
   hostKeyFingerprint: string
   pollingIntervalMinutes: string
   rateLimitPerMinute: string
@@ -51,7 +53,10 @@ export type ChannelFormValues = {
   authorization: string
 }
 
-export type ChannelField = Exclude<keyof ChannelFormValues, 'kind' | 'sendAuthorization'>
+export type ChannelField = Exclude<
+  keyof ChannelFormValues,
+  'kind' | 'sendAuthorization' | 'removePassphrase'
+>
 
 export type FieldError = 'required' | 'tooLong' | 'range' | 'format'
 
@@ -71,6 +76,7 @@ const fieldKinds = {
   pollingIntervalMinutes: 'number',
   authentication: 'choice',
   credential: 'text',
+  passphrase: 'text',
   rateLimitPerMinute: 'number',
   url: 'format',
   authorization: 'text',
@@ -110,7 +116,22 @@ function emptyToUndefined(value: string) {
   return value === '' ? undefined : value
 }
 
-function toBody(values: ChannelFormValues, secrets: { keep: boolean }) {
+type Secrets = { keep: false } | { keep: true; storedPassphrase: boolean }
+
+// Blank keeps the stored passphrase; only a private key takes one, so a password drops it.
+function passphraseOf(values: ChannelFormValues, secrets: Secrets) {
+  if (!secrets.keep) {
+    return values.authentication === 'privateKey' ? emptyToUndefined(values.passphrase) : undefined
+  }
+
+  if (values.authentication === 'privateKey') {
+    return values.removePassphrase ? null : emptyToUndefined(values.passphrase)
+  }
+
+  return secrets.storedPassphrase ? null : undefined
+}
+
+function toBody(values: ChannelFormValues, secrets: Secrets) {
   const kind = channelKindOf(values.kind)
 
   const common = {
@@ -122,7 +143,9 @@ function toBody(values: ChannelFormValues, secrets: { keep: boolean }) {
   const credential = secrets.keep ? emptyToUndefined(values.credential) : values.credential
 
   switch (kind.type) {
-    case 'sftp':
+    case 'sftp': {
+      const passphrase = passphraseOf(values, secrets)
+
       return {
         ...common,
         host: values.host,
@@ -131,12 +154,15 @@ function toBody(values: ChannelFormValues, secrets: { keep: boolean }) {
         remotePath: values.remotePath,
         authentication: values.authentication,
         credential,
+        ...(passphrase !== undefined && { passphrase }),
         hostKeyFingerprint:
           values.hostKeyFingerprint.trim() === '' ? null : values.hostKeyFingerprint,
         ...(kind.direction === 'inbound' && {
           pollingIntervalMinutes: toNumber(values.pollingIntervalMinutes),
         }),
       }
+    }
+
     case 'webhook':
       return { ...common, rateLimitPerMinute: toNumber(values.rateLimitPerMinute) }
     case 'http':
@@ -172,7 +198,11 @@ export function validateChannelUpdate(
   values: ChannelFormValues,
   existing: Channel,
 ): ChannelFormResult<ChannelUpdate> {
-  const body = toBody(values, { keep: true })
+  const body = toBody(values, {
+    keep: true,
+    storedPassphrase: existing.type === 'sftp' && existing.passphrase != null,
+  })
+
   const parsed = channelUpdateSchema.safeParse(body)
   const errors = parsed.success ? {} : collectErrors(parsed.error.issues, values)
 
@@ -208,6 +238,8 @@ export function toFormValues(channel?: Channel): ChannelFormValues {
     remotePath: '/',
     authentication: 'password',
     credential: '',
+    passphrase: '',
+    removePassphrase: false,
     hostKeyFingerprint: '',
     pollingIntervalMinutes: String(pollingIntervalMinutes.default),
     rateLimitPerMinute: String(webhookRateLimitPerMinute.default),

@@ -70,6 +70,11 @@ function ConnectionFacts({ channel }: { channel: Channel }) {
           <Fact label={tChannel(`authentication.${channel.authentication}`)}>
             <MaskedSecretText secret={channel.credential} />
           </Fact>
+          {channel.authentication === 'privateKey' && (
+            <Fact label={t('passphrase')}>
+              <MaskedSecretText secret={channel.passphrase ?? null} />
+            </Fact>
+          )}
           {channel.direction === 'inbound' && (
             <Fact label={t('pollingInterval')}>
               {tChannel('every', { minutes: channel.pollingIntervalMinutes })}

@@ -149,24 +149,31 @@ function useProblemText(run: FailedRun) {
   }
 }
 
+type ChannelSetting = 'address' | 'passphrase'
+
+const channelSettingLabels = {
+  address: 'channelAddress',
+  passphrase: 'channelPassphrase',
+} as const satisfies Record<ChannelSetting, string>
+
 function FixLink({
   target,
   runId,
   primary,
-  changeAddress = false,
+  channelSetting,
 }: {
   target: FixTarget
   runId: string
   primary: boolean
-  changeAddress?: boolean
+  channelSetting?: ChannelSetting | undefined
 }) {
   const t = useTranslations('Document.problem.fixLink')
   const canChange = useCanChange()
-  // Only an Admin can open the Channel settings; a Viewer sees the Channel's address on its page.
-  const channelSettings = changeAddress && canChange && target.kind === 'channel'
+  // Only an Admin can open the Channel settings; a Viewer sees the Channel on its page.
+  const channelSettings = channelSetting !== undefined && canChange && target.kind === 'channel'
 
   const label = channelSettings
-    ? t('channelAddress', { name: target.name })
+    ? t(channelSettingLabels[channelSetting], { name: target.name })
     : target.kind === 'lookupTable'
       ? t('lookupTable', { code: target.code, name: target.name })
       : t(target.kind, { name: target.name })
@@ -195,21 +202,21 @@ function StepBody({ text, children }: { text: string; children?: ReactNode }) {
 
 type FixLinkOptions = {
   primary: boolean
-  // Sends an Admin to the Channel settings to change its server address.
-  changeAddress?: boolean
+  // Sends an Admin to the Channel settings to change this setting.
+  channelSetting?: ChannelSetting
 }
 
 function fixStep(
   text: string,
   run: FailedRun,
   target: FixTarget,
-  { primary, changeAddress = false }: FixLinkOptions,
+  { primary, channelSetting }: FixLinkOptions,
 ): WhatToDoStep {
   return {
     key: 'fix',
     content: (
       <StepBody text={text}>
-        <FixLink changeAddress={changeAddress} primary={primary} runId={run.id} target={target} />
+        <FixLink channelSetting={channelSetting} primary={primary} runId={run.id} target={target} />
       </StepBody>
     ),
   }
@@ -250,8 +257,24 @@ export function useFixSteps(run: FailedRun): WhatToDoStep[] {
         return [
           fixStep(t('changeAddress', { address: blockedAddressOf(run) }), run, target, {
             primary: true,
-            changeAddress: true,
+            channelSetting: 'address',
           }),
+          { key: 'tryAgain', content: <TryAgainStep run={run} secondary /> },
+        ]
+      }
+
+      // A retry fails until the passphrase on the Channel unlocks its private key.
+      if (problem.reason === 'passphraseRejected' && target) {
+        return [
+          fixStep(
+            t('correctPassphrase', {
+              direction: run.direction,
+              tradingPartner: tradingPartner.name,
+            }),
+            run,
+            target,
+            { primary: true, channelSetting: 'passphrase' },
+          ),
           { key: 'tryAgain', content: <TryAgainStep run={run} secondary /> },
         ]
       }

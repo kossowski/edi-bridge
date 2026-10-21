@@ -18,8 +18,10 @@ import {
   channelHandlers,
   type ChannelRecord,
   createHandlers,
+  passphraseProtectedChannel,
   seedChannels,
   serverHostKey,
+  wrongPassphraseChannel,
 } from '@edi-bridge/mocks'
 
 import preview from '../../.storybook/preview'
@@ -200,6 +202,75 @@ export const PollProblemAddressBlockedGerman = meta.story({
     await userEvent.click(section.getByRole('button', { name: /^Verbindung testen/ }))
     await expect(await section.findByText(refused)).toBeVisible()
     await expect(section.getByRole('link', { name: 'Serveradresse ändern' })).toBeVisible()
+  },
+})
+
+function passphraseFact(canvasElement: HTMLElement) {
+  // SAFETY: every Fact pairs its dt label with the dd that follows it.
+  return within(canvasElement).getByText('Passphrase', { selector: 'dt' }).nextElementSibling!
+}
+
+export const StoredPassphrase = meta.story({
+  args: { id: passphraseProtectedChannel.id },
+  beforeEach({ msw }) {
+    msw.use(...channelHandlers(apiUrl, { channels: [passphraseProtectedChannel] }))
+  },
+  async play({ canvas, canvasElement }) {
+    await canvas.findByRole('heading', { level: 1, name: passphraseProtectedChannel.name })
+    await expect(passphraseFact(canvasElement)).toHaveTextContent(/Set$/)
+    await expect(canvas.queryByText('harbour lights 1907')).toBeNull()
+  },
+})
+
+export const PollProblemPassphraseRejected = meta.story({
+  args: { id: wrongPassphraseChannel.id },
+  beforeEach({ msw }) {
+    msw.use(...channelHandlers(apiUrl, { channels: [wrongPassphraseChannel] }))
+  },
+  async play({ canvas, canvasElement }) {
+    await canvas.findByRole('heading', { level: 2, name: 'Polling failed' })
+    const problem = pollProblemSection(canvasElement)
+    const rejected = 'The private key could not be unlocked.'
+    await expect(problem.getByText(rejected)).toBeVisible()
+    await expect(problem.getByRole('link', { name: 'Correct the passphrase' })).toHaveAttribute(
+      'href',
+      `/channels/${wrongPassphraseChannel.id}/edit`,
+    )
+
+    const section = hostKeySection(canvasElement)
+    await userEvent.click(section.getByRole('button', { name: /^Test connection/ }))
+    await expect(await section.findByText(rejected)).toBeVisible()
+    await expect(section.getByRole('link', { name: 'Correct the passphrase' })).toHaveAttribute(
+      'href',
+      `/channels/${wrongPassphraseChannel.id}/edit`,
+    )
+  },
+})
+
+export const PollProblemPassphraseRejectedGerman = meta.story({
+  args: { id: wrongPassphraseChannel.id },
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="de" messages={messagesDe} timeZone="Europe/Berlin">
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
+  beforeEach({ msw }) {
+    msw.use(...channelHandlers(apiUrl, { channels: [wrongPassphraseChannel] }))
+  },
+  async play({ canvas, canvasElement }) {
+    await canvas.findByRole('heading', { level: 2, name: 'Abfrage fehlgeschlagen' })
+
+    const problem = within(
+      within(canvasElement).getByRole('region', { name: 'Abfrage fehlgeschlagen' }),
+    )
+
+    await expect(
+      problem.getByText('Der private Schlüssel ließ sich nicht entsperren.'),
+    ).toBeVisible()
+    await expect(problem.getByRole('link', { name: 'Passphrase korrigieren' })).toBeVisible()
+    await expect(passphraseFact(canvasElement)).toHaveTextContent(/Gesetzt$/)
   },
 })
 
