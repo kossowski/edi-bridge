@@ -6,7 +6,7 @@ import { pollingIntervalMinutes } from '@edi-bridge/contracts'
 import { channels } from '@edi-bridge/db'
 
 import { type DecodedDocument, decodeDocument } from './decode-document'
-import { logAndReportDefect } from './defect-report'
+import { defectSource, type DefectSource } from './defect-report'
 import { receive } from './receive'
 import { Database, Download } from './services'
 
@@ -17,6 +17,7 @@ type ChannelPolling = {
   lastPollAt: number | undefined
   listed: ReadonlyMap<string, SftpFile>
   storedNotRemoved: Set<string>
+  defects: DefectSource
 }
 
 const channelDefect = (channel: InboundChannel) =>
@@ -84,8 +85,7 @@ const receiveFile = (channel: InboundChannel, file: SftpFile, state: ChannelPoll
     yield* storeAndRemove(channel, file, decodeDocument(content), state)
   }).pipe(
     Effect.catchCause(
-      logAndReportDefect(
-        channelDefect(channel),
+      state.defects.logAndReport(
         `File ${file.name} of Channel ${channel.id} not received or not removed`,
       ),
     ),
@@ -145,8 +145,7 @@ const pollChannel = (channel: InboundChannel, state: ChannelPolling) =>
       if (state.storedNotRemoved.has(fileKey(file))) {
         yield* removeStored(channel, file, state).pipe(
           Effect.catchCause(
-            logAndReportDefect(
-              channelDefect(channel),
+            state.defects.logAndReport(
               `Stored file ${file.name} of Channel ${channel.id} not removed`,
             ),
           ),
@@ -179,20 +178,20 @@ const inboundSftpChannels = Effect.gen(function* () {
   )
 })
 
-const pollingDefect = {
-  workspaceId: null,
-  runId: null,
-  tradingPartnerId: null,
-  channelId: null,
-  code: 'pollingDefect',
-} as const
-
 export const pollInboundChannels = (minute: Duration.Input = Duration.minutes(1)) =>
   Effect.gen(function* () {
     const minuteLength = Duration.fromInputUnsafe(minute)
     // Polling intervals are whole minutes, so a check every minute meets each of them.
     const checkEvery = Duration.times(minuteLength, pollingIntervalMinutes.min)
     const states = new Map<string, ChannelPolling>()
+
+    const loopDefects = defectSource({
+      workspaceId: null,
+      runId: null,
+      tradingPartnerId: null,
+      channelId: null,
+      code: 'pollingDefect',
+    })
 
     // Each check reads the Channels again, so a created or changed one needs no restart.
     const pollDue = Effect.gen(function* () {
@@ -212,6 +211,7 @@ export const pollInboundChannels = (minute: Duration.Input = Duration.minutes(1)
           lastPollAt: undefined,
           listed: new Map(),
           storedNotRemoved: new Set(),
+          defects: defectSource(channelDefect(channel)),
         }
 
         const interval = Duration.toMillis(
@@ -233,18 +233,15 @@ export const pollInboundChannels = (minute: Duration.Input = Duration.minutes(1)
 
         // Each Channel polls in its own fiber, so a failure or defect stops only that Channel.
         yield* pollChannel(channel, state).pipe(
+          state.defects.succeeding,
           // A failed poll stores its reason on the Channel; a defect is reported and stores none.
           Effect.catchCause((cause) =>
-            logAndReportDefect(
-              channelDefect(channel),
-              `Inbound Channel ${channel.id} not polled${reasonOf(cause)}`,
-            )(cause).pipe(Effect.andThen(storePollProblem(channel, cause, new Date(now)))),
+            state.defects
+              .logAndReport(`Inbound Channel ${channel.id} not polled${reasonOf(cause)}`)(cause)
+              .pipe(Effect.andThen(storePollProblem(channel, cause, new Date(now)))),
           ),
           Effect.catchCause(
-            logAndReportDefect(
-              channelDefect(channel),
-              `Poll problem of Inbound Channel ${channel.id} not stored`,
-            ),
+            state.defects.logAndReport(`Poll problem of Inbound Channel ${channel.id} not stored`),
           ),
           Effect.ensuring(
             Effect.sync(() => {
@@ -257,7 +254,8 @@ export const pollInboundChannels = (minute: Duration.Input = Duration.minutes(1)
     })
 
     return yield* pollDue.pipe(
-      Effect.catchCause(logAndReportDefect(pollingDefect, 'Inbound Channels not polled')),
+      loopDefects.succeeding,
+      Effect.catchCause(loopDefects.logAndReport('Inbound Channels not polled')),
       Effect.repeat(Schedule.fixed(checkEvery)),
     )
   })

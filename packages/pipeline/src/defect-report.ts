@@ -68,20 +68,52 @@ export const reportDefect = (report: Omit<DefectReport, 'cause'>, cause: unknown
     ),
   )
 
-// An expected failure, such as an unreachable queue or SFTP server, is no defect.
-export const reportDefectOf = (
-  report: Omit<DefectReport, 'cause'>,
-  cause: Cause.Cause<unknown>,
-) => {
-  const defect = Cause.findDefect(cause)
+export type DefectSource = ReturnType<typeof defectSource>
 
-  return Result.isSuccess(defect) ? reportDefect(report, defect.success) : Effect.void
+// A source that keeps failing, as during a database outage, reports its defect once until it succeeds again.
+export const defectSource = (report: Omit<DefectReport, 'cause'>) => {
+  let reported = false
+  let defects = 0
+
+  const reportOnce = (cause: Cause.Cause<unknown>) =>
+    Effect.suspend(() => {
+      const defect = Cause.findDefect(cause)
+
+      // An expected failure, such as an unreachable queue or SFTP server, is no defect.
+      if (Result.isFailure(defect)) {
+        return Effect.void
+      }
+
+      defects += 1
+
+      if (reported) {
+        return Effect.void
+      }
+
+      reported = true
+
+      return reportDefect(report, defect.success)
+    })
+
+  return {
+    // Every failure is logged, and only a defect is reported to error monitoring.
+    logAndReport: (message: string) => (cause: Cause.Cause<unknown>) =>
+      Effect.logError(message, cause).pipe(Effect.andThen(reportOnce(cause))),
+    // The source succeeds when the effect succeeds without a defect of the source meanwhile.
+    succeeding: <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+      Effect.suspend(() => {
+        const before = defects
+
+        return Effect.tap(effect, () =>
+          Effect.sync(() => {
+            if (defects === before) {
+              reported = false
+            }
+          }),
+        )
+      }),
+  }
 }
-
-// Every failure is logged, and only a defect is reported to error monitoring.
-export const logAndReportDefect =
-  (report: Omit<DefectReport, 'cause'>, message: string) => (cause: Cause.Cause<unknown>) =>
-    Effect.logError(message, cause).pipe(Effect.andThen(reportDefectOf(report, cause)))
 
 // A defect the pipeline finds itself has no cause to report but its own.
 export const reportFoundDefect = (message: string, ids: RunDefectIds) =>

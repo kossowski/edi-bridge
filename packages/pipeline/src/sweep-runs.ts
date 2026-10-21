@@ -1,7 +1,7 @@
 import { type Duration, Effect, Schedule } from 'effect'
 
 import { sendAcknowledgements } from './acknowledgement'
-import { logAndReportDefect } from './defect-report'
+import { defectSource } from './defect-report'
 import { deleteExpiredDocuments } from './delete-expired-documents'
 import { markOverdueInterchanges } from './mark-overdue-interchanges'
 import { queueReceivedRuns } from './queue-received-runs'
@@ -15,7 +15,12 @@ const sweepDefect = {
   code: 'sweepDefect',
 } as const
 
-const logAndReport = (message: string) => logAndReportDefect(sweepDefect, message)
+// Each step is a source of its own, so a defect of one step is reported apart from the others.
+const sweepStep = <E, R>(step: Effect.Effect<void, E, R>, message: string) => {
+  const defects = defectSource(sweepDefect)
+
+  return step.pipe(defects.succeeding, Effect.catchCause(defects.logAndReport(message)))
+}
 
 // A failed sweep leaves its Runs as they are, and the next one tries them again.
 export const sweepRunsEvery = ({
@@ -27,14 +32,12 @@ export const sweepRunsEvery = ({
 }) =>
   Effect.all(
     [
-      sweepStuckRuns(stuckAfter).pipe(Effect.catchCause(logAndReport('Stuck Runs not swept'))),
-      queueReceivedRuns.pipe(Effect.catchCause(logAndReport('Received Runs not queued'))),
-      markOverdueInterchanges.pipe(
-        Effect.catchCause(logAndReport('Overdue Interchanges not marked')),
-      ),
+      sweepStep(sweepStuckRuns(stuckAfter), 'Stuck Runs not swept'),
+      sweepStep(queueReceivedRuns, 'Received Runs not queued'),
+      sweepStep(markOverdueInterchanges, 'Overdue Interchanges not marked'),
       // A CONTRL attempt older than the bound of a stuck Run was cut off or failed.
-      sendAcknowledgements(stuckAfter).pipe(Effect.catchCause(logAndReport('CONTRLs not sent'))),
-      deleteExpiredDocuments.pipe(Effect.catchCause(logAndReport('Expired Documents not deleted'))),
+      sweepStep(sendAcknowledgements(stuckAfter), 'CONTRLs not sent'),
+      sweepStep(deleteExpiredDocuments, 'Expired Documents not deleted'),
     ],
     { discard: true },
   ).pipe(Effect.repeat(Schedule.spaced(interval)))

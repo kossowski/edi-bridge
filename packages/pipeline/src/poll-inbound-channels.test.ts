@@ -888,6 +888,39 @@ describe('the polling of inbound SFTP Channels', () => {
     }, wait)
   })
 
+  it('reports a repeating defect of a Channel once until a poll of that Channel succeeds', async () => {
+    const box = await outbox()
+    const defects = recordingDefectReporter()
+    let broken = true
+
+    const polling = await startPolling(
+      {
+        ...download,
+        list: (channel) =>
+          broken ? Effect.die(new Error('listing broke')) : download.list(channel),
+      },
+      [],
+      { defects },
+    )
+
+    const reportsAfterPoll = async (times: number, reports: number) => {
+      await polling.polled(box.channelId, times)
+      await vi.waitFor(() => {
+        expect(defects.reported).toHaveLength(reports)
+      }, wait)
+    }
+
+    await reportsAfterPoll(1, 1)
+    await polling.minutesPass(1)
+    await reportsAfterPoll(2, 1)
+    broken = false
+    await polling.minutesPass(1)
+    await reportsAfterPoll(3, 1)
+    broken = true
+    await polling.minutesPass(1)
+    await reportsAfterPoll(4, 2)
+  })
+
   it('reports a defect while receiving a file to error monitoring with its Channel', async () => {
     const box = await outbox({ 'orders.edi': threeOrders })
     const defects = recordingDefectReporter()
@@ -941,15 +974,10 @@ describe('the polling of inbound SFTP Channels', () => {
       expect(defects.reported).not.toEqual([])
     }, wait)
 
-    // Each later poll tries the removal again, and each attempt is a defect of its own.
-    for (const report of defects.reported) {
-      expect(report).toMatchObject({
-        workspaceId: workspace.id,
-        runId: null,
-        channelId: box.channelId,
-        code: 'channelDefect',
-      })
-    }
+    // Each later poll tries the removal again, and the repeating defect is reported once.
+    expect(defects.reported).toMatchObject([
+      { workspaceId: workspace.id, runId: null, channelId: box.channelId, code: 'channelDefect' },
+    ])
   })
 
   it('reports no failed poll to error monitoring', async () => {
@@ -1003,5 +1031,37 @@ describe('the polling loop', () => {
         },
       ])
     }, wait)
+  })
+
+  it('reports a repeating defect of the loop once until a check of the Channels succeeds', async () => {
+    const defects = recordingDefectReporter()
+    let broken = true
+    let checks = 0
+
+    const polling = await startPolling(download, [], {
+      db: breakingDatabase(connection.db, 'select', () => {
+        checks += 1
+
+        return broken
+      }),
+      defects,
+    })
+
+    const reportsAfterCheck = async (times: number, reports: number) => {
+      await vi.waitFor(() => {
+        expect(checks).toBe(times)
+        expect(defects.reported).toHaveLength(reports)
+      }, wait)
+    }
+
+    await reportsAfterCheck(1, 1)
+    await polling.minutesPass(1)
+    await reportsAfterCheck(2, 1)
+    broken = false
+    await polling.minutesPass(1)
+    await reportsAfterCheck(3, 1)
+    broken = true
+    await polling.minutesPass(1)
+    await reportsAfterCheck(4, 2)
   })
 })

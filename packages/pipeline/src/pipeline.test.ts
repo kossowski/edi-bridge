@@ -63,7 +63,14 @@ import {
   sweepStuckRuns,
 } from './index'
 import { contentHashOf } from './receive'
-import { type Database, type Delivery, Documents, type RunQueue } from './services'
+import {
+  type Database,
+  type Delivery,
+  Documents,
+  type QueuedRun,
+  type RunQueue,
+  type RunQueueService,
+} from './services'
 import {
   addContrlFlow,
   addOrdersFlow,
@@ -727,6 +734,59 @@ describe('the sweep of received Runs', () => {
         code: 'sweepDefect',
       })
     }
+  })
+
+  it('reports a repeating defect of a step once until that step succeeds', async () => {
+    const defects = recordingDefectReporter()
+    const { runId } = await receiveInvoice(goldenInvoice, inMemoryRunQueue({ failures: 1 }))
+    let broken = true
+    let attempts = 0
+
+    const queue = {
+      service: {
+        enqueue: (run: QueuedRun) =>
+          Effect.suspend(() => {
+            if (run.runId !== runId) {
+              return Effect.void
+            }
+
+            attempts += 1
+
+            return broken ? Effect.die(new Error('The queue broke')) : Effect.void
+          }),
+      } satisfies RunQueueService,
+    }
+
+    const reportsAfterSweeps = async (sweeps: number, reports: number) => {
+      const before = attempts
+
+      await vi.waitFor(
+        () => {
+          expect(attempts).toBeGreaterThanOrEqual(before + sweeps)
+        },
+        { timeout: 2000, interval: 20 },
+      )
+      expect(defects.reported).toHaveLength(reports)
+    }
+
+    const sweeping = Effect.runFork(
+      sweepRunsEvery({ interval: '20 millis', stuckAfter: '10 minutes' }).pipe(
+        Effect.provideService(DefectReporter, defects.service),
+        pipelineServices(connection.db, queue),
+      ),
+    )
+
+    try {
+      await reportsAfterSweeps(3, 1)
+      broken = false
+      await reportsAfterSweeps(2, 1)
+      broken = true
+      await reportsAfterSweeps(3, 2)
+    } finally {
+      await Effect.runPromise(Fiber.interrupt(sweeping))
+    }
+
+    expect(defects.reported).toMatchObject([{ code: 'sweepDefect' }, { code: 'sweepDefect' }])
   })
 
   it('reports no queue it could not reach to error monitoring', async () => {
