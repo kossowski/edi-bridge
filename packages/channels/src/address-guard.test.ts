@@ -1,7 +1,7 @@
 import { Effect } from 'effect'
 import { createServer as createHttpServer } from 'node:http'
-import { connect, createServer as createTcpServer } from 'node:net'
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { connect, createServer as createTcpServer, type Socket } from 'node:net'
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   addressPolicy,
@@ -307,7 +307,7 @@ const countingLookups = (name: string, ...addresses: string[]) => {
 
 // Forwards to the SFTP container from 127.0.0.1 only and counts the connections it accepts.
 const startSftpForwarder = async () => {
-  const connections: unknown[] = []
+  const connections: Socket[] = []
 
   const forwarder = createTcpServer((socket) => {
     connections.push(socket)
@@ -391,6 +391,27 @@ describe('channelReach tries the checked addresses in order', () => {
       ).toBe('succeeded')
       expect(forwarder.connections).toHaveLength(1)
       expect(lookups).toEqual(['sftp.partner.test'])
+    } finally {
+      forwarder.stop()
+    }
+  })
+
+  it('closes the connection when the private key cannot be parsed', async () => {
+    const forwarder = await startSftpForwarder()
+    const { resolve } = countingLookups('sftp.partner.test', '127.0.0.1')
+
+    try {
+      expect(
+        await failure(
+          reachVia(resolve).sftp({
+            ...sftpLoginAt('sftp.partner.test', forwarder.port),
+            credential: { privateKey: 'not a private key' },
+          }),
+        ),
+      ).toMatchObject({ reason: 'loginRejected' })
+      await vi.waitFor(() => {
+        expect(forwarder.connections.map(({ destroyed }) => destroyed)).toEqual([true])
+      })
     } finally {
       forwarder.stop()
     }

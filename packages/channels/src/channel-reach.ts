@@ -249,19 +249,27 @@ export const sftpSession = <A>(
 ) =>
   Effect.flatMap(connectAddresses(login.host, addressPolicy), (addresses) =>
     firstConnecting(addresses, timeoutMs, (address, connectTimeoutMs) =>
-      Effect.flatMap(tcpConnection(address, login.port, connectTimeoutMs), (socket) =>
-        sshSession(socket, login, timeoutMs, use),
+      Effect.scoped(
+        Effect.flatMap(tcpConnection(address, login.port, connectTimeoutMs), (socket) =>
+          sshSession(socket, login, timeoutMs, use),
+        ),
       ),
     ),
   )
 
-const tcpConnection = (host: string, port: number, connectTimeoutMs: number) =>
-  Effect.callback<Socket, ConnectFailed>((resume) => {
-    const socket = connect({ host, port })
-    let connected = false
+// The connect wait and ssh2 report socket errors; this keeps a late one from crashing the process.
+const ignoreSocketError = () => {}
 
+// The scope destroys the socket on every path, also when ssh2 refuses the login before taking it.
+const openedSocket = (host: string, port: number) =>
+  Effect.acquireRelease(
+    Effect.sync(() => connect({ host, port }).on('error', ignoreSocketError)),
+    (socket) => Effect.sync(() => socket.destroy()),
+  )
+
+const socketConnecting = (socket: Socket, connectTimeoutMs: number) =>
+  Effect.callback<Socket, ConnectFailed>((resume) => {
     const timer = setTimeout(() => {
-      socket.destroy()
       resume(Effect.fail(new ConnectFailed({ reason: 'timedOut' })))
     }, connectTimeoutMs)
 
@@ -272,7 +280,6 @@ const tcpConnection = (host: string, port: number, connectTimeoutMs: number) =>
 
     socket.once('error', onError)
     socket.once('connect', () => {
-      connected = true
       clearTimeout(timer)
       socket.removeListener('error', onError)
       resume(Effect.succeed(socket))
@@ -280,12 +287,12 @@ const tcpConnection = (host: string, port: number, connectTimeoutMs: number) =>
 
     return Effect.sync(() => {
       clearTimeout(timer)
-
-      if (!connected) {
-        socket.destroy()
-      }
+      socket.removeListener('error', onError)
     })
   })
+
+const tcpConnection = (host: string, port: number, connectTimeoutMs: number) =>
+  Effect.flatMap(openedSocket(host, port), (socket) => socketConnecting(socket, connectTimeoutMs))
 
 const sshSession = <A>(socket: Socket, login: SftpLogin, timeoutMs: number, use: SftpUse<A>) =>
   Effect.callback<A, ChannelUnreachable>((resume) => {
