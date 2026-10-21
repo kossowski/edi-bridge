@@ -624,6 +624,7 @@ export {
 } from './trading-partner-health'
 
 export {
+  channelProblemReasons,
   endWaitingForTradingPartnerRunEndpoint,
   type ErrorPosition,
   errorPositionSchema,

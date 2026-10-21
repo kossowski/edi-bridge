@@ -538,8 +538,7 @@ const rejectedLogin = seedChannels.find(
     type === 'sftp' && direction === 'outbound' && tradingPartnerId === awaitingContrl?.id,
 )
 
-// A mismatching host key, a blocked address and a rejected passphrase follow from the Channel,
-// never from this list.
+// Channel problems follow from the Channel, never from this list.
 export type ConnectionFailure = Exclude<
   ChannelTestResultReason,
   'hostKeyMismatch' | 'addressBlocked' | 'passphraseRejected'

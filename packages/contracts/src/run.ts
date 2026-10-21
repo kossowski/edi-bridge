@@ -45,7 +45,7 @@ export const fixerSchema = z.enum(fixers)
 
 export type Fixer = z.infer<typeof fixerSchema>
 
-const channelProblemReasons: ReadonlySet<ProblemReason> = new Set([
+export const channelProblemReasons: ReadonlySet<ProblemReason> = new Set([
   'hostKeyMismatch',
   'addressBlocked',
   'passphraseRejected',

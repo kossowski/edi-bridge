@@ -1,4 +1,5 @@
 import {
+  channelProblemReasons,
   type Fixer,
   type FixTarget,
   type MappingVersionSummary,
@@ -139,9 +140,7 @@ function fixTargetOf(
     }
 
     case 'you': {
-      return reason === 'hostKeyMismatch' ||
-        reason === 'addressBlocked' ||
-        reason === 'passphraseRejected'
+      return channelProblemReasons.has(reason)
         ? destinationChannelTarget(run, sources)
         : brokenPieceTarget(run, broken, mapping, sources)
     }
