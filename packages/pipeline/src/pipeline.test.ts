@@ -67,6 +67,7 @@ import { type Database, type Delivery, Documents, type RunQueue } from './servic
 import {
   addContrlFlow,
   addOrdersFlow,
+  breakingDatabase,
   defectReportsIn,
   defectReportsOf,
   deliverOverSftp,
@@ -79,6 +80,7 @@ import {
   pipelineServices,
   readRun,
   receiveOverSftp,
+  recordingDefectReporter,
   liveStatusesOf,
   testLiveEvents,
   seedInvoiceWorkspace,
@@ -693,6 +695,64 @@ describe('the sweep of received Runs', () => {
     const { runId } = await receiveInvoice(goldenInvoice, inMemoryRunQueue({ failures: 1 }))
 
     await sweep(inMemoryRunQueue({ failures: 1 }), '20 millis', runId)
+  })
+
+  it('reports a defect that stops a step of the sweep to error monitoring', async () => {
+    const defects = recordingDefectReporter()
+
+    const sweeping = Effect.runFork(
+      sweepRunsEvery({ interval: '1 hour', stuckAfter: '10 minutes' }).pipe(
+        Effect.provideService(DefectReporter, defects.service),
+        pipelineServices(breakingDatabase(connection.db, 'select'), inMemoryRunQueue()),
+      ),
+    )
+
+    try {
+      await vi.waitFor(
+        () => {
+          expect(defects.reported).not.toEqual([])
+        },
+        { timeout: 2000, interval: 20 },
+      )
+    } finally {
+      await Effect.runPromise(Fiber.interrupt(sweeping))
+    }
+
+    for (const report of defects.reported) {
+      expect(report).toMatchObject({
+        workspaceId: null,
+        runId: null,
+        tradingPartnerId: null,
+        channelId: null,
+        code: 'sweepDefect',
+      })
+    }
+  })
+
+  it('reports no queue it could not reach to error monitoring', async () => {
+    const defects = recordingDefectReporter()
+    const queue = inMemoryRunQueue({ failures: 1 })
+    const { runId } = await receiveInvoice(goldenInvoice, inMemoryRunQueue({ failures: 1 }))
+
+    const sweeping = Effect.runFork(
+      sweepRunsEvery({ interval: '20 millis', stuckAfter: '10 minutes' }).pipe(
+        Effect.provideService(DefectReporter, defects.service),
+        pipelineServices(connection.db, queue),
+      ),
+    )
+
+    try {
+      await vi.waitFor(
+        () => {
+          expect(queue.queued).toContainEqual({ workspaceId: workspace.id, runId })
+        },
+        { timeout: 2000, interval: 20 },
+      )
+    } finally {
+      await Effect.runPromise(Fiber.interrupt(sweeping))
+    }
+
+    expect(defects.reported).toEqual([])
   })
 })
 

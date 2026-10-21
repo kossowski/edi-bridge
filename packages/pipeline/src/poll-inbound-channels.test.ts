@@ -18,9 +18,16 @@ import {
 import { channels, connect, type Connection, documents, runs, workspaces } from '@edi-bridge/db'
 import { startTestDatabase, type TestDatabase } from '@edi-bridge/db/testing'
 
-import { Download, type DownloadService, pollInboundChannels, processRun } from './index'
+import {
+  DefectReporter,
+  Download,
+  type DownloadService,
+  pollInboundChannels,
+  processRun,
+} from './index'
 import {
   addOrdersFlow,
+  breakingDatabase,
   defectReportsIn,
   golden,
   goldenInvoice,
@@ -30,6 +37,7 @@ import {
   pipelineServices,
   readRun,
   receiveOverSftp,
+  recordingDefectReporter,
   seedInvoiceWorkspace,
   testSecrets,
 } from './testing'
@@ -165,7 +173,11 @@ afterEach(async () => {
 
 type PollLog = { message: unknown; cause: Cause.Cause<unknown> }
 
-const startPolling = async (service: DownloadService = download, logs: PollLog[] = []) => {
+const startPolling = async (
+  service: DownloadService = download,
+  logs: PollLog[] = [],
+  { db = connection.db, defects = recordingDefectReporter() } = {},
+) => {
   const recording = recorded(service)
   const scope = await Effect.runPromise(Scope.make())
   const clock = await Effect.runPromise(TestClock.make().pipe(Scope.provide(scope)))
@@ -176,7 +188,8 @@ const startPolling = async (service: DownloadService = download, logs: PollLog[]
 
   const polling = Effect.runFork(
     pollInboundChannels().pipe(
-      pipelineServices(connection.db, inMemoryRunQueue()),
+      Effect.provideService(DefectReporter, defects.service),
+      pipelineServices(db, inMemoryRunQueue()),
       Effect.provideService(Download, recording.service),
       Effect.provideService(Clock.Clock, clock),
       Effect.provide(
@@ -849,5 +862,82 @@ describe('the polling of inbound SFTP Channels', () => {
     }, wait)
 
     expect(await pollProblemOf(box.channelId)).toMatchObject({ reason: null, since: null })
+  })
+
+  it('reports a defect of a poll to error monitoring with its Channel', async () => {
+    const box = await outbox()
+    const defects = recordingDefectReporter()
+
+    await startPolling(
+      failingWith(box.channelId, () => Effect.die(new Error('listing broke'))),
+      [],
+      { defects },
+    )
+
+    await vi.waitFor(() => {
+      expect(defects.reported).toEqual([
+        {
+          workspaceId: workspace.id,
+          runId: null,
+          tradingPartnerId: null,
+          channelId: box.channelId,
+          code: 'channelDefect',
+          cause: expect.objectContaining({ name: 'Error' }),
+        },
+      ])
+    }, wait)
+  })
+
+  it('reports no failed poll to error monitoring', async () => {
+    const box = await outbox()
+    const defects = recordingDefectReporter()
+
+    const polling = await startPolling(
+      failingWith(box.channelId, () => Effect.fail(new DownloadFailed({ reason: 'timedOut' }))),
+      [],
+      { defects },
+    )
+
+    await pollProblemStored(box.channelId, { reason: 'timedOut', since: polling.startedAt })
+
+    expect(defects.reported).toEqual([])
+  })
+
+  it('reports a poll problem it could not store as a defect of its Channel', async () => {
+    const box = await outbox()
+    const defects = recordingDefectReporter()
+
+    await startPolling(
+      failingWith(box.channelId, () => Effect.fail(new DownloadFailed({ reason: 'timedOut' }))),
+      [],
+      { db: breakingDatabase(connection.db, 'update'), defects },
+    )
+
+    await vi.waitFor(() => {
+      expect(defects.reported).toMatchObject([
+        { workspaceId: workspace.id, runId: null, channelId: box.channelId, code: 'channelDefect' },
+      ])
+    }, wait)
+  })
+})
+
+describe('the polling loop', () => {
+  it('reports a defect that stops a check of the Channels to error monitoring', async () => {
+    const defects = recordingDefectReporter()
+
+    await startPolling(download, [], { db: breakingDatabase(connection.db, 'select'), defects })
+
+    await vi.waitFor(() => {
+      expect(defects.reported).toEqual([
+        {
+          workspaceId: null,
+          runId: null,
+          tradingPartnerId: null,
+          channelId: null,
+          code: 'pollingDefect',
+          cause: expect.objectContaining({ name: 'Error' }),
+        },
+      ])
+    }, wait)
   })
 })
