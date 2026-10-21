@@ -1,7 +1,7 @@
 import { Context, Data, Effect } from 'effect'
 import { createHash } from 'node:crypto'
 import { connect, isIP, type LookupFunction, type Socket } from 'node:net'
-import { Client, type SFTPWrapper } from 'ssh2'
+import { Client, type ConnectConfig, type SFTPWrapper } from 'ssh2'
 import { Agent, buildConnector, fetch, type RequestInit } from 'undici'
 import { z } from 'zod'
 
@@ -13,7 +13,7 @@ import type {
 } from '@edi-bridge/contracts'
 
 import { type AddressPolicy, blockedAddressOf } from './address-guard'
-import { lockedKey } from './private-key'
+import { unlockedKey } from './private-key'
 
 export class ChannelUnreachable extends Data.TaggedError('ChannelUnreachable')<{
   readonly reason: ChannelTestFailureReason
@@ -223,6 +223,23 @@ const statAndOpenDirectory = (
   })
 }
 
+type SshAuthentication = Pick<ConnectConfig, 'password' | 'authHandler'>
+
+const sshAuthentication = ({
+  username,
+  credential,
+}: SftpLogin): Effect.Effect<SshAuthentication, ChannelUnreachable> => {
+  if ('password' in credential) {
+    return Effect.succeed({ password: credential.password })
+  }
+
+  const unlocked = unlockedKey(credential)
+
+  return 'reason' in unlocked
+    ? Effect.fail(unreachable(unlocked.reason))
+    : Effect.succeed({ authHandler: [{ type: 'publickey', username, key: unlocked.key }] })
+}
+
 export type SftpUse<A> = (
   sftp: SFTPWrapper,
   done: (outcome: Effect.Effect<A, ChannelUnreachable>) => void,
@@ -236,15 +253,15 @@ export const sftpSession = <A>(
   use: SftpUse<A>,
 ) =>
   Effect.flatMap(connectAddresses(login.host, addressPolicy), (addresses) =>
-    lockedKey(login.credential)
-      ? Effect.fail(unreachable('passphraseRejected'))
-      : firstConnecting(addresses, timeoutMs, (address, connectTimeoutMs) =>
-          Effect.scoped(
-            Effect.flatMap(tcpConnection(address, login.port, connectTimeoutMs), (socket) =>
-              sshSession(socket, login, timeoutMs, use),
-            ),
+    Effect.flatMap(sshAuthentication(login), (authentication) =>
+      firstConnecting(addresses, timeoutMs, (address, connectTimeoutMs) =>
+        Effect.scoped(
+          Effect.flatMap(tcpConnection(address, login.port, connectTimeoutMs), (socket) =>
+            sshSession(socket, login, authentication, timeoutMs, use),
           ),
         ),
+      ),
+    ),
   )
 
 // The connect wait and ssh2 report socket errors; this keeps a late one from crashing the process.
@@ -284,7 +301,13 @@ const socketConnecting = (socket: Socket, connectTimeoutMs: number) =>
 const tcpConnection = (host: string, port: number, connectTimeoutMs: number) =>
   Effect.flatMap(openedSocket(host, port), (socket) => socketConnecting(socket, connectTimeoutMs))
 
-const sshSession = <A>(socket: Socket, login: SftpLogin, timeoutMs: number, use: SftpUse<A>) =>
+const sshSession = <A>(
+  socket: Socket,
+  login: SftpLogin,
+  authentication: SshAuthentication,
+  timeoutMs: number,
+  use: SftpUse<A>,
+) =>
   Effect.callback<A, ChannelUnreachable>((resume) => {
     const client = new Client()
     let settled = false
@@ -332,23 +355,18 @@ const sshSession = <A>(socket: Socket, login: SftpLogin, timeoutMs: number, use:
       })
     })
 
-    try {
-      client.connect({
-        sock: socket,
-        username: login.username,
-        readyTimeout: timeoutMs,
-        hostVerifier: (key: Buffer) => {
-          const fingerprint = fingerprintOf(key)
-          hostKey = { fingerprint, state: hostKeyState(fingerprint, login.hostKeyFingerprint) }
+    client.connect({
+      sock: socket,
+      username: login.username,
+      readyTimeout: timeoutMs,
+      hostVerifier: (key: Buffer) => {
+        const fingerprint = fingerprintOf(key)
+        hostKey = { fingerprint, state: hostKeyState(fingerprint, login.hostKeyFingerprint) }
 
-          return hostKey.state !== 'mismatch'
-        },
-        ...login.credential,
-      })
-    } catch {
-      // ssh2 parses the key before the handshake; an encrypted one was checked before connecting.
-      fail('loginRejected')
-    }
+        return hostKey.state !== 'mismatch'
+      },
+      ...authentication,
+    })
 
     return Effect.sync(() => {
       settled = true

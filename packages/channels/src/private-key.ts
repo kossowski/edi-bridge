@@ -1,6 +1,6 @@
 import ssh2 from 'ssh2'
 
-import type { SftpCredential } from './channel-reach'
+import type { ParsedKey } from 'ssh2'
 
 const opensshKey = /-----BEGIN OPENSSH PRIVATE KEY-----([\s\S]+?)-----END OPENSSH PRIVATE KEY-----/
 
@@ -31,19 +31,26 @@ const encryptedKey = (privateKey: string) => {
 const probe = Buffer.from('edi-bridge key probe')
 
 // A wrong passphrase can decrypt a legacy PEM key into another key ssh2 still parses.
-const unlocksKey = (privateKey: string, passphrase: string | undefined) => {
-  const key = ssh2.utils.parseKey(privateKey, passphrase)
-
-  if (key instanceof Error) {
-    return false
-  }
-
+const signsAndVerifies = (key: ParsedKey) => {
   const signature = key.sign(probe)
 
   return !(signature instanceof Error) && key.verify(probe, signature) === true
 }
 
-export const lockedKey = (credential: SftpCredential) =>
-  'privateKey' in credential &&
-  encryptedKey(credential.privateKey) &&
-  !unlocksKey(credential.privateKey, credential.passphrase)
+// ssh2 runs the key derivation of an encrypted key at each parse, so a login parses it once.
+export const unlockedKey = ({
+  privateKey,
+  passphrase,
+}: {
+  privateKey: string
+  passphrase?: string
+}): { key: ParsedKey } | { reason: 'passphraseRejected' | 'loginRejected' } => {
+  const encrypted = encryptedKey(privateKey)
+  const key = ssh2.utils.parseKey(privateKey, passphrase)
+
+  if (key instanceof Error || (encrypted && !signsAndVerifies(key))) {
+    return { reason: encrypted ? 'passphraseRejected' : 'loginRejected' }
+  }
+
+  return key.isPrivateKey() ? { key } : { reason: 'loginRejected' }
+}

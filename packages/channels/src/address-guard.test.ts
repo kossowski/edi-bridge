@@ -1,7 +1,7 @@
 import { Effect } from 'effect'
 import { createServer as createHttpServer } from 'node:http'
 import { connect, createServer as createTcpServer, type Socket } from 'node:net'
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 import {
   addressPolicy,
@@ -430,7 +430,7 @@ describe('channelReach tries the checked addresses in order', () => {
     }
   })
 
-  it('closes the connection when the private key cannot be parsed', async () => {
+  it('opens no connection when the private key cannot be parsed', async () => {
     const forwarder = await startSftpForwarder()
     const { resolve } = countingLookups('sftp.partner.test', '127.0.0.1')
 
@@ -443,9 +443,7 @@ describe('channelReach tries the checked addresses in order', () => {
           }),
         ),
       ).toMatchObject({ reason: 'loginRejected' })
-      await vi.waitFor(() => {
-        expect(forwarder.connections.map(({ destroyed }) => destroyed)).toEqual([true])
-      })
+      expect(forwarder.connections).toEqual([])
     } finally {
       forwarder.stop()
     }

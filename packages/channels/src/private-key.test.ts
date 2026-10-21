@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 
-import { lockedKey } from './private-key'
+import { unlockedKey } from './private-key'
 import { legacyPemKeyPair, sshKeyPair, wrongPassphrase } from './testing'
 
 const passphrase = 'edi-bridge-key-passphrase'
@@ -27,38 +27,57 @@ const ppkKey = (version: 2 | 3, keyType: string) =>
     `Private-MAC: ${randomBytes(version === 3 ? 32 : 20).toString('hex')}`,
   ].join('\n')
 
-describe('lockedKey', () => {
-  it('leaves a password to the login', () => {
-    expect(lockedKey({ password: wrongPassphrase })).toBe(false)
-  })
+const opened = (unlocked: ReturnType<typeof unlockedKey>) =>
+  'key' in unlocked && unlocked.key.isPrivateKey()
 
-  it('leaves an unencrypted key to the login', () => {
-    expect(lockedKey({ privateKey: sshKeyPair().private })).toBe(false)
+describe('unlockedKey', () => {
+  it('opens an unencrypted key', () => {
+    expect(opened(unlockedKey({ privateKey: sshKeyPair().private }))).toBe(true)
   })
 
   it('opens an OpenSSH key with its passphrase', () => {
-    expect(lockedKey({ privateKey: sshKeyPair(passphrase).private, passphrase })).toBe(false)
+    expect(opened(unlockedKey({ privateKey: sshKeyPair(passphrase).private, passphrase }))).toBe(
+      true,
+    )
   })
 
-  it('locks an OpenSSH key with a wrong passphrase', () => {
+  it('opens a legacy PEM key with its passphrase', () => {
     expect(
-      lockedKey({ privateKey: sshKeyPair(passphrase).private, passphrase: wrongPassphrase }),
+      opened(unlockedKey({ privateKey: legacyPemKeyPair(passphrase).private, passphrase })),
     ).toBe(true)
   })
 
-  it('locks a legacy PEM key without a passphrase', () => {
-    expect(lockedKey({ privateKey: legacyPemKeyPair(passphrase).private })).toBe(true)
+  it('rejects the passphrase of an OpenSSH key with a wrong passphrase', () => {
+    expect(
+      unlockedKey({ privateKey: sshKeyPair(passphrase).private, passphrase: wrongPassphrase }),
+    ).toEqual({ reason: 'passphraseRejected' })
   })
 
-  it('locks a PPK v2 RSA key that its passphrase does not decrypt', () => {
-    expect(lockedKey({ privateKey: ppkKey(2, 'ssh-rsa'), passphrase })).toBe(true)
+  it('rejects the passphrase of a legacy PEM key without a passphrase', () => {
+    expect(unlockedKey({ privateKey: legacyPemKeyPair(passphrase).private })).toEqual({
+      reason: 'passphraseRejected',
+    })
   })
 
-  it('leaves a PPK v2 Ed25519 key to the login, since ssh2 cannot read it', () => {
-    expect(lockedKey({ privateKey: ppkKey(2, 'ssh-ed25519'), passphrase })).toBe(false)
+  it('rejects the passphrase of a PPK v2 RSA key that its passphrase does not decrypt', () => {
+    expect(unlockedKey({ privateKey: ppkKey(2, 'ssh-rsa'), passphrase })).toEqual({
+      reason: 'passphraseRejected',
+    })
   })
 
-  it('leaves a PPK v3 key to the login, since ssh2 cannot read it', () => {
-    expect(lockedKey({ privateKey: ppkKey(3, 'ssh-rsa'), passphrase })).toBe(false)
+  it('rejects the login of a PPK v2 Ed25519 key, since ssh2 cannot read it', () => {
+    expect(unlockedKey({ privateKey: ppkKey(2, 'ssh-ed25519'), passphrase })).toEqual({
+      reason: 'loginRejected',
+    })
+  })
+
+  it('rejects the login of a PPK v3 key, since ssh2 cannot read it', () => {
+    expect(unlockedKey({ privateKey: ppkKey(3, 'ssh-rsa'), passphrase })).toEqual({
+      reason: 'loginRejected',
+    })
+  })
+
+  it('rejects the login of a public key', () => {
+    expect(unlockedKey({ privateKey: sshKeyPair().public })).toEqual({ reason: 'loginRejected' })
   })
 })
