@@ -118,6 +118,7 @@ describe('POST /channels', () => {
       id: channel.id,
       credential: { lastFour: null },
       hostKeyFingerprint: null,
+      pollProblem: null,
     })
     expect(webhookToken).toBeNull()
 
@@ -236,7 +237,29 @@ describe('an outbound SFTP Channel', () => {
     })
 
     expect(channel).not.toHaveProperty('pollingIntervalMinutes')
+    expect(channel).not.toHaveProperty('pollProblem')
     expect(channel).toMatchObject({ direction: 'outbound', remotePath: '/inbox' })
+  })
+})
+
+describe('the poll problem of an inbound SFTP Channel', () => {
+  it('is returned with the time of its first failure in the Channel and the Channel list', async () => {
+    const { channel } = await created(sftpInbox)
+
+    await api.connection.db
+      .update(channels)
+      .set({
+        pollProblemReason: 'hostKeyMismatch',
+        pollProblemSince: new Date('2026-10-20T07:15:00.000Z'),
+      })
+      .where(eq(channels.id, channel.id))
+
+    const pollProblem = { reason: 'hostKeyMismatch', since: '2026-10-20T07:15:00.000Z' }
+
+    expect(channelEndpoint.response.parse((await get(channel.id)).json())).toMatchObject({
+      pollProblem,
+    })
+    expect(channelsEndpoint.response.parse((await list()).json())).toMatchObject([{ pollProblem }])
   })
 })
 
@@ -400,6 +423,7 @@ describe('PUT /channels/:id', () => {
       id: channel.id,
       credential: { lastFour: null },
       hostKeyFingerprint: null,
+      pollProblem: null,
     })
     expect(channelEndpoint.response.parse((await get(channel.id)).json())).toEqual(response.json())
 

@@ -247,7 +247,7 @@ export const channelSchema = channelUnion(z.strictObject, {
   pollingInterval: pollingIntervalSchema,
   webhook: { url: z.url(), token: maskedSecretSchema },
   authorization: maskedSecretSchema.nullable(),
-  polling: { pollProblem: pollProblemSchema.nullable().optional() },
+  polling: { pollProblem: pollProblemSchema.nullable() },
 })
 
 export type Channel = z.infer<typeof channelSchema>
