@@ -1,6 +1,8 @@
 import { Context, Data, Effect } from 'effect'
 import { createHash } from 'node:crypto'
+import { isIP, type LookupFunction } from 'node:net'
 import { Client, type SFTPWrapper } from 'ssh2'
+import { Agent, fetch, type RequestInit } from 'undici'
 import { z } from 'zod'
 
 import type {
@@ -10,9 +12,12 @@ import type {
   TestedHostKey,
 } from '@edi-bridge/contracts'
 
+import { type AddressPolicy, blockedAddressOf } from './address-guard'
+
 export class ChannelUnreachable extends Data.TaggedError('ChannelUnreachable')<{
   readonly reason: ChannelTestFailureReason
   readonly hostKey?: TestedHostKey
+  readonly blockedAddress?: string
 }> {}
 
 export type SftpCredential = { password: string } | { privateKey: string }
@@ -62,6 +67,42 @@ const networkReason = (code: string | undefined): ChannelTestFailureReason | und
   }
 
   return unreachableHostCodes.has(code) ? 'hostUnreachable' : undefined
+}
+
+const lookupFailureReasonSchema = z
+  .object({ code: z.string() })
+  .transform(({ code }) => networkReason(code) ?? 'hostUnreachable')
+  .catch('hostUnreachable')
+
+const resolvedAddresses = (host: string, { resolve }: AddressPolicy) =>
+  Effect.tryPromise({
+    try: () => resolve(host),
+    catch: (error) => unreachable(lookupFailureReasonSchema.parse(error)),
+  })
+
+// Connecting to the checked address, not the host name, keeps a second lookup from rebinding it.
+const connectAddress = (
+  host: string,
+  addressPolicy: AddressPolicy | undefined,
+): Effect.Effect<string, ChannelUnreachable> =>
+  addressPolicy === undefined
+    ? Effect.succeed(host)
+    : Effect.flatMap(resolvedAddresses(host, addressPolicy), (addresses) => {
+        const blockedAddress = blockedAddressOf(addressPolicy, host, addresses)
+        const [address] = addresses
+
+        if (blockedAddress !== undefined) {
+          return Effect.fail(new ChannelUnreachable({ reason: 'addressBlocked', blockedAddress }))
+        }
+
+        return address === undefined
+          ? Effect.fail(unreachable('hostUnreachable'))
+          : Effect.succeed(address)
+      })
+
+export interface ConnectOptions {
+  timeoutMs: number
+  addressPolicy?: AddressPolicy | undefined
 }
 
 const sshLevelSchema = z.enum([
@@ -158,12 +199,22 @@ const statAndOpenDirectory = (
 // Unchecked without a fingerprint, so Channels set up before host key checks keep working.
 export const sftpSession = <A>(
   login: SftpLogin,
-  timeoutMs: number,
+  { timeoutMs, addressPolicy }: ConnectOptions,
   use: (
     sftp: SFTPWrapper,
     done: (outcome: Effect.Effect<A, ChannelUnreachable>) => void,
     hostKey: TestedHostKey,
   ) => void,
+) =>
+  Effect.flatMap(connectAddress(login.host, addressPolicy), (host) =>
+    sshSession(host, login, timeoutMs, use),
+  )
+
+const sshSession = <A>(
+  host: string,
+  login: SftpLogin,
+  timeoutMs: number,
+  use: Parameters<typeof sftpSession<A>>[2],
 ) =>
   Effect.callback<A, ChannelUnreachable>((resume) => {
     const client = new Client()
@@ -214,7 +265,7 @@ export const sftpSession = <A>(
 
     try {
       client.connect({
-        host: login.host,
+        host,
         port: login.port,
         username: login.username,
         readyTimeout: timeoutMs,
@@ -236,8 +287,8 @@ export const sftpSession = <A>(
     })
   })
 
-const reachSftp = (login: SftpLogin, timeoutMs: number) =>
-  sftpSession<TestedHostKey>(login, timeoutMs, (sftp, done, hostKey) => {
+const reachSftp = (login: SftpLogin, options: ConnectOptions) =>
+  sftpSession<TestedHostKey>(login, options, (sftp, done, hostKey) => {
     statAndOpenDirectory(sftp, login.remotePath, (outcome) => {
       done(Effect.as(outcome, hostKey))
     })
@@ -254,18 +305,62 @@ export const fetchFailureReasonSchema = z
   .transform(({ cause }) => networkReason(cause.code) ?? 'unexpectedResponse')
   .catch('unexpectedResponse')
 
-// HEAD sends no Document; an endpoint that only accepts POST still answers it.
-const reachHttp = ({ url, authorization }: HttpDestination) =>
+const pinnedLookup =
+  (address: string): LookupFunction =>
+  (_hostname, options, callback) => {
+    if (options.all) {
+      callback(null, [{ address, family: isIP(address) }])
+    } else {
+      callback(null, address, isIP(address))
+    }
+  }
+
+const requesting = (url: string, init: RequestInit, dispatcher?: Agent) =>
   Effect.tryPromise({
-    try: (signal) =>
-      fetch(url, {
-        method: 'HEAD',
+    try: async (signal) => {
+      const response = await fetch(url, {
+        ...init,
         redirect: 'manual',
-        headers: authorization === null ? {} : { authorization },
         signal,
-      }),
+        ...(dispatcher && { dispatcher }),
+      })
+
+      // An unread body holds its keep-alive connection until garbage collection.
+      await response.body?.cancel()
+
+      return response
+    },
     catch: (error) => unreachable(fetchFailureReasonSchema.parse(error)),
-  }).pipe(
+  })
+
+// The URL keeps its host name, so TLS still checks the certificate against it.
+export const httpRequest = (
+  url: string,
+  init: RequestInit,
+  addressPolicy: AddressPolicy | undefined,
+) => {
+  const host = URL.parse(url)?.hostname.replace(/^\[(.*)\]$/, '$1')
+
+  if (addressPolicy === undefined || host === undefined) {
+    return requesting(url, init)
+  }
+
+  return Effect.flatMap(connectAddress(host, addressPolicy), (address) =>
+    Effect.acquireUseRelease(
+      Effect.sync(() => new Agent({ connect: { lookup: pinnedLookup(address) } })),
+      (agent) => requesting(url, init, agent),
+      (agent) => Effect.promise(() => agent.destroy()),
+    ),
+  )
+}
+
+// HEAD sends no Document; an endpoint that only accepts POST still answers it.
+const reachHttp = ({ url, authorization }: HttpDestination, addressPolicy?: AddressPolicy) =>
+  httpRequest(
+    url,
+    { method: 'HEAD', headers: authorization === null ? {} : { authorization } },
+    addressPolicy,
+  ).pipe(
     Effect.flatMap((response) => {
       const reason = httpStatusReason(response.status)
 
@@ -279,8 +374,10 @@ export const timingOut = <A>(effect: Effect.Effect<A, ChannelUnreachable>, timeo
     orElse: () => Effect.fail(unreachable('timedOut')),
   })
 
-export const channelReach = ({ timeoutMs }: { timeoutMs: number }) =>
+// Without an address policy a Channel may reach any address.
+export const channelReach = (options: ConnectOptions) =>
   ChannelReach.of({
-    sftp: (login) => timingOut(reachSftp(login, timeoutMs), timeoutMs),
-    http: (destination) => timingOut(reachHttp(destination), timeoutMs),
+    sftp: (login) => timingOut(reachSftp(login, options), options.timeoutMs),
+    http: (destination) =>
+      timingOut(reachHttp(destination, options.addressPolicy), options.timeoutMs),
   })

@@ -1,7 +1,10 @@
+export { type AddressPolicy, addressPolicy, type HostResolver } from './address-guard'
+
 export {
   ChannelReach,
   channelReach,
   ChannelUnreachable,
+  type ConnectOptions,
   type HttpDestination,
   type SftpCredential,
   type SftpLogin,
