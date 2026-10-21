@@ -1944,7 +1944,7 @@
       "since": "Seit <time>{since}</time>. EDI Bridge versucht es {minutes, plural, one {jede Minute} other {alle # Minuten}} erneut. Dieser Hinweis verschwindet nach der nächsten erfolgreichen Abfrage.",
       "listSince": "Abfrage fehlgeschlagen seit <time>{since}</time>",
       "fix": {
-        "hostKey": "Neuen Serverschlüssel prüfen und übernehmen",
+        "hostKey": "Verbindung testen, dann neuen Schlüssel übernehmen",
         "credentials": "Anmeldedaten ändern",
         "settings": "Verbindungseinstellungen prüfen"
       },

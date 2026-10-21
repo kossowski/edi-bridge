@@ -102,7 +102,7 @@ export const PollProblemHostKeyMismatch = meta.story({
       problem.getByText(/This notice clears after the next successful poll\.$/),
     ).toBeVisible()
     await expect(
-      problem.getByRole('link', { name: 'Check and accept the new key' }),
+      problem.getByRole('link', { name: 'Test the connection, then accept the new key' }),
     ).toHaveAttribute('href', `/channels/${pollFailedInbox.id}#channel-host-key`)
 
     const section = hostKeySection(canvasElement)
@@ -162,7 +162,7 @@ export const PollProblemGerman = meta.story({
     ).toBeVisible()
     await expect(canvas.getByText('14.10.2026, 08:42')).toBeVisible()
     await expect(
-      canvas.getByRole('link', { name: 'Neuen Serverschlüssel prüfen und übernehmen' }),
+      canvas.getByRole('link', { name: 'Verbindung testen, dann neuen Schlüssel übernehmen' }),
     ).toBeVisible()
   },
 })
@@ -176,7 +176,7 @@ export const PollProblemDark = meta.story({
   },
   async play({ canvas }) {
     await expect(
-      await canvas.findByRole('link', { name: 'Check and accept the new key' }),
+      await canvas.findByRole('link', { name: 'Test the connection, then accept the new key' }),
     ).toBeVisible()
   },
 })
@@ -471,7 +471,9 @@ export const ViewerPollProblem = meta.story({
         await canvas.findByRole('heading', { level: 2, name: 'Polling failed' }),
       ).toBeVisible()
       await expect(canvas.getByText('An Admin can fix the connection.')).toBeVisible()
-      await expect(canvas.queryByRole('link', { name: 'Check and accept the new key' })).toBeNull()
+      await expect(
+        canvas.queryByRole('link', { name: 'Test the connection, then accept the new key' }),
+      ).toBeNull()
     },
   }),
 })

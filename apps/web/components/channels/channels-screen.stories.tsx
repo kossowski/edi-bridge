@@ -39,10 +39,9 @@ export const PollProblem = meta.story({
 
     await expect(row.getByText(/^Polling failed since/)).toBeVisible()
     await expect(row.getByText('The server showed a different key.')).toBeVisible()
-    await expect(row.getByRole('link', { name: 'Check and accept the new key' })).toHaveAttribute(
-      'href',
-      `/channels/${pollFailedInbox.id}#channel-host-key`,
-    )
+    await expect(
+      row.getByRole('link', { name: 'Test the connection, then accept the new key' }),
+    ).toHaveAttribute('href', `/channels/${pollFailedInbox.id}#channel-host-key`)
     await expect(canvas.getAllByText(/^Polling failed since/)).toHaveLength(1)
   },
 })
@@ -127,7 +126,9 @@ export const Viewer = meta.story({
       await expect(await canvas.findByRole('link', { name: 'ERP webhook' })).toBeVisible()
       await expect(canvas.queryByRole('link', { name: 'New connection' })).toBeNull()
       await expect(canvas.getByText(/^Polling failed since/)).toBeVisible()
-      await expect(canvas.queryByRole('link', { name: 'Check and accept the new key' })).toBeNull()
+      await expect(
+        canvas.queryByRole('link', { name: 'Test the connection, then accept the new key' }),
+      ).toBeNull()
     },
   }),
 })
