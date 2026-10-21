@@ -863,12 +863,13 @@ describe('the passphrase of an SFTP private key', () => {
   it('fails the Channel test with passphraseRejected when it is wrong or missing', async () => {
     const missing: ChannelRecord = { ...keyInput, id: crypto.randomUUID() }
     server.use(...channelHandlers(apiUrl, { channels: [wrongPassphraseChannel, missing] }))
+    const anyTime: unknown = expect.any(String)
 
     for (const { id } of [wrongPassphraseChannel, missing]) {
       expect(await testChannel(id)).toEqual({
         outcome: 'failed',
         reason: 'passphraseRejected',
-        testedAt: expect.any(String),
+        testedAt: anyTime,
         hostKey: null,
       })
     }
