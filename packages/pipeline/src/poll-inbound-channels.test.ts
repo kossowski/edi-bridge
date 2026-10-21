@@ -888,6 +888,72 @@ describe('the polling of inbound SFTP Channels', () => {
     }, wait)
   })
 
+  it('reports a defect while receiving a file to error monitoring with its Channel', async () => {
+    const box = await outbox({ 'orders.edi': threeOrders })
+    const defects = recordingDefectReporter()
+
+    const polling = await startPolling(
+      { ...download, read: () => Effect.die(new Error('reading broke')) },
+      [],
+      { defects },
+    )
+
+    await polling.pollAgain(box.channelId)
+    await vi.waitFor(() => {
+      expect(defects.reported).toEqual([
+        {
+          workspaceId: workspace.id,
+          runId: null,
+          tradingPartnerId: null,
+          channelId: box.channelId,
+          code: 'channelDefect',
+          cause: expect.objectContaining({ name: 'Error' }),
+        },
+      ])
+    }, wait)
+  })
+
+  it('reports a defect while removing a stored file to error monitoring with its Channel', async () => {
+    const box = await outbox({ 'orders.edi': threeOrders })
+    const defects = recordingDefectReporter()
+    let removals = 0
+
+    const polling = await startPolling(
+      {
+        ...download,
+        remove: () =>
+          Effect.suspend(() => {
+            removals += 1
+
+            return removals === 1
+              ? Effect.fail(new DownloadFailed({ reason: 'timedOut' }))
+              : Effect.die(new Error('removing broke'))
+          }),
+      },
+      [],
+      { defects },
+    )
+
+    await polling.pollAgain(box.channelId)
+    await polling.polledOnceMore(box.channelId, 3)
+    await vi.waitFor(() => {
+      expect(removals).toBeGreaterThanOrEqual(2)
+      expect(defects.reported).not.toEqual([])
+    }, wait)
+
+    // Each later poll tries the removal again, and each attempt is a defect of its own.
+    expect(defects.reported).toEqual(
+      defects.reported.map(() =>
+        expect.objectContaining({
+          workspaceId: workspace.id,
+          runId: null,
+          channelId: box.channelId,
+          code: 'channelDefect',
+        }),
+      ),
+    )
+  })
+
   it('reports no failed poll to error monitoring', async () => {
     const box = await outbox()
     const defects = recordingDefectReporter()
