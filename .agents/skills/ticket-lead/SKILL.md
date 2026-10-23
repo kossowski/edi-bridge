@@ -164,6 +164,8 @@ bash .agents/skills/ticket-lead/scripts/stack-status.sh <NN>
 
 The report goes out when it prints `ready for /land`. Otherwise fix what it lists first.
 
+Before you write the report, go through your own Open list. Fix in the stack every item that is a bug, a security or privacy gap, or a trivial fix inside the stack's scope, as in steps 3b to 3e. Only items outside the stack's scope stay Open.
+
 When an engineering lead started you, write the report into its inbox as `report` and end your turn. It answers what is open and tells you when to land by prompting `/land <NN>` into your session.
 
 ```markdown

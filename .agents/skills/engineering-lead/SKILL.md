@@ -87,6 +87,8 @@ Landing moves `main`, and every other ready stack then has to catch up, so stack
 herdr agent prompt ticket-<NN> "/land <NN>"
 ```
 
+The prompt is the literal text `/land <NN>` and nothing else. The permission classifier blocks a paraphrase such as "accepted, run /land".
+
 Its report arrives in the inbox. On "landed": write the PRs and the new `main` commit into the state file, and close the tab with `herdr tab close <tab id>`. The bottom PR closed the ticket on GitHub. On "stopped at": a `BEHIND` or `DIRTY` stack gets the catch-up answer of step 4, a red CI goes back to the ticket lead to fix.
 
 After a landing, tell every other ready ticket lead "main moved to <commit>: run the catch-up step and report again", and wait for their new reports before landing the next one.
