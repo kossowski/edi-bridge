@@ -81,9 +81,11 @@ Start the next part as soon as the part below has its PR open and linked (step d
 
 ```bash
 git fetch origin
-git worktree add -b <branch> ../<repo>-worktrees/<NN>-<k> <parent>
+git worktree add --no-track -b <branch> ../<repo>-worktrees/<NN>-<k> <parent>
 pnpm -C ../<repo>-worktrees/<NN>-<k> install --frozen-lockfile
 ```
+
+`--no-track` keeps the branch from tracking its parent; the first push in step d sets its upstream to `origin/<branch>`.
 
 For a parallel part, `<parent>` here and in its brief is the branch of the part its `Starts from` names.
 
@@ -108,7 +110,7 @@ Skip the review and the browser check for a part that is **tiny** or **CI-only**
 - **Tiny**: at most 20 insertions plus deletions without the generated files, counted with the command in `docs/agents/checks.md`, and no new behaviour: no new branch, route, endpoint, message or test case.
 - **CI-only**: every changed file is a CI-only file of `docs/agents/checks.md`.
 
-Otherwise call the Skill tool with `code-review`, fixed point `<parent>`, in the worktree. If the part is a UI part, run a **browser-check subagent** in parallel that calls the Skill tool with `browser-check` against the worktree, starts its dev server through `.agents/skills/developer/scripts/test-slot.sh`, and keeps the screenshots in its own context. Give the blocking findings you accept to one fresh developer subagent in the same worktree. A non-blocking finding goes into the report under Open; pass it on with the blocking ones only when its fix is trivial and inside the part's scope.
+Otherwise call the Skill tool with `code-review`, fixed point `<parent>`, in the worktree. A second review of the same part names the commits that are new since the last review and points at the earlier findings, the last review's output or the fix brief, so the reviewers check the fixes instead of starting over. If the part is a UI part, run a **browser-check subagent** in parallel that calls the Skill tool with `browser-check` against the worktree, starts its dev server through `.agents/skills/developer/scripts/test-slot.sh`, and keeps the screenshots in its own context. Give the blocking findings you accept to one fresh developer subagent in the same worktree. A non-blocking finding goes into the report under Open; pass it on with the blocking ones only when its fix is trivial and inside the part's scope.
 
 **d. Open the PR and link the stack.**
 
@@ -122,6 +124,7 @@ gh pr create --base <parent branch name, `main` for part 1> --head <branch> \
 - Write the body with the `pr` skill into a file in your scratchpad. It starts with `Part <k> of <n> of #<NN>`. The body of part 1 also carries `Closes #<NN>`, so merging the stack closes the ticket.
 - Open the PR ready for review, not as a draft. `gh stack merge` does not merge drafts.
 - Write the PR number into the stack file.
+- Every later `git -C <worktree> push` goes to that upstream. Read its output in full and never pipe it through `tail` or a filter: a failed push that nobody sees leaves CI waiting for a commit that never reaches GitHub.
 
 From part 2 on, link every PR of the ticket so far, bottom to top:
 
@@ -137,7 +140,11 @@ The first call creates the stack on GitHub, later calls add the new PR to it. PR
 bash .agents/skills/ticket-lead/scripts/wait-for-ci.sh <PR> $(git -C <worktree> rev-parse HEAD)
 ```
 
-The commit makes the script wait until GitHub shows the push. Without it, the script can report the previous commit's CI. If CI fails, a fresh developer subagent fixes it in the worktree. Then `git -C <worktree> push`, and wait again. Parts already started above it follow as in _Fix a lower part_.
+The commit makes the script wait until GitHub shows the push. Without it, the script can report the previous commit's CI.
+
+Before you re-run a failed CI job, check `docs/agents/known-flakes.md`. A failure not listed there is real until a sub-agent shows that the same test fails on `main` at the same commit. A new flake gets a row there with its owner ticket; ask the lead, or the user, for the ticket number.
+
+If CI fails, a fresh developer subagent fixes it in the worktree. Then `git -C <worktree> push`, and wait again. Parts already started above it follow as in _Fix a lower part_.
 
 ### 4. Resolve the ticket
 
@@ -160,6 +167,8 @@ bash .agents/skills/ticket-lead/scripts/stack-status.sh <NN>
 ```
 
 The report goes out when it prints `ready for /land`. Otherwise fix what it lists first.
+
+Before you write the report, go through your own Open list. Fix in the stack every item that is a bug, a security or privacy gap, or a trivial fix inside the stack's scope, as in steps 3b to 3e. Only items outside the stack's scope stay Open.
 
 When an engineering lead started you, write the report into its inbox as `report` and end your turn. It answers what is open and tells you when to land by prompting `/land <NN>` into your session.
 

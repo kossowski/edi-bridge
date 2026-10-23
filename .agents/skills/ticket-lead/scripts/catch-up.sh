@@ -41,7 +41,7 @@ for i in "${!PARTS[@]}"; do
     fi
   fi
   if [[ $(git -C "$wt" rev-parse HEAD) != $(git -C "$wt" rev-parse "origin/$branch" 2>/dev/null) ]]; then
-    git -C "$wt" push --quiet --force-with-lease origin "$branch"
+    git -C "$wt" push -u --force-with-lease origin "$branch"
     echo "part $k: pushed $(git -C "$wt" rev-parse --short HEAD)"
   fi
 done

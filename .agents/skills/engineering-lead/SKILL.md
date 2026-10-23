@@ -31,6 +31,8 @@ Me: <session name> · User: <present | away, I decide product questions>
 ## Open for the user
 ```
 
+Edit it with a command that fails when the text to replace is absent, for example `python3` with `assert old in s` before `s.replace(old, new)`; a plain `sed -i` or `replace` that matches nothing changes nothing and says nothing, and left wrong rows in the table before. After a status change, re-read the row.
+
 After a reset or a pause, read it, then act on every message left in the inbox (step 4) before anything else. Restart the watch, and check each running ticket lead with `herdr agent read ticket-<NN> --source recent-unwrapped --lines 30`.
 
 ## Steps
@@ -67,7 +69,9 @@ A ticket lead writes each question and report as one file into the **inbox**, `~
 bash .agents/skills/engineering-lead/scripts/watch.sh
 ```
 
-It returns as soon as the inbox holds a message and prints each one, oldest first. It also returns when a ticket lead sits on a permission prompt, when the machine swaps, or after 90 minutes as a heartbeat. A `SendMessage` from a ticket lead is a nudge only: the message itself is in the inbox.
+It returns as soon as the inbox holds a message and prints each one, oldest first, with the age of the oldest; past 30 minutes it adds `STALE: <file> unanswered for <n> min` and shows a herdr notification. It also returns when a ticket lead starts to sit on a permission prompt (once per prompt, with a notification), when the machine swaps, or after 90 minutes as a heartbeat that lists every ticket lead's status. A `SendMessage` from a ticket lead is a nudge only: the message itself is in the inbox.
+
+Run `watch.sh` as it is, never inside a shell loop or behind a filter: in the Bash tool `grep` is a shell function that swallows exit codes, and a wrapped watch once left a ready report unread for 6 hours. After a restart or a compaction, check `ls ~/.agents/leads/inbox/` by hand first.
 
 Act on each message, then move its file to `~/.agents/leads/inbox/done/`. Answer a ticket lead with `herdr agent prompt ticket-<NN> "<answer>"`; it arrives as its next prompt. A message is one of:
 
@@ -86,6 +90,8 @@ Landing moves `main`, and every other ready stack then has to catch up, so stack
 ```bash
 herdr agent prompt ticket-<NN> "/land <NN>"
 ```
+
+The prompt is the literal text `/land <NN>` and nothing else. The permission classifier blocks a paraphrase such as "accepted, run /land".
 
 Its report arrives in the inbox. On "landed": write the PRs and the new `main` commit into the state file, and close the tab with `herdr tab close <tab id>`. The bottom PR closed the ticket on GitHub. On "stopped at": a `BEHIND` or `DIRTY` stack gets the catch-up answer of step 4, a red CI goes back to the ticket lead to fix.
 
