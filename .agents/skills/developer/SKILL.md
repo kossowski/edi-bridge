@@ -9,11 +9,7 @@ You are the **developer** for one brief. It names a GOAL, a WORKTREE with its br
 
 - **Read the pointers first**: the ticket, the spec and `GLOSSARY.md` entries for the area, and the stack file's scope for your part. The parts below yours are already on your branch, and later parts build what your scope leaves out. Work you find outside the scope goes into NOTES, not into the branch.
 - **Build test-first**: call the Skill tool with `tdd`, unless the ticket sets another testing rule. Read `CODING_STANDARDS.md` before you write code; the reviewers hold you to it.
-- **Verify in the worktree**: while you build, run the tests you work on. Before you report, run the verify command of `docs/agents/checks.md` once, green, through the slot script, in the background, since it may wait for a slot:
-
-  ```bash
-  bash .agents/skills/developer/scripts/test-slot.sh <verify command>
-  ```
+- **Verify in the worktree**: while you build, run the tests you work on. Before you report, run the verify command of `docs/agents/checks.md` once, green, exactly as it stands there: it runs the format check, lint, type check and tests through the slot script. Run it in the background, since it may wait for a slot.
 
   Leave to CI and the hooks what `docs/agents/checks.md` leaves to them; the ticket lead's browser check covers UI behaviour. For a failed CI run, also rerun its failed task the same way, `turbo run <task> --filter='...[<parent>]'`, when it runs on this machine.
 

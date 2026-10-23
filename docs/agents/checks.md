@@ -7,10 +7,10 @@ What the `developer`, `ticket-lead` and `browser-check` skills run, check and sk
 The developer runs it once before reporting, through the slot script:
 
 ```bash
-pnpm -C <worktree> turbo run check-types test --filter='...[<parent>]'
+bash .agents/skills/developer/scripts/test-slot.sh sh -c "pnpm -C <worktree> format:check && pnpm -C <worktree> turbo run lint check-types test --filter='...[<parent>]'"
 ```
 
-It type-checks and unit-tests the packages changed since `<parent>` and every package that depends on them. The `apps/api` and `packages/db` tests start Postgres with Testcontainers, so Docker must run.
+It checks the formatting of the whole worktree with `oxfmt --check`, then lints, type-checks and unit-tests the packages changed since `<parent>` and every package that depends on them. These are the checks of the CI `format` and `lint` jobs that a green local run otherwise misses. The `apps/api` and `packages/db` tests start Postgres with Testcontainers, so Docker must run.
 
 ## Left to CI and the hooks
 
