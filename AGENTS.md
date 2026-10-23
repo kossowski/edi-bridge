@@ -33,7 +33,7 @@ Read `CODING_STANDARDS.md` before writing or reviewing code.
 
 ### Checks
 
-What agents verify locally, leave to CI, and count as a UI or CI-only part. See `docs/agents/checks.md`; the agent scripts read this repo's values from `.agents/project.env`.
+What agents verify locally, leave to CI, and count as a UI or CI-only part. See `docs/agents/checks.md`; the agent scripts read this repo's values from `.agents/project.env`. CI failures known to be flaky, and what to do about each, are in `docs/agents/known-flakes.md`.
 
 ### Machine budget
 

@@ -140,7 +140,11 @@ The first call creates the stack on GitHub, later calls add the new PR to it. PR
 bash .agents/skills/ticket-lead/scripts/wait-for-ci.sh <PR> $(git -C <worktree> rev-parse HEAD)
 ```
 
-The commit makes the script wait until GitHub shows the push. Without it, the script can report the previous commit's CI. If CI fails, a fresh developer subagent fixes it in the worktree. Then `git -C <worktree> push`, and wait again. Parts already started above it follow as in _Fix a lower part_.
+The commit makes the script wait until GitHub shows the push. Without it, the script can report the previous commit's CI.
+
+Before you re-run a failed CI job, check `docs/agents/known-flakes.md`. A failure not listed there is real until a sub-agent shows that the same test fails on `main` at the same commit. A new flake gets a row there with its owner ticket; ask the lead, or the user, for the ticket number.
+
+If CI fails, a fresh developer subagent fixes it in the worktree. Then `git -C <worktree> push`, and wait again. Parts already started above it follow as in _Fix a lower part_.
 
 ### 4. Resolve the ticket
 
