@@ -81,9 +81,11 @@ Start the next part as soon as the part below has its PR open and linked (step d
 
 ```bash
 git fetch origin
-git worktree add -b <branch> ../<repo>-worktrees/<NN>-<k> <parent>
+git worktree add --no-track -b <branch> ../<repo>-worktrees/<NN>-<k> <parent>
 pnpm -C ../<repo>-worktrees/<NN>-<k> install --frozen-lockfile
 ```
+
+`--no-track` keeps the branch from tracking its parent; the first push in step d sets its upstream to `origin/<branch>`.
 
 For a parallel part, `<parent>` here and in its brief is the branch of the part its `Starts from` names.
 
@@ -122,6 +124,7 @@ gh pr create --base <parent branch name, `main` for part 1> --head <branch> \
 - Write the body with the `pr` skill into a file in your scratchpad. It starts with `Part <k> of <n> of #<NN>`. The body of part 1 also carries `Closes #<NN>`, so merging the stack closes the ticket.
 - Open the PR ready for review, not as a draft. `gh stack merge` does not merge drafts.
 - Write the PR number into the stack file.
+- Every later `git -C <worktree> push` goes to that upstream. Read its output in full and never pipe it through `tail` or a filter: a failed push that nobody sees leaves CI waiting for a commit that never reaches GitHub.
 
 From part 2 on, link every PR of the ticket so far, bottom to top:
 
