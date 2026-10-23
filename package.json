@@ -15,6 +15,7 @@
     "test:watch": "turbo run test:watch --concurrency=10",
     "test:e2e": "turbo run test:e2e",
     "test:agent-hooks": "node --test '.claude/hooks/*.test.mjs'",
+    "test:agent-scripts": "node --test '.agents/skills/*/scripts/__tests__/*.test.mjs'",
     "check:fast": "turbo run lint check-types test test:stories",
     "check": "turbo run lint check-types test test:stories test:canvas test:e2e build build-storybook --concurrency=1",
     "storybook": "turbo run storybook --concurrency=10",
