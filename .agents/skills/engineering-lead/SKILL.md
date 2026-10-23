@@ -31,6 +31,8 @@ Me: <session name> · User: <present | away, I decide product questions>
 ## Open for the user
 ```
 
+Edit it with a command that fails when the text to replace is absent, for example `python3` with `assert old in s` before `s.replace(old, new)`; a plain `sed -i` or `replace` that matches nothing changes nothing and says nothing, and left wrong rows in the table before. After a status change, re-read the row.
+
 After a reset or a pause, read it, then act on every message left in the inbox (step 4) before anything else. Restart the watch, and check each running ticket lead with `herdr agent read ticket-<NN> --source recent-unwrapped --lines 30`.
 
 ## Steps
